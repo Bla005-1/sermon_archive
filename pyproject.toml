@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "sermon-archive"
+version = "0.1.0"
+description = "Sermon Archive GUI (Django + HTMX) with single-user auth"
+readme = "README.md"
+package-mode = false
+packages = [{ include = "sermon_site" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+Django = "^5.0"
+django-axes = "^6.5"
+python-dotenv = "^1.0"
+markdown2 = "^2.5"
+gunicorn = "^23.0"
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.26"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

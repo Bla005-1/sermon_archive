@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Sermons{% endblock %}
+{% block content %}
+<form method='get' class='search' style='display:flex;gap:.5rem;align-items:center;'>
+  <input type='text' name='q' value='{{ q }}' placeholder='Search title'>
+  <button>Search</button>
+  <a href='{% url "sermon_create" %}'>New Sermon</a>
+</form>
+
+<ul class='list'>
+  {% for s in sermons %}
+    <li><a href='{% url "sermon_detail" s.pk %}'>
+      {{ s.preached_on }} — {{ s.title }} ({{ s.speaker_name }})
+    </a></li>
+  {% empty %}
+    <li>No sermons yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}
+

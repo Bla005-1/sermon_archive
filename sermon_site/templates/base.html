@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <title>{% block title %}Sermon Archive{% endblock %}</title>
+  <link rel='stylesheet' href='{% static "css/app.css" %}'>
+  <script src='https://unpkg.com/htmx.org@1.9.12'></script>
+</head>
+<body>
+  <header style='display:flex;gap:1rem;align-items:center;'>
+    <a href='{% url "sermon_list" %}'>Sermons</a>
+    <form method='post' action='{% url "logout" %}' style='margin-left:auto;'>
+      {% csrf_token %}<button>Logout</button>
+    </form>
+  </header>
+  <main style='max-width:900px;margin:2rem auto;padding:0 1rem;'>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
+

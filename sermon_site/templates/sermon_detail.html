@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}{{ sermon.title }}{% endblock %}
+{% block content %}
+<h1>{{ sermon.title }}</h1>
+<p><strong>Date:</strong> {{ sermon.preached_on }} |
+<strong>Speaker:</strong> {{ sermon.speaker_name }}</p>
+<p><a href='{% url "sermon_edit" sermon.pk %}'>Edit</a></p>
+
+<h3>Passages</h3>
+<div id='passage-tools'>
+  <input id='ref' type='text' placeholder='e.g., John 10:11-14' name='ref_text'>
+  <input id='context_note' type='text' placeholder='Context (optional)' name='context_note'>
+  <button
+    hx-post='{% url "passage_add" sermon.pk %}'
+    hx-include='#ref, #context_note'
+    hx-target='#passage-list'
+    hx-swap='outerHTML'>
+    + Add
+  </button>
+  <div id='preview'
+       hx-get='{% url "passage_preview" sermon.pk %}'
+       hx-trigger='keyup changed delay:300ms from:#ref'
+       hx-target='#preview'
+       hx-vals='js:{ref: document.getElementById("ref").value}'></div>
+</div>
+
+<div id='passage-list'>
+  {% include 'archive/_partials/passage_list.html' %}
+</div>
+
+<h3>Attachments</h3>
+<form
+  hx-post='{% url "attachment_upload" sermon.pk %}'
+  hx-encoding='multipart/form-data'
+  hx-target='#attachment-list'
+  hx-swap='outerHTML'>
+  <input type='file' name='attachment'>
+  <button>Upload</button>
+</form>
+<div id='attachment-list'>
+  {% include 'archive/_partials/attachment_list.html' %}
+</div>
+
+<h3>Notes</h3>
+<pre>{{ sermon.notes_md }}</pre>
+{% endblock %}
+

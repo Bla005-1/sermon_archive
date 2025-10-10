@@ -1,0 +1,17 @@
+<ul>
+  {% for att in sermon.attachments.all %}
+    <li>
+      {{ att.original_filename }} ({{ att.byte_size }} bytes)
+      <button
+        hx-get='{% url "attachment_delete" sermon.pk att.id %}'
+        hx-target='#attachment-list'
+        hx-swap='outerHTML'
+        hx-confirm='Delete this file?'>
+        Delete
+      </button>
+    </li>
+  {% empty %}
+    <li>No attachments yet.</li>
+  {% endfor %}
+</ul>
+

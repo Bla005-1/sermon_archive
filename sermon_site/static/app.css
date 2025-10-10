@@ -1,0 +1,7 @@
+body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+a{color:inherit}
+label{display:block;margin:.25rem 0}
+input,textarea,button{padding:.5rem;margin:.25rem 0}
+ul{list-style:disc;margin-left:1.25rem}
+.preview{padding:.5rem;background:#f6f6f6;border:1px solid #ddd;margin:.5rem 0}
+

@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}{% if sermon %}Edit{% else %}New{% endif %} Sermon{% endblock %}
+{% block content %}
+<h2>{% if sermon %}Edit{% else %}New{% endif %} Sermon</h2>
+<form method='post'>
+  {% csrf_token %}
+  <label>Date <input type='date' name='preached_on' value='{{ sermon.preached_on|date:"Y-m-d" }}'></label><br>
+  <label>Title <input type='text' name='title' value='{{ sermon.title }}' required></label><br>
+  <label>Speaker <input type='text' name='speaker_name' value='{{ sermon.speaker_name }}'></label><br>
+  <label>Series <input type='text' name='series_name' value='{{ sermon.series_name }}'></label><br>
+  <label>Location <input type='text' name='location_name' value='{{ sermon.location_name }}'></label><br>
+  <label>Notes<br>
+    <textarea name='notes_md' rows='10' cols='80'>{{ sermon.notes_md }}</textarea>
+  </label><br>
+  <button type='submit'>Save</button>
+</form>
+{% endblock %}
+
