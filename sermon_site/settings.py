@@ -17,13 +17,15 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(BASE_DIR.parent / '.env')
+load_dotenv(BASE_DIR / '.env')
 
 def _get_bool(name: str, default: bool = False) -> bool:
     val = os.getenv(name)
     if val is None:
         return default
     return val.lower() in {'1', 'true', 'yes', 'on'}
+
+SERMON_STORAGE_ROOT = os.getenv('SERMON_STORAGE_ROO', '.')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -34,7 +36,9 @@ SECRET_KEY = 'django-insecure-w32^hi_$xx#7+!3z@g_=_esqc+0p677(^rvc6!!tt=obc&4&0#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _get_bool('DJANGO_DEBUG', False)
 
-ALLOWED_HOSTS = []
+
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
 
 
 # Application definition
@@ -46,6 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'archive'
 ]
 
 MIDDLEWARE = [
