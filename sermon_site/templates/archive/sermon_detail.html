@@ -1,50 +1,57 @@
 {% extends 'base.html' %}
 {% block title %}{{ sermon.title }}{% endblock %}
 {% block content %}
-<div class="detail-header">
-  <div class="heading">
+<section class="detail-hero">
+  <div class="detail-heading">
+    <p class="hero-eyebrow">Message detail</p>
     <h1 class="page-title">{{ sermon.title }}</h1>
-    <div class="meta">
+    <div class="detail-meta">
       <span class="badge">{{ sermon.preached_on }}</span>
       {% if sermon.speaker_name %}<span class="sep">•</span><span>{{ sermon.speaker_name }}</span>{% endif %}
       {% if sermon.series_name %}<span class="sep">•</span><span>{{ sermon.series_name }}</span>{% endif %}
       {% if sermon.location_name %}<span class="sep">•</span><span>{{ sermon.location_name }}</span>{% endif %}
     </div>
   </div>
-  <div class="actions">
-    <a class="btn" href="{% url 'sermon_edit' sermon.pk %}">Edit</a>
+  <div class="detail-actions">
+    <a class="btn" href="{% url 'sermon_edit' sermon.pk %}">Edit sermon</a>
   </div>
-  <hr>
-  </div>
+</section>
 
 <section class="panel">
   <h2 class="panel-title">Passages</h2>
   <div class="stack gap-sm" id="passage-tools">
-    <input type="hidden" id="csrf" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+    {% csrf_token %}
     <div class="grid-two">
-      <input class="input" id="ref" type="text" placeholder="e.g., John 10:11-14" name="ref_text">
+      <input class="input" id="ref" type="text" placeholder="e.g., John 10:11-14" name="ref_text"
+             hx-on:keyup="document.getElementById('add-btn').disabled = !(/\S+\s+\d+:\d+/.test(this.value))"
+             hx-on:change="document.getElementById('add-btn').disabled = !(/\S+\s+\d+:\d+/.test(this.value))">
       <input class="input" id="context_note" type="text" placeholder="Context (optional)" name="context_note">
     </div>
     <div class="row">
-      <button class="btn btn-primary"
+      <button id="add-btn" class="btn btn-primary" disabled
         hx-post="{% url 'passage_add' sermon.pk %}"
-        hx-include="#ref, #context_note, #csrf"
+        hx-include="#ref, #context_note, input[name=csrfmiddlewaretoken]"
         hx-target="#passage-list"
         hx-swap="outerHTML">
-        + Add
+        + Add passage
       </button>
       <span class="htmx-indicator" aria-hidden="true"></span>
     </div>
     <div id="preview"
          class="preview"
          hx-get="{% url 'passage_preview' sermon.pk %}"
-         hx-trigger="keyup changed delay:300ms from:#ref"
+         hx-trigger="keyup[ /\\S+\\s+\\d+:\\d+/.test(event.target.value) ] changed delay:300ms from:#ref"
          hx-target="#preview"
          hx-vals="js:{ref: document.getElementById('ref').value}"></div>
   </div>
   <div id="passage-list" class="list">
     {% include 'archive/_partials/passage_list.html' %}
   </div>
+</section>
+
+<section class="panel">
+  <h2 class="panel-title">Notes</h2>
+  <pre class="prose">{{ sermon.notes_md }}</pre>
 </section>
 
 <section class="panel">
@@ -64,9 +71,5 @@
   </div>
 </section>
 
-<section class="panel">
-  <h2 class="panel-title">Notes</h2>
-  <pre class="prose">{{ sermon.notes_md }}</pre>
-  </section>
-{% endblock %}
 
+{% endblock %}

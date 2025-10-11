@@ -14,33 +14,44 @@
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
-  <header class="site-header">
-    <div class="container header-inner">
-      <a class="brand" href="{% url 'sermon_list' %}">Sermon Archive</a>
-      <nav class="nav">
-        <a class="nav-link" href="{% url 'sermon_list' %}">Sermons</a>
-      </nav>
-      <form method="post" action="{% url 'logout' %}" class="logout">
-        {% csrf_token %}
-        <button class="btn btn-ghost" type="submit">Logout</button>
-      </form>
-    </div>
-  </header>
-  <main id="content" class="container content">
-    {% if messages %}
-      <div class="alerts">
-        {% for message in messages %}
-          <div class="alert">{{ message }}</div>
-        {% endfor %}
+  <div class="site-shell">
+    <header class="site-header">
+      <div class="container header-inner">
+        <div class="brand-block">
+          <a class="brand" href="{% url 'sermon_list' %}">
+            <span class="brand-mark" aria-hidden="true">✶</span>
+            <span class="brand-text">Sermon Archive</span>
+          </a>
+        </div>
+        <nav class="nav" aria-label="Primary">
+          <a class="nav-link" href="{% url 'sermon_list' %}">Browse</a>
+        </nav>
+        <form method="post" action="{% url 'logout' %}" class="logout">
+          {% csrf_token %}
+          <button class="btn btn-ghost" type="submit">Logout</button>
+        </form>
       </div>
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
-  <footer class="site-footer">
-    <div class="container">
-      <small>&copy; {% now 'Y' %} Sermon Archive</small>
-    </div>
-  </footer>
+    </header>
+    <main id="content" class="page">
+      <div class="container page-inner">
+        {% if messages %}
+          <div class="alerts">
+            {% for message in messages %}
+              <div class="alert">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <div>
+          <span class="brand-mark" aria-hidden="true">✶</span>
+        </div>
+        <p class="muted">"Many are the plans in a person's heart, but it is the Lord's purpose that prevails." Proverbs 19:21</p>
+      </div>
+    </footer>
+  </div>
 </body>
 </html>
-

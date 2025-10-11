@@ -1,9 +1,10 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">Too many failed login attempts</h1>
-  <hr>
+<div class="status-card">
+  <div class="detail-heading">
+    <p class="hero-eyebrow">Security pause</p>
+    <h1 class="page-title">Too many failed attempts</h1>
+    <p class="muted">Your account is temporarily locked. Please try again later or contact an administrator for assistance.</p>
+  </div>
 </div>
-<p class="muted">Your account is temporarily locked. Please try again later.</p>
 {% endblock %}
-

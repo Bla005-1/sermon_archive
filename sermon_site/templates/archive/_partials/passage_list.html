@@ -1,5 +1,6 @@
 <ul class="bullet-list">
-  {% for p in sermon.passages.all %}
+  {% with ps=passages|default:sermon.sermonpassage_set.all %}
+  {% for p in ps %}
     <li>
       {{ p.start_verse.book.name }} {{ p.start_verse.chapter }}:{{ p.start_verse.verse }}
       –
@@ -16,5 +17,6 @@
   {% empty %}
     <li class="empty">No passages yet.</li>
   {% endfor %}
+  {% endwith %}
 </ul>
 

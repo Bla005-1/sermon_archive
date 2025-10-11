@@ -30,7 +30,7 @@ def _get_bool(name: str, default: bool = False) -> bool:
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-w32^hi_$xx#7+!3z@g_=_esqc+0p677(^rvc6!!tt=obc&4&0#'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _get_bool('DJANGO_DEBUG', False)

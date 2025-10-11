@@ -1,21 +1,23 @@
 {% extends 'base.html' %}
 {% block title %}Login{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">Login</h1>
-  <hr>
+<div class="auth-card">
+  <div class="detail-heading">
+    <p class="hero-eyebrow">Welcome back</p>
+    <h1 class="page-title">Login</h1>
+    <p class="muted">Access the archive to manage messages, attachments, and notes.</p>
+  </div>
+  <form class="form" method="post">
+    {% csrf_token %}
+    <div class="form-django">
+      {{ form.as_p }}
+    </div>
+    <div class="detail-actions">
+      <button class="btn btn-primary" type="submit">Log in</button>
+    </div>
+  </form>
+  {% if form.errors %}
+    <p class="error">Invalid credentials or locked out.</p>
+  {% endif %}
 </div>
-<form class="form" method="post">
-  {% csrf_token %}
-  <div class="form-django">
-    {{ form.as_p }}
-  </div>
-  <div class="actions">
-    <button class="btn btn-primary" type="submit">Log in</button>
-  </div>
-</form>
-{% if form.errors %}
-  <p class="error">Invalid credentials or locked out.</p>
-{% endif %}
 {% endblock %}
-

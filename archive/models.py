@@ -196,7 +196,7 @@ class Sermon(models.Model):
     # Avoid NULL on insert; DB has CURRENT_TIMESTAMP defaults.
     created_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
     updated_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
-
+    
     class Meta:
         managed = False
         db_table = 'sermons'
@@ -301,4 +301,4 @@ class SermonPassage(models.Model):
         unique_together = (('sermon', 'ord'),)
 
     def __str__(self):
-        return f'{self.sermon_id} · {self.ref_text or ""} · #{self.ord}'
+        return f'{self.sermon} · {self.ref_text or ""} · #{self.ord}'

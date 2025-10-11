@@ -1,20 +1,41 @@
 {% extends 'base.html' %}
 {% block title %}Sermons{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">Sermons</h1>
-  <div class="actions">
-    <a class="btn btn-primary" href="{% url 'sermon_create' %}">New Sermon</a>
+<section class="hero">
+  <div>
+    <p class="hero-eyebrow">Library</p>
+    <h1 class="hero-title">Sermons</h1>
+    <p class="hero-description">
+      {% if q %}
+        Searching for “{{ q }}”. Refine your query or clear the filter to browse the full archive.
+      {% endif %}
+    </p>
   </div>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="{% url 'sermon_create' %}">New Sermon</a>
+    {% if q %}
+      <a class="btn" href="{% url 'sermon_list' %}">Clear search</a>
+    {% endif %}
+  </div>
+  <div class="hero-stats">
+    <div class="stat">
+      <span class="stat-value">{{ sermons|length }}</span>
+      <span class="muted">{% if q %}matching{% else %}Available{% endif %} Sermon{{ sermons|length|pluralize }}</span>
+    </div>
+  </div>
+</section>
+
+<div class="toolbar">
   <form method="get" class="searchbar">
-    <input class="input" type="text" name="q" value="{{ q }}" placeholder="Search by title" aria-label="Search sermons by title">
-    <button class="btn" type="submit">Search</button>
+    <input class="input" type="text" name="q" value="{{ q }}" placeholder="Search by title or speaker" aria-label="Search sermons">
+    <button class="btn btn-primary" type="submit">Search</button>
   </form>
-  <p class="muted">{% if sermons %}{{ sermons|length }} result{{ sermons|length|pluralize }}{% else %}No results{% endif %}</p>
-  <hr>
+  <div class="toolbar-group">
+    <span class="muted">{% if sermons %}{{ sermons|length }} result{{ sermons|length|pluralize }}{% else %}No results yet{% endif %}</span>
+  </div>
 </div>
 
-<ul class="card-list">
+<ul class="card-grid">
   {% for s in sermons %}
     <li class="card">
       <a class="card-link" href="{% url 'sermon_detail' s.pk %}">
@@ -27,8 +48,7 @@
       </a>
     </li>
   {% empty %}
-    <li class="empty">No sermons yet.</li>
+    <li class="empty">No sermons yet. Start by creating your first entry.</li>
   {% endfor %}
-  </ul>
+</ul>
 {% endblock %}
-

@@ -1,36 +1,37 @@
 {% extends 'base.html' %}
 {% block title %}{% if sermon %}Edit{% else %}New{% endif %} Sermon{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">{% if sermon %}Edit{% else %}New{% endif %} Sermon</h1>
-  <hr>
+<div class="form-card">
+  <div class="detail-heading">
+    <p class="hero-eyebrow">{% if sermon %}Update{% else %}Create{% endif %}</p>
+    <h1 class="page-title">{% if sermon %}Edit{% else %}New{% endif %} Sermon</h1>
+    <p class="muted">Capture the core details of the message so your team can revisit it in seconds.</p>
+  </div>
+  <form class="form" method="post">
+    {% csrf_token %}
+    <div class="grid-two">
+      <label class="field">Date
+        <input class="input" type="date" name="preached_on" value="{{ sermon.preached_on|date:'Y-m-d' }}">
+      </label>
+      <label class="field">Title
+        <input class="input" type="text" name="title" value="{{ sermon.title }}" required>
+      </label>
+      <label class="field">Speaker
+        <input class="input" type="text" name="speaker_name" value="{{ sermon.speaker_name }}">
+      </label>
+      <label class="field">Series
+        <input class="input" type="text" name="series_name" value="{{ sermon.series_name }}">
+      </label>
+      <label class="field">Location
+        <input class="input" type="text" name="location_name" value="{{ sermon.location_name }}">
+      </label>
+    </div>
+    <label class="field">Notes
+      <textarea class="input" name="notes_md" rows="10">{{ sermon.notes_md }}</textarea>
+    </label>
+    <div class="detail-actions">
+      <button class="btn btn-primary" type="submit">Save sermon</button>
+    </div>
+  </form>
 </div>
-
-<form class="form" method="post">
-  {% csrf_token %}
-  <div class="grid-two">
-    <label class="field">Date
-      <input class="input" type="date" name="preached_on" value="{{ sermon.preached_on|date:'Y-m-d' }}">
-    </label>
-    <label class="field">Title
-      <input class="input" type="text" name="title" value="{{ sermon.title }}" required>
-    </label>
-    <label class="field">Speaker
-      <input class="input" type="text" name="speaker_name" value="{{ sermon.speaker_name }}">
-    </label>
-    <label class="field">Series
-      <input class="input" type="text" name="series_name" value="{{ sermon.series_name }}">
-    </label>
-    <label class="field">Location
-      <input class="input" type="text" name="location_name" value="{{ sermon.location_name }}">
-    </label>
-  </div>
-  <label class="field">Notes
-    <textarea class="input" name="notes_md" rows="10">{{ sermon.notes_md }}</textarea>
-  </label>
-  <div class="actions">
-    <button class="btn btn-primary" type="submit">Save</button>
-  </div>
-</form>
 {% endblock %}
-
