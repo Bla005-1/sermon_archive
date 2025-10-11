@@ -1,11 +1,11 @@
-<ul>
+<ul class="bullet-list">
   {% for p in sermon.passages.all %}
     <li>
       {{ p.start_verse.book.name }} {{ p.start_verse.chapter }}:{{ p.start_verse.verse }}
       –
       {{ p.end_verse.book.name }} {{ p.end_verse.chapter }}:{{ p.end_verse.verse }}
       {% if p.context_note %} ({{ p.context_note }}){% endif %}
-      <button
+      <button class="btn btn-ghost btn-danger"
         hx-get='{% url "passage_delete" sermon.pk p.ord %}'
         hx-target='#passage-list'
         hx-swap='outerHTML'
@@ -14,7 +14,7 @@
       </button>
     </li>
   {% empty %}
-    <li>No passages yet.</li>
+    <li class="empty">No passages yet.</li>
   {% endfor %}
 </ul>
 

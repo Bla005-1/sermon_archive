@@ -1,23 +1,43 @@
 {% load static %}
 <!doctype html>
-<html lang='en'>
+<html lang="en">
 <head>
-  <meta charset='utf-8'>
-  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}Sermon Archive{% endblock %}</title>
-  <link rel='stylesheet' href='{% static "css/app.css" %}'>
-  <script src='https://unpkg.com/htmx.org@1.9.12'></script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
 </head>
 <body>
-  <header style='display:flex;gap:1rem;align-items:center;'>
-    <a href='{% url "sermon_list" %}'>Sermons</a>
-    <form method='post' action='{% url "logout" %}' style='margin-left:auto;'>
-      {% csrf_token %}<button>Logout</button>
-    </form>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="{% url 'sermon_list' %}">Sermon Archive</a>
+      <nav class="nav">
+        <a class="nav-link" href="{% url 'sermon_list' %}">Sermons</a>
+      </nav>
+      <form method="post" action="{% url 'logout' %}" class="logout">
+        {% csrf_token %}
+        <button class="btn btn-ghost" type="submit">Logout</button>
+      </form>
+    </div>
   </header>
-  <main style='max-width:900px;margin:2rem auto;padding:0 1rem;'>
+  <main id="content" class="container content">
+    {% if messages %}
+      <div class="alerts">
+        {% for message in messages %}
+          <div class="alert">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="site-footer">
+    <div class="container">
+      <small>&copy; {% now 'Y' %} Sermon Archive</small>
+    </div>
+  </footer>
 </body>
 </html>
 

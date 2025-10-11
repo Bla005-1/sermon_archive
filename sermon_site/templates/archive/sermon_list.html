@@ -1,20 +1,34 @@
 {% extends 'base.html' %}
 {% block title %}Sermons{% endblock %}
 {% block content %}
-<form method='get' class='search' style='display:flex;gap:.5rem;align-items:center;'>
-  <input type='text' name='q' value='{{ q }}' placeholder='Search title'>
-  <button>Search</button>
-  <a href='{% url "sermon_create" %}'>New Sermon</a>
-</form>
+<div class="page-header">
+  <h1 class="page-title">Sermons</h1>
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'sermon_create' %}">New Sermon</a>
+  </div>
+  <form method="get" class="searchbar">
+    <input class="input" type="text" name="q" value="{{ q }}" placeholder="Search by title" aria-label="Search sermons by title">
+    <button class="btn" type="submit">Search</button>
+  </form>
+  <p class="muted">{% if sermons %}{{ sermons|length }} result{{ sermons|length|pluralize }}{% else %}No results{% endif %}</p>
+  <hr>
+</div>
 
-<ul class='list'>
+<ul class="card-list">
   {% for s in sermons %}
-    <li><a href='{% url "sermon_detail" s.pk %}'>
-      {{ s.preached_on }} — {{ s.title }} ({{ s.speaker_name }})
-    </a></li>
+    <li class="card">
+      <a class="card-link" href="{% url 'sermon_detail' s.pk %}">
+        <div class="card-title">{{ s.title }}</div>
+        <div class="card-meta">
+          <span class="badge">{{ s.preached_on }}</span>
+          {% if s.speaker_name %}<span class="sep">•</span><span>{{ s.speaker_name }}</span>{% endif %}
+          {% if s.series_name %}<span class="sep">•</span><span>{{ s.series_name }}</span>{% endif %}
+        </div>
+      </a>
+    </li>
   {% empty %}
-    <li>No sermons yet.</li>
+    <li class="empty">No sermons yet.</li>
   {% endfor %}
-</ul>
+  </ul>
 {% endblock %}
 
