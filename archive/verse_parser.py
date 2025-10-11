@@ -55,7 +55,7 @@ def parse_reference(ref_text: str) -> Tuple[BibleVerse, BibleVerse]:
     except ObjectDoesNotExist:
         raise ValueError('Verse not found in database.')
 
-    if start_v.id > end_v.id:
+    if start_v.verse_id > end_v.verse_id:
         start_v, end_v = end_v, start_v
     return start_v, end_v
 
