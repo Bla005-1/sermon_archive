@@ -1,22 +1,29 @@
+import re
 from typing import Tuple
 from django.core.exceptions import ObjectDoesNotExist
 from .models import BibleBook, BibleVerse
 
-ALIASES = {
-    'gen': 'Genesis', 'ge': 'Genesis', 'gn': 'Genesis',
-    'john': 'John', 'jn': 'John',
-    '1 sam': '1 Samuel', '1 samuel': '1 Samuel', 'i samuel': '1 Samuel', '1sam': '1 Samuel',
-    '2 sam': '2 Samuel', '2 samuel': '2 Samuel', 'ii samuel': '2 Samuel', '2sam': '2 Samuel',
+DASHES = r'[\-\u2012\u2013\u2014]'  # -, figure dash, en dash, em dash
+BOOK_ALIASES = {
+    # normalize roman and variants → Arabic names stored in bible_books
+    'ii samuel': '2 Samuel',
+    '2 sam': '2 Samuel',
+    'song of songs': 'Song of Solomon',
+    'canticles': 'Song of Solomon',
+    # add as you encounter more…
 }
 
+class ParseError(Exception): ...
+
 def normalize_book(raw: str) -> str:
-    s = ' '.join(raw.lower().split())
-    if s in ALIASES:
-        return ALIASES[s]
-    parts = s.split(' ', 1)
-    if parts and parts[0] in {'1','2','3'} and len(parts) > 1:
-        return f"{parts[0]} {parts[1].capitalize()}"
-    return s.capitalize()
+    name = re.sub(r'\s+', ' ', raw).strip().lower()
+    name = BOOK_ALIASES.get(name, name.title())
+    # handle roman numerals like "II Timothy" → "2 Timothy"
+    name = re.sub(r'(^| )I{1}(?= [A-Z])', r' 1', name)
+    name = re.sub(r'(^| )I{2}(?= [A-Z])', r' 2', name)
+    name = re.sub(r'(^| )I{3}(?= [A-Z])', r' 3', name)
+    # final tidy (e.g., " 2 Timothy" → "2 Timothy")
+    return re.sub(r'^\s+', '', name)
 
 def parse_reference(ref_text: str) -> Tuple[BibleVerse, BibleVerse]:
     if not ref_text:
