@@ -26,9 +26,15 @@
         <input class="input" type="text" name="location_name" value="{{ sermon.location_name }}">
       </label>
     </div>
-    <label class="field">Notes
-      <textarea class="input" name="notes_md" rows="10">{{ sermon.notes_md }}</textarea>
-    </label>
+    <div class="field notes-field" data-notes-widget>
+      <div class="notes-field__header">
+        <label for="id_notes_md">Notes</label>
+        <button class="btn btn-ghost" type="button" data-notes-toggle-button aria-pressed="false">Show Markdown</button>
+      </div>
+      <textarea class="input" id="id_notes_md" name="notes_md" rows="10" data-notes-source>{{ sermon.notes_md|default:'' }}</textarea>
+      <pre class="preview notes-preview__plain" data-notes-plain></pre>
+      <div class="preview notes-preview__markdown prose" data-notes-markdown hidden></div>
+    </div>
     <div class="detail-actions">
       <button class="btn btn-primary" type="submit">Save sermon</button>
     </div>

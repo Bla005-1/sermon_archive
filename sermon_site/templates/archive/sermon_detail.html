@@ -50,8 +50,15 @@
 </section>
 
 <section class="panel">
-  <h2 class="panel-title">Notes</h2>
-  <pre class="prose">{{ sermon.notes_md }}</pre>
+  <div class="notes-panel" data-notes-widget>
+    <div class="notes-panel__header">
+      <h2 class="panel-title">Notes</h2>
+      <button class="btn btn-ghost" type="button" data-notes-toggle-button aria-pressed="false">Show Markdown</button>
+    </div>
+    <textarea hidden data-notes-source>{{ sermon.notes_md|default:'' }}</textarea>
+    <pre class="preview notes-preview__plain" data-notes-plain></pre>
+    <div class="preview notes-preview__markdown prose" data-notes-markdown hidden></div>
+  </div>
 </section>
 
 <section class="panel">
@@ -70,6 +77,5 @@
     {% include 'archive/_partials/attachment_list.html' %}
   </div>
 </section>
-
 
 {% endblock %}

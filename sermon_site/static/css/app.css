@@ -43,24 +43,14 @@
 html,body{height:100%}
 body{
   font-family:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  background: radial-gradient(120% 120% at 0% 0%, rgba(76, 110, 245, 0.18), transparent 60%),
-              radial-gradient(120% 120% at 100% 0%, rgba(14, 165, 233, 0.18), transparent 65%),
-              var(--bg);
+  background: var(--bg);
   color:var(--fg);
   margin:0;
   min-height:100vh;
   -webkit-font-smoothing:antialiased;
   position:relative;
 }
-body::before{
-  content:"";
-  position:fixed;
-  inset:0;
-  background:radial-gradient(circle at 20% 20%, rgba(76, 110, 245, 0.22) 0, transparent 55%),
-             radial-gradient(circle at 80% 10%, rgba(52, 211, 153, 0.16) 0, transparent 45%);
-  pointer-events:none;
-  opacity:0.7;
-}
+body::before{content:none}
 a{color:inherit;text-decoration:none}
 a:hover{text-decoration:none}
 
@@ -182,7 +172,33 @@ textarea{min-height:180px;resize:vertical}
   .toolbar{padding:16px}
   .searchbar{flex:1;width:100%}
 }
-
+/* Notes */
+.notes-field__header,
+.notes-panel__header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px}
+.notes-field__header label{font-weight:500}
+.notes-preview__plain{white-space:pre-wrap}
+.notes-preview__markdown{white-space:normal}
+.notes-preview__markdown h1,
+.notes-preview__markdown h2,
+.notes-preview__markdown h3,
+.notes-preview__markdown h4,
+.notes-preview__markdown h5,
+.notes-preview__markdown h6{margin:1em 0 .5em; font-weight:600}
+.notes-preview__markdown p{margin:0 0 1em}
+.notes-preview__markdown ul,
+.notes-preview__markdown ol{margin:0 0 1em 1.25em; padding:0}
+.notes-preview__markdown li{margin:.25em 0}
+.notes-preview__markdown pre{background:var(--surface); border:1px solid var(--border); padding:.75rem; border-radius:12px; overflow:auto}
+.notes-preview__markdown code{font-family:"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; background:var(--accent); padding:.1em .3em; border-radius:6px}
+.notes-panel textarea[hidden]{display:none}
 .htmx-indicator{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--brand);border-radius:50%;display:inline-block;animation:spin 1s linear infinite;opacity:0}
 .htmx-request + .htmx-indicator, .htmx-request .htmx-indicator{opacity:1}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* Notes panel */
+.notes-panel.panel{background:var(--surface-strong)}
+.notes-panel .preview{font-family:inherit; background:var(--surface-strong)}
+.notes-preview__plain{font-family:inherit}
+.notes-preview__markdown{font-family:inherit}
+.notes-preview__markdown > :first-child{margin-top:0}
+.notes-preview__markdown > :last-child{margin-bottom:0}
