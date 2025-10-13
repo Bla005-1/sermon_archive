@@ -14,6 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
   <script src="{% static 'js/notes_toggle.js' %}" defer></script>
   <script src="{% static 'js/passage_suggestions.js' %}" defer></script>
+  <script src="{% static 'js/header_actions.js' %}" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
@@ -29,14 +30,12 @@
         <div class="header-actions">
           <nav class="header-nav" aria-label="Primary">
             <a class="header-action" href="{% url 'sermon_list' %}">Browse</a>
+            <a class="header-action" href="{% url 'logout' %}" data-logout-link>Logout</a>
           </nav>
-          <form method="post" action="{% url 'logout' %}" class="logout">
-            {% csrf_token %}
-            <button class="header-action" type="submit">Logout</button>
-          </form>
         </div>
       </div>
     </header>
+    <main id="content" class="page {% block page_class %}{% endblock %}">
     <main id="content" class="page">
       <div class="container page-inner">
         {% if messages %}

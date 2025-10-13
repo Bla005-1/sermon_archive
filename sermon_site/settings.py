@@ -38,7 +38,7 @@ DEBUG = _get_bool('DJANGO_DEBUG', False)
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
-
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 
@@ -134,12 +134,27 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = '/static/'
+
+STATIC_ROOT = '/home/bryce/personal_services/sermon_archive/staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'sermon_site' / 'static',  # matches your project tree
 ]
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
+if DEBUG:
+    # Local development: use relative path
+    STATIC_URL = '/static/'
+    STORAGES = {
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+else:
+    # Production: use your CDN/domain and manifest hashing
+    STATIC_URL = 'https://sermons.loosesocket.com/static/'
+    STORAGES = {
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage',
+        },
+    }
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'

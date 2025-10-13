@@ -10,8 +10,10 @@
 │  ├─ wsgi.py
 │  ├─ asgi.py
 │  ├─ static/
-│  │  └─ css/app.css
-│  ├─ media/           # (empty; runtime)
+│  │  ├─ css/
+│  │  │  └─ css files
+│  │  └─ js/
+│  │     └─ js files
 │  └─ templates/
 │     ├─ base.html
 │     ├─ locked_out.html

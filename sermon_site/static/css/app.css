@@ -65,13 +65,13 @@ a:hover{text-decoration:none}
 .page-inner{display:flex;flex-direction:column;gap:32px}
 
 .site-header{position:sticky;top:0;z-index:50;backdrop-filter:blur(var(--blur));background:var(--header-surface);border-bottom:1px solid var(--border);box-shadow:0 10px 30px rgba(15, 23, 42, 0.08)}
-.header-inner{display:flex;align-items:center;gap:28px;min-height:88px}
-.brand-block{display:flex;flex-direction:column;gap:6px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:1.2rem;letter-spacing:-0.02em}
-.brand-mark{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:12px;background:linear-gradient(135deg, var(--brand), var(--brand-strong));color:var(--brand-fg);font-weight:600;box-shadow:var(--shadow-sm)}
+.header-inner{display:flex;align-items:center;gap:24px;min-height:82px;padding:12px 0}
+.brand-block{display:flex;flex-direction:column;gap:4px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:1.16rem;letter-spacing:-0.02em}
+.brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:11px;background:linear-gradient(135deg, var(--brand), var(--brand-strong));color:var(--brand-fg);font-weight:600;box-shadow:var(--shadow-sm)}
 .brand-text{display:inline-flex;align-items:center;gap:8px}
 .brand-tagline{margin:0;color:var(--muted);font-size:.9rem}
-.header-actions{margin-left:auto;display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:999px;background:var(--surface);backdrop-filter:blur(calc(var(--blur) * .6));box-shadow:var(--shadow-sm);border:1px solid var(--border)}
+.header-actions{margin-left:auto;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:999px;background:var(--surface);backdrop-filter:blur(calc(var(--blur) * .6));box-shadow:var(--shadow-sm);border:1px solid var(--border)}
 .header-nav{display:flex}
 .header-action,
 .header-action[type=submit] {
@@ -89,7 +89,7 @@ a:hover{text-decoration:none}
   text-decoration: none;
   color: var(--brand-strong);
 }
-.header-action{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 22px;border-radius:999px;font-weight:600;color:var(--brand-strong);background:var(--action-bg);border:1px solid transparent;box-shadow:none;transition:transform var(--transition), box-shadow var(--transition), background var(--transition), color var(--transition);text-decoration:none}
+.header-action{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 18px;border-radius:18px;font-weight:600;color:var(--brand-strong);background:var(--action-bg);border:1px solid transparent;box-shadow:none;transition:transform var(--transition), box-shadow var(--transition), background var(--transition), color var(--transition);text-decoration:none}
 .header-action:hover{background:rgba(108, 99, 255, 0.2);color:var(--brand-strong);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
 .header-action:focus{outline:none;box-shadow:0 0 0 4px var(--accent)}
 .header-action[type=submit]{cursor:pointer;appearance:none}
@@ -121,7 +121,7 @@ hr{border:none;border-top:1px solid var(--border)}
 .toolbar-group{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 
 .searchbar{display:flex;align-items:center;gap:10px;padding:12px 16px;border:1px solid var(--border);border-radius:999px;background:var(--surface-strong);box-shadow:var(--shadow-sm)}
-.searchbar .input{border:none;background:transparent;padding:0 4px;min-width:220px}
+.searchbar .input{border:none;background:transparent;padding:0 4px;min-width:0;flex:1;width:100%}
 .searchbar .input:focus{box-shadow:none}
 .searchbar button{box-shadow:none}
 
@@ -191,12 +191,22 @@ textarea{min-height:180px;resize:vertical}
 .status-card{max-width:520px}
 
 @media (max-width: 640px){
-  .header-inner{flex-direction:column;align-items:flex-start;gap:18px;padding:24px 0}
-  .header-actions{margin-left:0;width:100%;flex-direction:column;align-items:stretch;gap:10px;padding:14px;border-radius:22px}
-  .header-action{width:100%}
-  .hero{padding:26px 24px}
-  .toolbar{padding:16px}
-  .searchbar{flex:1;width:100%}
+  .container{padding:0 20px}
+  .page{padding:44px 0 64px}
+  .page-inner{gap:28px}
+  .header-inner{flex-direction:row;align-items:center;gap:14px;padding:10px 0;min-height:0}
+  .brand-block{flex-direction:row;align-items:center;gap:8px}
+  .brand{font-size:1.05rem}
+  .brand-mark{width:26px;height:26px;border-radius:10px}
+  .header-actions{margin-left:auto;width:auto;flex-direction:row;align-items:center;gap:8px;padding:0;border-radius:18px;background:transparent;box-shadow:none;border:none}
+  .header-action{width:auto;padding:8px 14px;border-radius:16px}
+  .hero{padding:22px 20px}
+  .toolbar{flex-direction:column;align-items:stretch;gap:14px;padding:14px 16px}
+  .toolbar-group{justify-content:space-between}
+  .searchbar{flex:1;width:100%;padding:10px 12px;gap:8px}
+  .searchbar button{padding:8px 14px}
+  .panel{padding:22px}
+  .notes-panel .preview{padding:14px 16px}
 }
 /* Notes */
 .notes-field__header,
@@ -228,3 +238,44 @@ textarea{min-height:180px;resize:vertical}
 .notes-preview__markdown{font-family:inherit}
 .notes-preview__markdown > :first-child{margin-top:0}
 .notes-preview__markdown > :last-child{margin-bottom:0}
+
+/* ---------- Header: tighter + no-wrap on small screens ---------- */
+@media (max-width: 480px){
+  .container{ padding: 0 12px; }
+
+  .header-inner{ gap: 10px; }
+  .brand-text{ white-space: nowrap; }
+  .brand{ font-size: 1rem; }
+
+  .header-actions{
+    gap: 6px;
+    flex-wrap: nowrap;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  .header-actions > *{ flex: 0 0 auto; }
+  .header-nav{ display: flex; }
+  .logout{ display: flex; margin: 0; }
+
+  .header-action{
+    padding: 6px 10px;
+    border-radius: 14px;
+    white-space: nowrap;
+    line-height: 1.1;
+  }
+}
+
+/* ---------- Optional "compact" page layout for forms/details ---------- */
+.page--compact .container{ padding: 0 12px; }
+@media (min-width: 641px){
+  .page--compact .container{ padding: 0 16px; }
+}
+
+.page--compact .form-card,
+.page--compact .panel{ padding: 16px; }
+
+.page--compact .preview{ padding: 12px 14px; }
+.page--compact .input,
+.page--compact textarea{ padding: 10px 12px; }
