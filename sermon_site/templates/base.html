@@ -25,13 +25,15 @@
             <span class="brand-text">Sermon Archive</span>
           </a>
         </div>
-        <nav class="nav" aria-label="Primary">
-          <a class="nav-link" href="{% url 'sermon_list' %}">Browse</a>
-        </nav>
-        <form method="post" action="{% url 'logout' %}" class="logout">
-          {% csrf_token %}
-          <button class="btn btn-ghost" type="submit">Logout</button>
-        </form>
+        <div class="header-actions">
+          <nav class="header-nav" aria-label="Primary">
+            <a class="header-action" href="{% url 'sermon_list' %}">Browse</a>
+          </nav>
+          <form method="post" action="{% url 'logout' %}" class="logout">
+            {% csrf_token %}
+            <button class="header-action" type="submit">Logout</button>
+          </form>
+        </div>
       </div>
     </header>
     <main id="content" class="page">

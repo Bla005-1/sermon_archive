@@ -2,9 +2,7 @@
   {% with ps=passages|default:sermon.sermonpassage_set.all %}
   {% for p in ps %}
     <li>
-      {{ p.start_verse.book.name }} {{ p.start_verse.chapter }}:{{ p.start_verse.verse }}
-      –
-      {{ p.end_verse.book.name }} {{ p.end_verse.chapter }}:{{ p.end_verse.verse }}
+      {{ p.ref_display }}
       {% if p.context_note %} ({{ p.context_note }}){% endif %}
       <button class="btn btn-ghost btn-danger"
         hx-get='{% url "passage_delete" sermon.pk p.ord %}'

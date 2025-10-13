@@ -302,3 +302,14 @@ class SermonPassage(models.Model):
 
     def __str__(self):
         return f'{self.sermon} · {self.ref_text or ""} · #{self.ord}'
+
+    def ref_display(self):
+        s, e = self.start_verse, self.end_verse
+        if not e or (s.book.book_id == e.book.book_id and s.chapter == e.chapter and s.verse == e.verse):
+            return f'{s.book.name} {s.chapter}:{s.verse}'
+        if s.book.book_id == e.book.book_id:
+            if s.chapter == e.chapter:
+                return f'{s.book.name} {s.chapter}:{s.verse}–{e.verse}'
+            return f'{s.book.name} {s.chapter}:{s.verse}–{e.chapter}:{e.verse}'
+        return f'{s.book.name} {s.chapter}:{s.verse} – {e.book.name} {e.chapter}:{e.verse}'
+    

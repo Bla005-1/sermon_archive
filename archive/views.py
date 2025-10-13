@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.uploadedfile import UploadedFile
 from django.db.models import Max
 from .models import Sermon, BibleBook, BibleVerse, SermonPassage, Attachment
-from .verse_parser import parse_reference, tolerant_parse_reference
+from .verse_parser import tolerant_parse_reference
 from .storage import save_attachment_file
 
 @login_required
