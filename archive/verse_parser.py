@@ -1,7 +1,15 @@
+"""Utility functions for parsing human-entered Bible references."""
+
+import logging
 import re
-from typing import Tuple, Optional
+from typing import Optional, Tuple
+
 from django.core.exceptions import ObjectDoesNotExist
+
 from .models import BibleBook, BibleVerse
+
+
+logger = logging.getLogger(__name__)
 
 DASHES = r'[\-\u2012\u2013\u2014]'  # -, figure dash, en dash, em dash
 BOOK_ALIASES = {
@@ -29,7 +37,7 @@ def _find_book_tolerant(name_normalized: str) -> Optional[BibleBook]:
     try:
         return BibleBook.objects.get(name__iexact=name_normalized)
     except ObjectDoesNotExist:
-        pass
+        logger.debug('Book lookup failed for exact name %s', name_normalized)
     # Prefix match (e.g., "john" -> "John", not "1 John")
     qs = BibleBook.objects.filter(name__istartswith=name_normalized)
     if qs.count() == 1:
@@ -39,8 +47,8 @@ def _find_book_tolerant(name_normalized: str) -> Optional[BibleBook]:
         wb = BibleBook.objects.filter(name__iregex=rf'(^| ){re.escape(name_normalized)}($| )')
         if wb.count() == 1:
             return wb.first()
-    except Exception:
-        pass
+    except Exception:  # pragma: no cover - regex errors depend on DB backend
+        logger.exception('Regex search failed while looking up book %s', name_normalized)
     # Fallback: any contains, choose shortest name
     cont = list(BibleBook.objects.filter(name__icontains=name_normalized).order_by('name'))
     if len(cont) == 1:
@@ -74,7 +82,7 @@ def tolerant_parse_reference(ref_text: str) -> Tuple[BibleVerse, BibleVerse]:
     m = _REF_RE.match(cleaned)
     if not m:
         # Keep the error actionable (what we accept)
-        raise ValueError('Reference must look like "Book Chapter:Verse" or "Book Chapter:Start-End".')
+        raise ValueError('References should be formatted like "Book Chapter:Verse" or "Book Chapter:Start-End".')
 
     book_raw = m.group('book').strip()
     ch = int(m.group('ch'))
@@ -85,14 +93,16 @@ def tolerant_parse_reference(ref_text: str) -> Tuple[BibleVerse, BibleVerse]:
     book_name = normalize_book(book_raw)
     book = _find_book_tolerant(book_name)
     if not book:
-        raise ValueError(f'Unknown book: {book_raw}')
+        logger.warning('Unknown Bible book provided: %s', book_raw)
+        raise ValueError(f'We could not find a Bible book named "{book_raw}".')
 
     # Pull verses; fail clearly if either side doesn’t exist
     try:
         start_v = BibleVerse.objects.get(book=book, chapter=ch, verse=min(v1, v2))
         end_v   = BibleVerse.objects.get(book=book, chapter=ch, verse=max(v1, v2))
     except ObjectDoesNotExist:
-        raise ValueError('Verse not found in database.')
+        logger.warning('Verse lookup failed for %s %s:%s-%s', book.name, ch, v1, v2)
+        raise ValueError('We could not locate that verse in the archive. Please verify the chapter and verse numbers.')
 
     # Safety: ensure order by primary key if ids aren’t strictly monotonic by (ch,verse)
     if start_v.verse_id > end_v.verse_id:

@@ -4,7 +4,7 @@ from django.utils import timezone
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from django.db.models.manager import RelatedManager
-    
+
 # ----------------------------
 # Auth / Django system tables
 # ----------------------------
@@ -198,6 +198,7 @@ class Sermon(models.Model):
     # Avoid NULL on insert; DB has CURRENT_TIMESTAMP defaults.
     created_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
     updated_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
+    preached_on_raw = ''
     if TYPE_CHECKING:
         attachments: RelatedManager['Attachment']
         passages: RelatedManager['SermonPassage']

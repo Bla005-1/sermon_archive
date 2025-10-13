@@ -10,7 +10,9 @@
     {% csrf_token %}
     <div class="grid-two">
       <label class="field">Date
-        <input class="input" type="date" name="preached_on" value="{{ sermon.preached_on|date:'Y-m-d' }}">
+        {% with posted=sermon.preached_on_raw %}
+          <input class="input" type="date" name="preached_on" value="{% if posted %}{{ posted }}{% elif sermon.preached_on %}{{ sermon.preached_on|date:'Y-m-d' }}{% endif %}">
+        {% endwith %}
       </label>
       <label class="field">Title
         <input class="input" type="text" name="title" value="{{ sermon.title }}" required>
