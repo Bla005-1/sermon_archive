@@ -89,11 +89,17 @@ def sermon_create(request):
         except (ValidationError, DatabaseError):
             logger.exception('Error creating sermon for user %s', request.user)
             messages.error(request, 'We could not save the sermon. Please fix any issues and try again.')
-            return render(request, 'archive/sermon_form.html', {'sermon': _build_sermon_from_post(data)})
+            return render(request, 'archive/sermon_form.html', {
+                'sermon': _build_sermon_from_post(data),
+                'is_edit': False,
+            })
         messages.success(request, 'Sermon created successfully.')
         logger.info('User %s created sermon %s', request.user, sermon.pk)
         return redirect('sermon_detail', pk=sermon.pk)
-    return render(request, 'archive/sermon_form.html', {'sermon': _build_sermon_from_post({}, Sermon())})
+    return render(request, 'archive/sermon_form.html', {
+        'sermon': _build_sermon_from_post({}, Sermon()),
+        'is_edit': False,
+    })
 
 @login_required
 def sermon_edit(request, pk: int):
@@ -107,12 +113,15 @@ def sermon_edit(request, pk: int):
         except (ValidationError, DatabaseError):
             logger.exception('Error updating sermon %s for user %s', sermon.pk, request.user)
             messages.error(request, 'We could not update the sermon. Please correct any issues and try again.')
-            return render(request, 'archive/sermon_form.html', {'sermon': _build_sermon_from_post(data, sermon)})
+            return render(request, 'archive/sermon_form.html', {
+                'sermon': _build_sermon_from_post(data, sermon),
+                'is_edit': True,
+            })
         messages.success(request, 'Sermon updated successfully.')
         logger.info('User %s updated sermon %s', request.user, sermon.pk)
         return redirect('sermon_detail', pk=sermon.pk)
     sermon.preached_on_raw = ''
-    return render(request, 'archive/sermon_form.html', {'sermon': sermon})
+    return render(request, 'archive/sermon_form.html', {'sermon': sermon, 'is_edit': True})
 
 @login_required
 def passage_preview(request, pk: int):

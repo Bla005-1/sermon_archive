@@ -1,31 +1,29 @@
 {% extends 'base.html' %}
 {% block page_class %}page--compact{% endblock %}
-{% block title %}{% if sermon %}Edit{% else %}New{% endif %} Sermon{% endblock %}
+{% block title %}{% if is_edit %}Edit{% else %}New{% endif %} Sermon{% endblock %}
 {% block content %}
 <div class="form-card">
   <div class="detail-heading">
-    <p class="hero-eyebrow">{% if sermon %}Update{% else %}Create{% endif %}</p>
-    <h1 class="page-title">{% if sermon %}Edit{% else %}New{% endif %} Sermon</h1>
+    <p class="hero-eyebrow">{% if is_edit %}Update{% else %}Create{% endif %}</p>
+    <h1 class="page-title">{% if is_edit %}Edit{% else %}New{% endif %} Sermon</h1>
   </div>
   <form class="form" method="post">
     {% csrf_token %}
     <div class="grid-two">
       <label class="field">Date
-        {% with posted=sermon.preached_on_raw %}
-          <input class="input" type="date" name="preached_on" value="{% if posted %}{{ posted }}{% elif sermon.preached_on %}{{ sermon.preached_on|date:'Y-m-d' }}{% endif %}">
-        {% endwith %}
+        <input class="input" type="date" name="preached_on"{% if is_edit and sermon.preached_on %} value="{{ sermon.preached_on|date:'Y-m-d' }}"{% endif %}>
       </label>
       <label class="field">Title
-        <input class="input" type="text" name="title" value="{{ sermon.title }}" required>
+        <input class="input" type="text" name="title"{% if is_edit and sermon.title %} value="{{ sermon.title }}"{% endif %} required>
       </label>
       <label class="field">Speaker
-        <input class="input" type="text" name="speaker_name" value="{{ sermon.speaker_name }}">
+        <input class="input" type="text" name="speaker_name"{% if is_edit and sermon.speaker_name %} value="{{ sermon.speaker_name }}"{% endif %}>
       </label>
       <label class="field">Series
-        <input class="input" type="text" name="series_name" value="{{ sermon.series_name }}">
+        <input class="input" type="text" name="series_name"{% if is_edit and sermon.series_name %} value="{{ sermon.series_name }}"{% endif %}>
       </label>
       <label class="field">Location
-        <input class="input" type="text" name="location_name" value="{{ sermon.location_name }}">
+        <input class="input" type="text" name="location_name"{% if is_edit and sermon.location_name %} value="{{ sermon.location_name }}"{% endif %}>
       </label>
     </div>
     <div class="field notes-field" data-notes-widget>
@@ -33,7 +31,7 @@
         <label for="id_notes_md">Notes</label>
         <button class="btn btn-ghost" type="button" data-notes-toggle-button aria-pressed="true">Show Plain Text</button>
       </div>
-      <textarea class="input" id="id_notes_md" name="notes_md" rows="10" data-notes-source>{{ sermon.notes_md|default:'' }}</textarea>
+      <textarea class="input" id="id_notes_md" name="notes_md" rows="10" data-notes-source>{% if is_edit %}{{ sermon.notes_md|default:'' }}{% endif %}</textarea>
       <pre class="preview notes-preview__plain" data-notes-plain hidden></pre>
       <div class="preview notes-preview__markdown prose" data-notes-markdown></div>
     </div>
