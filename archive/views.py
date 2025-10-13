@@ -77,40 +77,22 @@ def passage_add(request, pk: int):
         start_v, end_v = tolerant_parse_reference(ref_text)
     except ValueError as e:
         return HttpResponseBadRequest(str(e))
-    next_ord = (
-        SermonPassage.objects
-        .filter(sermon=sermon)
-        .aggregate(m=Max('ord'))['m'] or 0
-    ) + 1
+    next_ord = (sermon.passages.aggregate(m=Max('ord'))['m'] or 0) + 1
     SermonPassage.objects.create(
         sermon=sermon, start_verse=start_v, end_verse=end_v,
         context_note=context_note, ord=next_ord
     )
-    passages = (
-        SermonPassage.objects
-        .filter(sermon=sermon)
-        .select_related('start_verse__book', 'end_verse__book')
-        .order_by('ord')
-    )
-    return render(request, 'archive/_partials/passage_list.html', {'sermon': sermon, 'passages': passages})
+    return render(request, 'archive/_partials/passage_list.html', {'sermon': sermon})
 
 @login_required
 def passage_delete(request, pk: int, ord: int):
     sermon = get_object_or_404(Sermon, pk=pk)
     SermonPassage.objects.filter(sermon=sermon, ord=ord).delete()
-    for i, sp in enumerate(
-        SermonPassage.objects.filter(sermon=sermon).order_by('ord'), start=1
-    ):
+    for i, sp in enumerate(sermon.passages.order_by('ord'), start=1):
         if sp.ord != i:
             sp.ord = i
             sp.save(update_fields=['ord'])
-    passages = (
-        SermonPassage.objects
-        .filter(sermon=sermon)
-        .select_related('start_verse__book', 'end_verse__book')
-        .order_by('ord')
-    )
-    return render(request, 'archive/_partials/passage_list.html', {'sermon': sermon, 'passages': passages})
+    return render(request, 'archive/_partials/passage_list.html', {'sermon': sermon})
 
 @login_required
 @require_POST

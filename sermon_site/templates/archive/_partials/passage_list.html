@@ -1,5 +1,5 @@
 <ul class="bullet-list">
-  {% with ps=passages|default:sermon.sermonpassage_set.all %}
+  {% with ps=passages|default:sermon.passages.all %}
   {% for p in ps %}
     <li>
       {{ p.ref_display }}

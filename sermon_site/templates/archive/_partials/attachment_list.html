@@ -1,9 +1,10 @@
 <ul class="bullet-list">
-  {% for att in sermon.attachments.all %}
+  {% with atts=attachments|default:sermon.attachments.all %}
+  {% for att in atts %}
     <li>
       {{ att.original_filename }} ({{ att.byte_size }} bytes)
       <button class="btn btn-ghost btn-danger"
-        hx-get='{% url "attachment_delete" sermon.pk att.id %}'
+        hx-get='{% url "attachment_delete" sermon.pk att.pk %}'
         hx-target='#attachment-list'
         hx-swap='outerHTML'
         hx-confirm='Delete this file?'>
@@ -13,5 +14,6 @@
   {% empty %}
     <li class="empty">No attachments yet.</li>
   {% endfor %}
+  {% endwith %}
 </ul>
 

@@ -37,12 +37,6 @@
       </button>
       <span class="htmx-indicator" aria-hidden="true"></span>
     </div>
-    <div id="preview"
-         class="preview"
-         hx-get="{% url 'passage_preview' sermon.pk %}"
-         hx-trigger="keyup[ /\\S+\\s+\\d+:\\d+/.test(event.target.value) ] changed delay:300ms from:#ref"
-         hx-target="#preview"
-         hx-vals="js:{ref: document.getElementById('ref').value}"></div>
   </div>
   <div id="passage-list" class="list">
     {% include 'archive/_partials/passage_list.html' %}
@@ -53,11 +47,11 @@
   <div class="notes-panel" data-notes-widget>
     <div class="notes-panel__header">
       <h2 class="panel-title">Notes</h2>
-      <button class="btn btn-ghost" type="button" data-notes-toggle-button aria-pressed="false">Show Markdown</button>
+      <button class="btn btn-ghost" type="button" data-notes-toggle-button aria-pressed="true">Show Plain Text</button>
     </div>
     <textarea hidden data-notes-source>{{ sermon.notes_md|default:'' }}</textarea>
-    <pre class="preview notes-preview__plain" data-notes-plain></pre>
-    <div class="preview notes-preview__markdown prose" data-notes-markdown hidden></div>
+    <pre class="preview notes-preview__plain" data-notes-plain hidden></pre>
+    <div class="preview notes-preview__markdown prose" data-notes-markdown></div>
   </div>
 </section>
 

@@ -1,8 +1,10 @@
 from django.db import models, transaction
 from django.db.models import Max
 from django.utils import timezone
-
-
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from django.db.models.manager import RelatedManager
+    
 # ----------------------------
 # Auth / Django system tables
 # ----------------------------
@@ -196,7 +198,11 @@ class Sermon(models.Model):
     # Avoid NULL on insert; DB has CURRENT_TIMESTAMP defaults.
     created_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
     updated_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
-    
+    if TYPE_CHECKING:
+        attachments: RelatedManager['Attachment']
+        passages: RelatedManager['SermonPassage']
+
+
     class Meta:
         managed = False
         db_table = 'sermons'
@@ -208,7 +214,11 @@ class Sermon(models.Model):
 class Attachment(models.Model):
     attachment_id = models.BigAutoField(primary_key=True)
     # DDL: ON DELETE CASCADE
-    sermon = models.ForeignKey(Sermon, models.CASCADE)
+    sermon = models.ForeignKey(
+        Sermon,
+        models.CASCADE,
+        related_name='attachments',
+    )
     rel_path = models.CharField(max_length=255)
     original_filename = models.CharField(max_length=255, blank=True, null=True)
     mime_type = models.CharField(max_length=64, blank=True, null=True)
@@ -222,35 +232,6 @@ class Attachment(models.Model):
 
     def __str__(self):
         return self.rel_path
-
-
-class Illustration(models.Model):
-    illustration_id = models.BigAutoField(primary_key=True)
-    title = models.CharField(max_length=256)
-    body_md = models.TextField()
-    keywords_csv = models.TextField(blank=True, null=True)
-    source = models.CharField(max_length=256, blank=True, null=True)
-    created_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
-    updated_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'illustrations'
-
-    def __str__(self):
-        return self.title
-
-
-class SermonIllustration(models.Model):
-    # Composite PK per DDL (PRIMARY KEY (sermon_id, illustration_id))
-    pk = models.CompositePrimaryKey('sermon_id', 'illustration_id')
-    sermon = models.ForeignKey(Sermon, models.CASCADE)
-    illustration = models.ForeignKey(Illustration, models.DO_NOTHING)  # DDL: ON DELETE RESTRICT
-    ord = models.PositiveSmallIntegerField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'sermon_illustrations'
 
 
 class OrderedPassageManager(models.Manager):
@@ -278,7 +259,7 @@ class OrderedPassageManager(models.Manager):
 class SermonPassage(models.Model):
     id = models.BigAutoField(primary_key=True)
     # DDL: sermon_id FK ON DELETE CASCADE
-    sermon = models.ForeignKey(Sermon, models.CASCADE)
+    sermon = models.ForeignKey(Sermon, models.CASCADE, related_name='passages')
     # DDL: start_verse_id RESTRICT, end_verse_id RESTRICT
     start_verse = models.ForeignKey(BibleVerse, models.RESTRICT)
     end_verse = models.ForeignKey(

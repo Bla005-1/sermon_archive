@@ -28,11 +28,11 @@
     <div class="field notes-field" data-notes-widget>
       <div class="notes-field__header">
         <label for="id_notes_md">Notes</label>
-        <button class="btn btn-ghost" type="button" data-notes-toggle-button aria-pressed="false">Show Markdown</button>
+        <button class="btn btn-ghost" type="button" data-notes-toggle-button aria-pressed="true">Show Plain Text</button>
       </div>
       <textarea class="input" id="id_notes_md" name="notes_md" rows="10" data-notes-source>{{ sermon.notes_md|default:'' }}</textarea>
-      <pre class="preview notes-preview__plain" data-notes-plain></pre>
-      <div class="preview notes-preview__markdown prose" data-notes-markdown hidden></div>
+      <pre class="preview notes-preview__plain" data-notes-plain hidden></pre>
+      <div class="preview notes-preview__markdown prose" data-notes-markdown></div>
     </div>
     <div class="detail-actions">
       <button class="btn btn-primary" type="submit">Save sermon</button>

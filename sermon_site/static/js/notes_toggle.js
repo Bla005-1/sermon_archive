@@ -9,8 +9,9 @@
       return;
     }
 
-    let isMarkdown = false;
-
+    // Initial mode: aria-pressed="true" means Markdown preview is currently shown.
+    // Rely solely on the button state to avoid desync with hidden attributes.
+    let isMarkdown = toggleButton.getAttribute('aria-pressed') === 'true';
     const readSource = () => {
       if (source.tagName === 'TEXTAREA') {
         return source.value || '';
@@ -38,13 +39,17 @@
 
     const updateMode = () => {
       if (isMarkdown) {
-        plainEl.hidden = true;
+        // Show Markdown, hide plain
         markdownEl.hidden = false;
+        plainEl.hidden = true;
+        // Button indicates the action (switch to Plain Text)
         toggleButton.textContent = 'Show Plain Text';
         toggleButton.setAttribute('aria-pressed', 'true');
       } else {
-        markdownEl.hidden = true;
+        // Show Plain, hide Markdown
         plainEl.hidden = false;
+        markdownEl.hidden = true;
+        // Button indicates the action (switch to Markdown)
         toggleButton.textContent = 'Show Markdown';
         toggleButton.setAttribute('aria-pressed', 'false');
       }
