@@ -27,8 +27,8 @@ def _build_storage_path(base_storage: str, sermon) -> str:
     """Create the directory path where files for the sermon should live."""
 
     year = sermon.preached_on.year if getattr(sermon, 'preached_on', None) else date.today().year
-    root = os.path.join(base_storage, str(year), str(sermon.id))
-    logger.debug('Resolved attachment storage root %s for sermon %s', root, sermon.id)
+    root = os.path.join(base_storage, str(year), str(sermon.sermon_id))
+    logger.debug('Resolved attachment storage root %s for sermon %s', root, sermon.sermon_id)
     return root
 
 
@@ -45,19 +45,19 @@ def save_attachment_file(sermon, uploaded_file):
     try:
         os.makedirs(root, exist_ok=True)
     except OSError as exc:  # pragma: no cover - exercised in filesystem errors
-        logger.exception('Unable to create attachment directory %s for sermon %s', root, sermon.id)
+        logger.exception('Unable to create attachment directory %s for sermon %s', root, sermon.sermon_id)
         raise AttachmentStorageError('Unable to prepare a storage location for the attachment.') from exc
 
     fn = f'{uuid.uuid4().hex}__{uploaded_file.name}'
     abs_path = os.path.join(root, fn)
-    logger.info('Saving attachment %s to %s for sermon %s', uploaded_file.name, abs_path, sermon.id)
+    logger.info('Saving attachment %s to %s for sermon %s', uploaded_file.name, abs_path, sermon.sermon_id)
 
     try:
         with open(abs_path, 'wb') as f:
             for chunk in uploaded_file.chunks():
                 f.write(chunk)
     except OSError as exc:  # pragma: no cover - exercised in filesystem errors
-        logger.exception('Unable to write attachment %s for sermon %s', uploaded_file.name, sermon.id)
+        logger.exception('Unable to write attachment %s for sermon %s', uploaded_file.name, sermon.sermon_id)
         raise AttachmentStorageError('Unable to save the uploaded attachment. Please try again.') from exc
 
     rel_path = os.path.relpath(abs_path, base_storage)
@@ -67,6 +67,6 @@ def save_attachment_file(sermon, uploaded_file):
         'byte_size': getattr(uploaded_file, 'size', os.path.getsize(abs_path)),
     }
 
-    logger.debug('Attachment %s saved for sermon %s (%s)', uploaded_file.name, sermon.id, metadata)
+    logger.debug('Attachment %s saved for sermon %s (%s)', uploaded_file.name, sermon.sermon_id, metadata)
     return rel_path, metadata
 

@@ -12,9 +12,9 @@ from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .models import Attachment, Sermon, SermonPassage
+from .models import Attachment, BibleBook, Sermon, SermonPassage
 from .storage import AttachmentStorageError, save_attachment_file
-from .verse_parser import tolerant_parse_reference
+from .verse_parser import BOOK_ALIASES, normalize_book, tolerant_parse_reference
 
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,16 @@ def sermon_list(request):
 def sermon_detail(request, pk: int):
     sermon = get_object_or_404(Sermon, pk=pk)
     logger.debug('User %s viewing sermon %s', request.user, pk)
-    return render(request, 'archive/sermon_detail.html', {'sermon': sermon})
+    book_suggestions = [
+        {'name': book.name, 'normalized': normalize_book(book.name)}
+        for book in BibleBook.objects.order_by('order_num')
+    ]
+    ctx = {
+        'sermon': sermon,
+        'book_suggestions': book_suggestions,
+        'book_aliases': BOOK_ALIASES,
+    }
+    return render(request, 'archive/sermon_detail.html', ctx)
 
 @login_required
 def sermon_create(request):
