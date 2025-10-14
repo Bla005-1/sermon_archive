@@ -6,3 +6,4 @@
 @import "notes.css";
 @import "responsive.css";
 @import "compact.css";
+[hidden] { display: none; }

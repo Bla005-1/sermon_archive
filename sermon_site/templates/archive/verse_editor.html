@@ -5,7 +5,7 @@
 <div class="form-card" data-verse-editor>
   <div class="detail-heading">
     <p class="hero-eyebrow">Scripture tools</p>
-    <h1 class="page-title">Add Verse</h1>
+    <h1 class="page-title">Verse Tools</h1>
     <p class="muted">Search for a verse or passage to view translations and notes.</p>
   </div>
   <form class="form" method="post" data-verse-editor-form{% if result and result.force_new_translation %} data-force-new-translation="true"{% endif %}>
@@ -39,7 +39,7 @@
         </div>
         <div class="stack gap-md">
           <div class="grid-two">
-            <label class="field">Translation
+            <label class="field" data-translation-select-field>Translation
               <select class="input" name="translation" data-translation-select{% if result.is_read_only %} disabled{% endif %}>
                 {% for t in result.available_translations %}
                   <option value="{{ t }}"{% if t == result.selected_translation %} selected{% endif %}>{{ t }}</option>
@@ -56,9 +56,9 @@
               <input class="input" type="text" name="new_translation_name" value="{{ result.new_translation_name|default:'' }}" data-new-translation-input>
             </label>
           </div>
-          <div class="field" data-existing-translation-field>
+          <div class="field" data-verse-field>
             <label class="field">Text
-              <textarea class="input verse-textarea" name="verse_text" rows="6" data-verse-text-existing{% if result.is_read_only %} readonly{% endif %}
+              <textarea class="input verse-textarea" name="verse_text" rows="6" data-verse-text{% if result.is_read_only %} readonly{% endif %}
                         data-initial-value="{{ result.verse_text|default:'' }}">{{ result.verse_text|default:'' }}</textarea>
             </label>
           </div>
@@ -92,7 +92,7 @@
               <span class="badge">{{ result.single_label }}</span>
               <button class="btn btn-ghost" type="button" data-note-edit-button>Edit</button>
             </div>
-            <div class="preview notes-preview__markdown prose" data-note-display{% if not result.note_html %} hidden{% endif %}>{{ result.note_html|safe }}</div>
+            <div class="preview notes-preview__markdown prose" data-note-display{% if not result.note_text %} hidden{% endif %}>{{ result.note_html|safe }}</div>
           </div>
           <div class="field notes-field" data-note-editor{% if result.note_text %} hidden{% endif %}>
             <div class="notes-field__header">
