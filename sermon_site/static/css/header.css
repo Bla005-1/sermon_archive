@@ -5,8 +5,49 @@
 .brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:11px;background:linear-gradient(135deg, var(--brand), var(--brand-strong));color:var(--brand-fg);font-weight:600;box-shadow:var(--shadow-sm)}
 .brand-text{display:inline-flex;align-items:center;gap:8px}
 .brand-tagline{margin:0;color:var(--muted);font-size:.9rem}
-.header-actions{margin-left:auto;display:flex;align-items:center;gap:12px;padding:4px;background:transparent;border:none;box-shadow:none;border-radius:999px}
-.header-nav{display:flex}
+.header-actions{margin-left:auto;display:flex;align-items:center;gap:12px;padding:4px;background:transparent;border:none;box-shadow:none;border-radius:999px;position:relative}
+.header-nav{display:flex;align-items:center;gap:12px}
+.header-menu-toggle{
+  display:none;
+  appearance:none;
+  border:1px solid var(--border);
+  background:var(--surface-strong);
+  color:var(--brand-strong);
+  border-radius:18px;
+  padding:10px;
+  min-height:38px;
+  min-width:44px;
+  cursor:pointer;
+  box-shadow:var(--shadow-sm);
+  transition:transform var(--transition), box-shadow var(--transition), background var(--transition), color var(--transition);
+  align-items:center;
+  justify-content:center;
+  gap:0;
+}
+.header-menu-toggle:hover{background:var(--action-bg);color:var(--brand-strong);transform:translateY(-1px)}
+.header-menu-toggle:focus{outline:none;box-shadow:0 0 0 4px var(--accent)}
+.header-menu-toggle .hamburger{display:inline-flex;flex-direction:column;gap:5px}
+.header-menu-toggle .hamburger span{display:block;width:18px;height:2px;border-radius:999px;background:currentColor}
+.header-actions.is-collapsed{gap:8px;padding:0}
+.header-actions.is-collapsed .header-menu-toggle{display:inline-flex}
+.header-actions.is-collapsed .header-nav{
+  position:absolute;
+  top:calc(100% + 10px);
+  right:0;
+  display:none;
+  flex-direction:column;
+  gap:8px;
+  padding:14px;
+  border-radius:var(--radius);
+  border:1px solid var(--border);
+  background:var(--surface-strong);
+  box-shadow:var(--shadow-lg);
+  min-width:190px;
+  z-index:60;
+}
+.header-actions.is-collapsed.is-open .header-nav{display:flex}
+.header-actions.is-collapsed .header-action{width:100%;justify-content:flex-start}
+.header-actions.is-collapsed .header-action:hover{transform:none}
 .header-action,
 .header-action:link,
 .header-action:visited,

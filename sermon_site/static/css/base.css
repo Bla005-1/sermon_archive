@@ -23,10 +23,11 @@
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg: #101225;
+    --bg: #0c0e1a;
+    --surface: rgba(37, 42, 78, 0.85);
     --bg-accent: rgba(143, 138, 255, 0.18);
     --surface: rgba(27, 30, 60, 0.68);
-    --surface-strong: rgba(27, 30, 60, 0.88);
+    --surface-strong: rgba(27, 30, 60, 0.658);
     --header-surface: rgba(20, 22, 45, 0.9);
     --fg: #e4e6ff;
     --muted: #a3a6d4;
@@ -55,3 +56,14 @@ body{
 body::before{content:none}
 a{color:inherit;text-decoration:none}
 a:hover{text-decoration:none}
+.sr-only{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0, 0, 0, 0);
+  white-space:nowrap;
+  border:0;
+}
