@@ -283,6 +283,17 @@ textarea{min-height:180px;resize:vertical}
 .page--compact .form-card,
 .page--compact .panel{ padding: 16px; }
 
+.page--compact .form-card{ width: min(100%, 680px); }
+
+@media (max-width: 720px){
+  .page--compact .form-card{
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
 @media (max-width: 640px){
   .page--compact .form-card,
   .page--compact .panel{ padding: 10px 12px; }
