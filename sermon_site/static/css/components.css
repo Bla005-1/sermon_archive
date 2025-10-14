@@ -57,6 +57,7 @@ textarea{min-height:180px;resize:vertical}
 .card-link{display:flex;flex-direction:column;gap:12px;padding:24px 26px;position:relative}
 .card-title{font-size:1.2rem;font-weight:600;margin:0}
 .card-meta{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:.95rem}
+.card-note{margin:0;font-size:.95rem}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--accent);font-weight:500;font-size:.85rem}
 .bullet-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .bullet-list li{border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:18px}
@@ -64,6 +65,7 @@ textarea{min-height:180px;resize:vertical}
 .panel{border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;background:var(--surface);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:18px}
 .panel-title{margin:0;font-size:1.35rem}
 .detail-header, .detail-hero{display:flex;flex-direction:column;gap:20px}
+.detail-back{margin-bottom:16px}
 @media (min-width: 860px){.detail-hero{flex-direction:row;justify-content:space-between;align-items:flex-end}}
 .detail-heading{display:flex;flex-direction:column;gap:14px}
 .detail-meta{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted)}

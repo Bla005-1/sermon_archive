@@ -2,6 +2,11 @@
 {% block page_class %}page--compact{% endblock %}
 {% block title %}{{ sermon.title }}{% endblock %}
 {% block content %}
+{% if back_to_results_url %}
+<div class="detail-back">
+  <a class="btn btn-ghost" href="{{ back_to_results_url }}">← Back to results</a>
+</div>
+{% endif %}
 <section class="detail-hero">
   <div class="detail-heading">
     <p class="hero-eyebrow">Message detail</p>

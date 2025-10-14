@@ -109,6 +109,32 @@
         {% endif %}
       </div>
 
+      {% if result.related_sermons %}
+      <div class="panel stack" id="related-sermons">
+        <div class="stack gap-sm">
+          <h2 class="panel-title">Related Sermons</h2>
+          <p class="muted">Explore how this passage has been preached before.</p>
+        </div>
+        <ul class="card-grid">
+          {% for related in result.related_sermons %}
+          <li class="card">
+            <a class="card-link" href="{{ related.detail_url }}">
+              <div class="card-title">{{ related.ref_text }}</div>
+              {% if related.context_note %}
+                <p class="card-note muted">{{ related.context_note }}</p>
+              {% endif %}
+              <div class="card-meta">
+                <span class="badge">{{ related.sermon.preached_on }}</span>
+                <span class="sep">•</span><span>{{ related.sermon.title }}</span>
+                {% if related.sermon.speaker_name %}<span class="sep">•</span><span>{{ related.sermon.speaker_name }}</span>{% endif %}
+              </div>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
       <div class="detail-actions">
         <button class="btn btn-primary" type="submit" name="form_action" value="save" data-save-button disabled{% if result.is_read_only %} aria-disabled="true"{% endif %}>Save changes</button>
       </div>

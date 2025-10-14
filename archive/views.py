@@ -9,7 +9,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 from django.db import DatabaseError, transaction
-from django.db.models import Max
+from django.db.models import F, Max
+from django.db.models.functions import Coalesce
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -155,6 +156,113 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
     return result, ''
 
 
+def _serialize_related_passages(back_params, query_start, query_end, passages):
+    if not query_start or not query_end or not passages:
+        return []
+
+    query_start, query_end = (min(query_start, query_end), max(query_start, query_end))
+    query_length = (query_end - query_start) + 1
+    is_single = query_start == query_end
+
+    serialized = []
+
+    for passage in passages:
+        sermon = passage.sermon
+        start_id = getattr(passage, 'start_id', None)
+        if start_id is None:
+            start_id = getattr(passage, 'start_verse_id', None) or passage.start_verse.verse_id
+        end_id = getattr(passage, 'end_id', None)
+        if end_id is None:
+            if passage.end_verse_id:
+                end_id = passage.end_verse.verse_id
+            else:
+                end_id = start_id
+
+        length = (end_id - start_id) + 1
+
+        detail_url = reverse('sermon_detail', kwargs={'pk': sermon.pk})
+        if back_params:
+            detail_url = f"{detail_url}?{urlencode(back_params)}"
+
+        display_text = passage.ref_text or passage.ref_display()
+
+        payload = {
+            'sermon': sermon,
+            'ref_text': display_text,
+            'context_note': passage.context_note or '',
+            'detail_url': detail_url,
+        }
+
+        if is_single:
+            is_exact = start_id == query_start and end_id == query_end
+            boundary_distance = abs(start_id - query_start) + abs(end_id - query_end)
+            date_key = -sermon.preached_on.toordinal() if sermon.preached_on else float('inf')
+            sort_key = (
+                0 if is_exact else 1,
+                length,
+                boundary_distance,
+                date_key,
+                -sermon.pk,
+            )
+        else:
+            overlap_start = max(start_id, query_start)
+            overlap_end = min(end_id, query_end)
+            overlap_length = overlap_end - overlap_start + 1 if overlap_end >= overlap_start else 0
+            if overlap_length <= 0:
+                continue
+            coverage_ratio = overlap_length / query_length
+            length_diff = abs(length - query_length)
+            start_diff = abs(start_id - query_start)
+            end_diff = abs(end_id - query_end)
+            date_key = -sermon.preached_on.toordinal() if sermon.preached_on else float('inf')
+            coverage_group = 0
+            if coverage_ratio < 1:
+                coverage_group = 1 if coverage_ratio >= 0.5 else 2
+            if coverage_ratio == 1 and length_diff >= query_length:
+                coverage_group = max(coverage_group, 1)
+            if coverage_ratio < 1 and length_diff >= query_length:
+                coverage_group = max(coverage_group, 2)
+            sort_key = (
+                coverage_group,
+                length_diff,
+                start_diff,
+                end_diff,
+                -overlap_length,
+                date_key,
+                -sermon.pk,
+            )
+
+        serialized.append((sort_key, payload))
+
+    serialized.sort(key=lambda item: item[0])
+    return [item[1] for item in serialized]
+
+
+def _build_related_sermons(reference_text: str, translation: str, start_verse_id: int, end_verse_id: int):
+    if not start_verse_id or not end_verse_id:
+        return []
+
+    query_start = min(start_verse_id, end_verse_id)
+    query_end = max(start_verse_id, end_verse_id)
+
+    passages = list(
+        SermonPassage.objects.select_related('sermon', 'start_verse__book', 'end_verse__book')
+        .annotate(
+            start_id=F('start_verse__verse_id'),
+            end_id=Coalesce('end_verse__verse_id', F('start_verse__verse_id')),
+        )
+        .filter(start_id__lte=query_end, end_id__gte=query_start)
+    )
+
+    back_params = {}
+    if reference_text:
+        back_params['from_ref'] = reference_text
+    if translation:
+        back_params['from_translation'] = translation
+
+    return _serialize_related_passages(back_params, query_start, query_end, passages)
+
+
 def _build_sermon_from_post(data, instance=None):
     """Populate a Sermon instance (or stub) with POSTed data for redisplay."""
 
@@ -198,10 +306,20 @@ def sermon_detail(request, pk: int):
         {'name': book.name, 'normalized': normalize_book(book.name)}
         for book in BibleBook.objects.order_by('order_num')
     ]
+    back_to_results = ''
+    back_reference = request.GET.get('from_ref', '').strip()
+    if back_reference:
+        params = {'ref': back_reference}
+        back_translation = request.GET.get('from_translation', '').strip()
+        if back_translation:
+            params['translation'] = back_translation
+        query = urlencode(params)
+        back_to_results = f"{reverse('verse_editor')}?{query}#related-sermons"
     ctx = {
         'sermon': sermon,
         'book_suggestions': book_suggestions,
         'book_aliases': BOOK_ALIASES,
+        'back_to_results_url': back_to_results,
     }
     return render(request, 'archive/sermon_detail.html', ctx)
 
@@ -346,6 +464,14 @@ def verse_editor(request):
         # Ensure note preview reflects stored markdown when landing from redirect.
         result['note_html'] = _render_markdown(result['note_text']) if result['note_text'] else ''
         result['new_translation_text'] = ''
+
+    if result:
+        result['related_sermons'] = _build_related_sermons(
+            reference,
+            result.get('selected_translation', ''),
+            result['start_verse_id'],
+            result['end_verse_id'],
+        )
 
     book_suggestions = [
         {'name': book.name, 'normalized': normalize_book(book.name)}

@@ -4,7 +4,7 @@
     {% for p in ps %}
       <li>
         {{ p.ref_display }}
-        {% if p.context_note %} ({{ p.context_note }}){% endif %}
+        {% if p.context_note %} - {{ p.context_note }}{% endif %}
         <button class="btn btn-ghost btn-danger"
           hx-get='{% url "passage_delete" sermon.pk p.ord %}'
           hx-target='#passage-list'

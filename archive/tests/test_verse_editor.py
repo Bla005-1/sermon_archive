@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from types import SimpleNamespace
 import unittest
 
@@ -46,3 +47,58 @@ class VerseEditorHelperTests(unittest.TestCase):
         text = '¹⁶ For God so loved the world ⁴²'
 
         self.assertEqual(views._strip_superscripts(text), ' For God so loved the world ')
+
+
+class RelatedSermonSerializationTests(unittest.TestCase):
+    def make_passage(self, pk, start, end=None, *, ref_text='', context_note='', preached_on=None, speaker='Speaker'):
+        sermon = SimpleNamespace(
+            pk=pk,
+            preached_on=preached_on or date(2024, 1, pk),
+            title=f'Sermon {pk}',
+            speaker_name=speaker,
+        )
+
+        end_value = end if end is not None else start
+
+        class Passage(SimpleNamespace):
+            def ref_display(self_inner):
+                return self_inner._display
+
+        return Passage(
+            sermon=sermon,
+            start_id=start,
+            end_id=end_value,
+            ref_text=ref_text,
+            context_note=context_note,
+            start_verse=SimpleNamespace(verse_id=start),
+            end_verse=SimpleNamespace(verse_id=end_value),
+            end_verse_id=end,
+            _display=ref_text or f'Passage {pk}',
+        )
+
+    def test_single_verse_prioritizes_exact_matches(self):
+        passages = [
+            self.make_passage(1, 99, 101, ref_text='John 3:15–17'),
+            self.make_passage(2, 100, 100, ref_text='John 3:16'),
+            self.make_passage(3, 97, 104, ref_text='John 3:13–18'),
+        ]
+
+        serialized = views._serialize_related_passages({'from_ref': 'John 3:16'}, 100, 100, passages)
+
+        self.assertEqual([item['ref_text'] for item in serialized], ['John 3:16', 'John 3:15–17', 'John 3:13–18'])
+        self.assertTrue(serialized[0]['detail_url'].endswith('from_ref=John+3%3A16'))
+
+    def test_passage_results_rank_by_overlap_then_length(self):
+        passages = [
+            self.make_passage(1, 100, 102, ref_text='John 3:16–18'),
+            self.make_passage(2, 99, 103, ref_text='John 3:15–19'),
+            self.make_passage(3, 100, 101, ref_text='John 3:16–17'),
+            self.make_passage(4, 100, 110, ref_text='John 3:16–4:2'),
+        ]
+
+        serialized = views._serialize_related_passages({'from_ref': 'John 3:16-18'}, 100, 102, passages)
+
+        self.assertEqual(
+            [item['ref_text'] for item in serialized],
+            ['John 3:16–18', 'John 3:15–19', 'John 3:16–17', 'John 3:16–4:2'],
+        )
