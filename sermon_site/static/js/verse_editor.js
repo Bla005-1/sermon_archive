@@ -382,6 +382,16 @@
       const selectEl = crossrefContainer.querySelector('[data-crossref-select]');
       const defaultActive = crossrefContainer.getAttribute('data-active-verse') || '';
 
+      const verseEditorUrl = crossrefContainer.getAttribute('data-verse-editor-url') || '';
+
+      const buildVerseEditorLink = function (reference) {
+        if (!verseEditorUrl || !reference) {
+          return '';
+        }
+        const joiner = verseEditorUrl.includes('?') ? '&' : '?';
+        return `${verseEditorUrl}${joiner}ref=${encodeURIComponent(reference)}`;
+      };
+
       const renderCrossReferences = function (verseId) {
         if (!listEl) {
           return;
@@ -399,9 +409,14 @@
         for (const item of items) {
           const li = document.createElement('li');
           li.className = 'cross-reference-item';
-          const refEl = document.createElement('div');
+          const refEl = document.createElement('a');
           refEl.className = 'cross-reference-item__ref';
-          refEl.textContent = item.reference || '';
+          const referenceText = item.reference || '';
+          refEl.textContent = referenceText;
+          const link = buildVerseEditorLink(referenceText);
+          if (link) {
+            refEl.href = link;
+          }
           const textEl = document.createElement('p');
           textEl.className = 'cross-reference-item__text';
           textEl.textContent = item.text || '';

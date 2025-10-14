@@ -143,7 +143,7 @@
       {% endif %}
 
       {% if result.cross_references.has_any %}
-      <div class="panel stack" id="cross-references" data-crossref-container data-active-verse="{{ result.cross_references.active_verse_id }}">
+      <div class="panel stack" id="cross-references" data-crossref-container data-active-verse="{{ result.cross_references.active_verse_id }}" data-verse-editor-url="{% url 'verse_editor' %}">
         <div class="stack gap-sm">
           <h2 class="panel-title">Cross References</h2>
           <p class="muted">See supporting verses from the KJV translation.</p>
@@ -163,7 +163,7 @@
         <ul class="cross-reference-list" data-crossref-list{% if not result.cross_references.initial_items %} hidden{% endif %}>
           {% for item in result.cross_references.initial_items %}
             <li class="cross-reference-item">
-              <div class="cross-reference-item__ref">{{ item.reference }}</div>
+              <a class="cross-reference-item__ref" href="{% url 'verse_editor' %}?ref={{ item.reference|urlencode }}">{{ item.reference }}</a>
               <p class="cross-reference-item__text">{{ item.text }}</p>
             </li>
           {% endfor %}
