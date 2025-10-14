@@ -1,18 +1,30 @@
 """View logic for the sermon archive application."""
 
 import logging
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
-from django.db import DatabaseError
+from django.db import DatabaseError, transaction
 from django.db.models import Max
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.urls import reverse
 from django.views.decorators.http import require_POST
+from markdown2 import Markdown
 
-from .models import Attachment, BibleBook, Sermon, SermonPassage
+from .models import (
+    Attachment,
+    BibleBook,
+    BibleVerse,
+    Sermon,
+    SermonPassage,
+    VerseNote,
+    VerseText,
+)
 from .storage import AttachmentStorageError, save_attachment_file
 from .verse_parser import BOOK_ALIASES, normalize_book, tolerant_parse_reference
 
@@ -21,6 +33,118 @@ logger = logging.getLogger(__name__)
 
 
 SERMON_FIELDS = ['preached_on', 'title', 'speaker_name', 'series_name', 'location_name', 'notes_md']
+
+PREFERRED_TRANSLATIONS = ('NIV', 'ESV', 'KJV')
+_SUPERSCRIPT_DIGITS = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
+_markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
+
+
+def _superscript_number(number: int) -> str:
+    return ''.join(_SUPERSCRIPT_DIGITS.get(ch, ch) for ch in str(number))
+
+
+def _determine_available_translations(verse_ids, translation_map):
+    available = []
+    for name, verse_texts in translation_map.items():
+        if all(vid in verse_texts for vid in verse_ids):
+            available.append(name)
+    return available
+
+
+def _select_default_translation(available):
+    for candidate in PREFERRED_TRANSLATIONS:
+        if candidate in available:
+            return candidate
+    return available[0] if available else None
+
+
+def _join_passage_text(verses, verse_text_lookup):
+    parts = []
+    for verse in verses:
+        text = verse_text_lookup.get(verse.verse_id, '')
+        marker = _superscript_number(verse.verse)
+        if text:
+            parts.append(f'{marker} {text}')
+        else:
+            parts.append(marker)
+    return ' '.join(p.strip() for p in parts if p).strip()
+
+
+def _render_markdown(text: str) -> str:
+    return _markdown_renderer.convert(text or '')
+
+
+def _format_reference(start, end):
+    if start.verse_id == end.verse_id:
+        return f'{start.book.name} {start.chapter}:{start.verse}'
+    return f'{start.book.name} {start.chapter}:{start.verse}–{end.verse}'
+
+
+def _load_passage_context(reference_text: str, forced_translation: str = ''):
+    try:
+        start_v, end_v = tolerant_parse_reference(reference_text)
+    except ValueError as exc:
+        return None, str(exc)
+
+    verses = list(
+        BibleVerse.objects.filter(
+            book=start_v.book,
+            chapter=start_v.chapter,
+            verse__gte=start_v.verse,
+            verse__lte=end_v.verse,
+        ).order_by('verse')
+    )
+    verse_ids = [v.verse_id for v in verses]
+    verse_texts = VerseText.objects.filter(verse__in=verses).order_by('translation', 'verse__verse')
+    translation_map = {}
+    for vt in verse_texts:
+        translation_map.setdefault(vt.translation, {})[vt.verse_id] = vt.text
+
+    available_translations = _determine_available_translations(verse_ids, translation_map)
+    selected_translation = ''
+    if forced_translation and forced_translation in available_translations:
+        selected_translation = forced_translation
+    else:
+        selected_translation = _select_default_translation(available_translations)
+
+    translation_payload = {
+        name: _join_passage_text(verses, verse_lookup)
+        for name, verse_lookup in translation_map.items()
+        if name in available_translations
+    }
+    verse_text = translation_payload.get(selected_translation, '')
+
+    note_map = {n.verse_id: n for n in VerseNote.objects.filter(verse__in=verses)}
+    is_range = len(verses) > 1
+    notes_payload = []
+    for verse in verses:
+        note_obj = note_map.get(verse.verse_id)
+        notes_payload.append(
+            {
+                'label': f'{verse.book.name} {verse.chapter}:{verse.verse}',
+                'html': _render_markdown(note_obj.note_md) if note_obj and note_obj.note_md else '',
+            }
+        )
+
+    note_entry = note_map.get(verses[0].verse_id) if verses else None
+    result = {
+        'start_verse_id': verses[0].verse_id if verses else None,
+        'end_verse_id': verses[-1].verse_id if verses else None,
+        'available_translations': available_translations,
+        'selected_translation': selected_translation or '',
+        'translation_payload': translation_payload,
+        'verse_text': verse_text,
+        'is_read_only': is_range,
+        'notes': notes_payload,
+        'heading': _format_reference(start_v, end_v),
+        'description': 'Compare translations across the passage.' if is_range else 'Edit translation text and notes for this verse.',
+        'single_label': f'{start_v.book.name} {start_v.chapter}:{start_v.verse}',
+        'note_text': note_entry.note_md if note_entry and note_entry.note_md else '',
+        'note_html': _render_markdown(note_entry.note_md) if note_entry and note_entry.note_md else '',
+        'force_new_translation': False,
+        'new_translation_name': '',
+    }
+    return result, ''
 
 
 def _build_sermon_from_post(data, instance=None):
@@ -122,6 +246,107 @@ def sermon_edit(request, pk: int):
         return redirect('sermon_detail', pk=sermon.pk)
     sermon.preached_on_raw = ''
     return render(request, 'archive/sermon_form.html', {'sermon': sermon, 'is_edit': True})
+
+
+@login_required
+def verse_editor(request):
+    reference = request.GET.get('ref', '').strip()
+    translation_hint = request.GET.get('translation', '').strip()
+    error_message = ''
+    result = None
+
+    if request.method == 'POST':
+        action = request.POST.get('form_action')
+        reference = request.POST.get('reference', '').strip()
+        translation_hint = request.POST.get('selected_translation', '').strip()
+        if action == 'save':
+            result, error_message = _load_passage_context(reference, translation_hint)
+            if error_message:
+                messages.error(request, error_message)
+            elif result['is_read_only']:
+                messages.error(request, 'Passages are view-only. Please select a single verse to edit translation text or notes.')
+            else:
+                verse = get_object_or_404(BibleVerse, pk=result['start_verse_id'])
+                translation_mode = request.POST.get('translation_mode', 'existing')
+                verse_text_value = request.POST.get('verse_text', '')
+                note_md = request.POST.get('note_md')
+                note_original = request.POST.get('note_original', '')
+                if translation_mode == 'new':
+                    translation_name = request.POST.get('new_translation_name', '').strip().upper()
+                else:
+                    translation_name = request.POST.get('translation', '').strip()
+
+                existing_lower = {name.lower() for name in result['available_translations']}
+
+                if translation_mode == 'new' and not translation_name:
+                    messages.error(request, 'Please provide a translation label for the new text.')
+                elif translation_mode != 'new' and not translation_name:
+                    messages.error(request, 'Select a translation to update or choose “Add New Translation”.')
+                elif not verse_text_value.strip():
+                    messages.error(request, 'Please enter the verse text before saving.')
+                elif translation_mode == 'new' and translation_name.lower() in existing_lower:
+                    messages.error(request, f'The translation "{translation_name}" already exists for this verse.')
+                else:
+                    with transaction.atomic():
+                        VerseText.objects.update_or_create(
+                            verse=verse,
+                            translation=translation_name,
+                            defaults={'text': verse_text_value.strip()},
+                        )
+                        if note_md is not None and note_md != note_original:
+                            VerseNote.objects.update_or_create(
+                                verse=verse,
+                                defaults={
+                                    'note_md': note_md,
+                                    'updated_at': timezone.now(),
+                                },
+                            )
+                    messages.success(request, 'Verse details saved successfully.')
+                    logger.info('User %s updated verse %s (%s)', request.user, verse.pk, translation_name)
+                    query = urlencode({'ref': reference, 'translation': translation_name})
+                    redirect_url = f"{reverse('verse_editor')}?{query}"
+                    return redirect(redirect_url)
+
+                if result:
+                    result['force_new_translation'] = translation_mode == 'new'
+                    if translation_mode == 'new':
+                        result['selected_translation'] = ''
+                        result['new_translation_name'] = translation_name
+                        result['verse_text'] = verse_text_value
+                    else:
+                        result['selected_translation'] = translation_name
+                        result['verse_text'] = verse_text_value
+                        if translation_name:
+                            result['translation_payload'][translation_name] = verse_text_value
+                    if note_md is not None:
+                        result['note_text'] = note_md
+                        result['note_html'] = _render_markdown(note_md) if note_md else ''
+        else:
+            result, error_message = _load_passage_context(reference, translation_hint)
+            if error_message:
+                messages.error(request, error_message)
+    elif reference:
+        result, error_message = _load_passage_context(reference, translation_hint)
+
+    if not result and not error_message and reference:
+        result, error_message = _load_passage_context(reference, translation_hint)
+
+    if result and request.method != 'POST':
+        # Ensure note preview reflects stored markdown when landing from redirect.
+        result['note_html'] = _render_markdown(result['note_text']) if result['note_text'] else ''
+
+    book_suggestions = [
+        {'name': book.name, 'normalized': normalize_book(book.name)}
+        for book in BibleBook.objects.order_by('order_num')
+    ]
+    ctx = {
+        'reference': reference,
+        'result': result,
+        'error_message': error_message,
+        'book_suggestions': book_suggestions,
+        'book_aliases': BOOK_ALIASES,
+    }
+    return render(request, 'archive/verse_editor.html', ctx)
 
 @login_required
 def passage_preview(request, pk: int):

@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block page_class %}page--compact{% endblock %}
+{% block title %}Add Verse{% endblock %}
+{% block content %}
+<div class="form-card" data-verse-editor>
+  <div class="detail-heading">
+    <p class="hero-eyebrow">Scripture tools</p>
+    <h1 class="page-title">Add Verse</h1>
+    <p class="muted">Search for a verse or passage to view translations and notes.</p>
+  </div>
+  <form class="form" method="post" data-verse-editor-form{% if result and result.force_new_translation %} data-force-new-translation="true"{% endif %}>
+    {% csrf_token %}
+    <div class="grid-two">
+      <label class="field">Reference
+        <div class="input-with-suggestions" data-passage-suggestion-container>
+          <input class="input" type="text" name="reference" value="{{ reference|default:'' }}" required
+                 placeholder="e.g., John 3:16-17" autocomplete="off" data-passage-input>
+          <div class="suggestions-panel" data-passage-suggestions hidden></div>
+        </div>
+      </label>
+      <div class="field field--submit">
+        <span class="field-label" aria-hidden="true">&nbsp;</span>
+        <button class="btn btn-primary" type="submit" name="form_action" value="search">Search</button>
+      </div>
+    </div>
+    {% if error_message %}
+    <div class="alert alert--error">{{ error_message }}</div>
+    {% endif %}
+
+    {% if result %}
+      <input type="hidden" name="start_verse_id" value="{{ result.start_verse_id }}">
+      <input type="hidden" name="end_verse_id" value="{{ result.end_verse_id }}">
+      <input type="hidden" name="selected_translation" value="{{ result.selected_translation|default:'' }}" data-selected-translation>
+      <input type="hidden" name="translation_mode" value="existing" data-translation-mode>
+      <div class="panel stack">
+        <div class="stack gap-sm">
+          <h2 class="panel-title">{{ result.heading }}</h2>
+          <p class="muted">{{ result.description }}</p>
+        </div>
+        <div class="stack gap-md">
+          <div class="grid-two">
+            <label class="field">Translation
+              <select class="input" name="translation" data-translation-select{% if result.is_read_only %} disabled{% endif %}>
+                {% for t in result.available_translations %}
+                  <option value="{{ t }}"{% if t == result.selected_translation %} selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="field field--submit">
+              <span class="field-label" aria-hidden="true">&nbsp;</span>
+              <button class="btn btn-ghost" type="button" data-add-translation{% if result.is_read_only %} disabled{% endif %}>Add New Translation</button>
+            </div>
+          </div>
+          <div class="field" data-new-translation-field hidden>
+            <label class="field">New translation label
+              <input class="input" type="text" name="new_translation_name" value="{{ result.new_translation_name|default:'' }}" data-new-translation-input>
+            </label>
+          </div>
+          <label class="field">Text
+            <textarea class="input" name="verse_text" rows="6" data-verse-text{% if result.is_read_only %} readonly{% endif %}
+                      data-initial-value="{{ result.verse_text|default:'' }}">{{ result.verse_text|default:'' }}</textarea>
+          </label>
+          {% if result.is_read_only %}
+            <p class="muted">Passage text is view-only. Select an individual verse to edit or add translations.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel stack" data-notes-section>
+        <h2 class="panel-title">Notes</h2>
+        {% if result.is_read_only %}
+          {% if result.notes %}
+            <div class="stack gap-md">
+              {% for note in result.notes %}
+                <div class="note-preview">
+                  <div class="note-preview__header">
+                    <span class="badge">{{ note.label }}</span>
+                  </div>
+                  {% if note.html %}
+                    <div class="prose">{{ note.html|safe }}</div>
+                  {% else %}
+                    <p class="muted">No notes for this verse.</p>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted">There are no notes for this passage yet.</p>
+          {% endif %}
+        {% else %}
+          <input type="hidden" name="note_original" value="{{ result.note_text|default:'' }}" data-note-original>
+          <div class="notes-view" data-note-view{% if not result.note_text %} hidden{% endif %}>
+            <div class="notes-view__header">
+              <span class="badge">{{ result.single_label }}</span>
+              <button class="btn btn-ghost" type="button" data-note-edit-button>Edit</button>
+            </div>
+            {% if result.note_html %}
+              <div class="prose" data-note-display>{{ result.note_html|safe }}</div>
+            {% else %}
+              <p class="muted">No notes saved yet.</p>
+            {% endif %}
+          </div>
+          <div class="field notes-field" data-note-editor{% if result.note_text %} hidden{% endif %}>
+            <div class="notes-field__header">
+              <label for="id_note_md">Markdown</label>
+              <button class="btn btn-ghost" type="button" data-note-cancel-button{% if not result.note_text %} hidden{% endif %}>Cancel</button>
+            </div>
+            <textarea class="input" id="id_note_md" name="note_md" rows="8" data-note-input
+                      data-initial-value="{{ result.note_text|default:'' }}">{{ result.note_text|default:'' }}</textarea>
+            <div class="preview notes-preview__markdown prose" data-note-preview></div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="detail-actions">
+        <button class="btn btn-primary" type="submit" name="form_action" value="save" data-save-button disabled{% if result.is_read_only %} aria-disabled="true"{% endif %}>Save changes</button>
+      </div>
+    {% endif %}
+  </form>
+</div>
+
+{{ book_suggestions|json_script:"passage-book-data" }}
+{{ book_aliases|json_script:"passage-book-aliases" }}
+{% if result %}
+  {{ result.translation_payload|json_script:"verse-translation-data" }}
+{% endif %}
+{% endblock %}

@@ -15,6 +15,7 @@
   <script src="{% static 'js/notes_toggle.js' %}" defer></script>
   <script src="{% static 'js/passage_suggestions.js' %}" defer></script>
   <script src="{% static 'js/header_actions.js' %}" defer></script>
+  <script src="{% static 'js/verse_editor.js' %}" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
@@ -30,6 +31,9 @@
         <div class="header-actions">
           <nav class="header-nav" aria-label="Primary">
             <a class="header-action" href="{% url 'sermon_list' %}">Browse</a>
+            {% if request.user.is_authenticated %}
+            <a class="header-action" href="{% url 'verse_editor' %}">Add Verse</a>
+            {% endif %}
             <a class="header-action" href="{% url 'logout' %}" data-logout-link>Logout</a>
           </nav>
         </div>
