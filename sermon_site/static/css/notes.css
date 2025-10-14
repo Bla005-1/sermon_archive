@@ -1,7 +1,11 @@
 /* Notes */
 .notes-field__header,
-.notes-panel__header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px}
+.notes-panel__header,
+.notes-view__header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px}
 .notes-field__header label{font-weight:500}
+.note-preview{display:flex; flex-direction:column; gap:12px}
+.note-preview__header{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.notes-view{display:flex; flex-direction:column; gap:12px}
 .notes-preview__plain{white-space:pre-wrap}
 .notes-preview__markdown{white-space:normal}
 .notes-preview__markdown h1,

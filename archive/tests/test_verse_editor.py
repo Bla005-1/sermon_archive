@@ -41,3 +41,8 @@ class VerseEditorHelperTests(unittest.TestCase):
             joined,
             '¹⁶ For God so loved the world ¹⁷ For God did not send his Son',
         )
+
+    def test_strip_superscripts_removes_unicode_markers(self):
+        text = '¹⁶ For God so loved the world ⁴²'
+
+        self.assertEqual(views._strip_superscripts(text), ' For God so loved the world ')

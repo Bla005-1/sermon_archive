@@ -31,6 +31,12 @@
     }
   }
 
+  const SUPERSCRIPT_PATTERN = /[\u00B2\u00B3\u00B9\u2070-\u209F]/g;
+
+  function normalizeVerseText(value) {
+    return (value || '').replace(SUPERSCRIPT_PATTERN, '').trim();
+  }
+
   ready(function () {
     const form = document.querySelector('[data-verse-editor-form]');
     if (!form) {
@@ -41,7 +47,10 @@
     const translationSelect = form.querySelector('[data-translation-select]');
     const selectedTranslationInput = form.querySelector('[data-selected-translation]');
     const translationModeInput = form.querySelector('[data-translation-mode]');
-    const verseText = form.querySelector('[data-verse-text]');
+    const existingTranslationField = form.querySelector('[data-existing-translation-field]');
+    const newTranslationTextField = form.querySelector('[data-new-translation-text]');
+    const existingVerseText = form.querySelector('[data-verse-text-existing]');
+    const newVerseText = form.querySelector('[data-verse-text-new]');
     const saveButton = form.querySelector('[data-save-button]');
     const addTranslationButton = form.querySelector('[data-add-translation]');
     const newTranslationField = form.querySelector('[data-new-translation-field]');
@@ -55,18 +64,72 @@
     const noteOriginalInput = form.querySelector('[data-note-original]');
     const noteEditButton = form.querySelector('[data-note-edit-button]');
     const noteCancelButton = form.querySelector('[data-note-cancel-button]');
+    const noteEmptyHint = form.querySelector('[data-note-empty-hint]');
 
-    let initialVerseText = verseText ? verseText.getAttribute('data-initial-value') || '' : '';
+    let initialVerseText = {
+      existing: normalizeVerseText(
+        existingVerseText
+          ? existingVerseText.getAttribute('data-initial-value') || existingVerseText.value || ''
+          : ''
+      ),
+      new: normalizeVerseText(
+        newVerseText ? newVerseText.getAttribute('data-initial-value') || newVerseText.value || '' : ''
+      ),
+    };
     let initialNoteText = noteInput ? noteInput.getAttribute('data-initial-value') || '' : '';
     let isNewTranslation = false;
+    let lastSelectedTranslation = translationSelect ? translationSelect.value || '' : '';
+
+    function getActiveVerseKey() {
+      return isNewTranslation ? 'new' : 'existing';
+    }
+
+    function getActiveVerseElement() {
+      return isNewTranslation ? newVerseText : existingVerseText;
+    }
+
+    function setInitialVerseTextValue(key, value) {
+      initialVerseText[key] = normalizeVerseText(value || '');
+    }
+
+    function resolveExistingBaseline() {
+      if (
+        translationSelect &&
+        translationSelect.value &&
+        Object.prototype.hasOwnProperty.call(translationData, translationSelect.value)
+      ) {
+        return translationData[translationSelect.value];
+      }
+      if (
+        lastSelectedTranslation &&
+        Object.prototype.hasOwnProperty.call(translationData, lastSelectedTranslation)
+      ) {
+        return translationData[lastSelectedTranslation];
+      }
+      if (existingVerseText) {
+        const currentValue = existingVerseText.value || '';
+        if (currentValue) {
+          return currentValue;
+        }
+        const stored = existingVerseText.getAttribute('data-initial-value');
+        if (typeof stored === 'string') {
+          return stored;
+        }
+        return existingVerseText.value || '';
+      }
+      return '';
+    }
 
     function syncSaveState() {
       if (!saveButton) {
         return;
       }
       let dirty = false;
-      if (verseText && !verseText.readOnly) {
-        dirty = dirty || verseText.value !== initialVerseText;
+      const activeVerse = getActiveVerseElement();
+      const activeKey = getActiveVerseKey();
+      if (activeVerse && !activeVerse.readOnly && !activeVerse.disabled) {
+        dirty =
+          dirty || normalizeVerseText(activeVerse.value) !== initialVerseText[activeKey];
       }
       if (noteInput && noteEditor && !noteEditor.hasAttribute('hidden')) {
         dirty = dirty || noteInput.value !== initialNoteText;
@@ -87,19 +150,27 @@
     }
 
     function enterNewTranslationMode(initialName, initialText) {
-      if (!verseText || !addTranslationButton || !newTranslationField) {
+      if (!addTranslationButton || !newTranslationField || !newVerseText) {
         return;
       }
       isNewTranslation = true;
       setTranslationMode('new');
-      verseText.readOnly = false;
-      const textValue = typeof initialText === 'string' ? initialText : '';
-      verseText.value = textValue;
-      verseText.setAttribute('data-initial-value', '');
-      initialVerseText = '';
-      if (newTranslationField) {
-        newTranslationField.hidden = false;
+      if (existingTranslationField) {
+        existingTranslationField.hidden = true;
       }
+      if (existingVerseText) {
+        existingVerseText.disabled = true;
+      }
+      if (newTranslationTextField) {
+        newTranslationTextField.hidden = false;
+      }
+      const textValue = typeof initialText === 'string' ? initialText : '';
+      newVerseText.disabled = false;
+      newVerseText.readOnly = false;
+      newVerseText.value = textValue;
+      newVerseText.setAttribute('data-initial-value', textValue);
+      setInitialVerseTextValue('new', '');
+      newTranslationField.hidden = false;
       if (newTranslationInput) {
         newTranslationInput.required = true;
         if (typeof initialName === 'string') {
@@ -108,6 +179,7 @@
         newTranslationInput.focus();
       }
       if (translationSelect) {
+        lastSelectedTranslation = translationSelect.value || '';
         translationSelect.disabled = true;
         translationSelect.selectedIndex = -1;
       }
@@ -128,19 +200,37 @@
         newTranslationInput.required = false;
         newTranslationInput.value = '';
       }
+      if (newTranslationTextField) {
+        newTranslationTextField.hidden = true;
+      }
+      if (newVerseText) {
+        newVerseText.disabled = true;
+        newVerseText.value = '';
+        newVerseText.setAttribute('data-initial-value', '');
+        setInitialVerseTextValue('new', '');
+      }
+      if (existingTranslationField) {
+        existingTranslationField.hidden = false;
+      }
+      const baseline = resolveExistingBaseline();
       if (translationSelect) {
         translationSelect.disabled = false;
+        if (lastSelectedTranslation) {
+          translationSelect.value = lastSelectedTranslation;
+        } else if (translationSelect.options && translationSelect.options.length > 0) {
+          translationSelect.selectedIndex = 0;
+          lastSelectedTranslation = translationSelect.value || '';
+        }
         const value = translationSelect.value || '';
         if (selectedTranslationInput) {
           selectedTranslationInput.value = value;
         }
-        if (value && Object.prototype.hasOwnProperty.call(translationData, value)) {
-          verseText.value = translationData[value];
-        }
       }
-      initialVerseText = verseText ? verseText.value : '';
-      if (verseText) {
-        verseText.setAttribute('data-initial-value', initialVerseText);
+      if (existingVerseText) {
+        existingVerseText.disabled = false;
+        existingVerseText.value = baseline;
+        existingVerseText.setAttribute('data-initial-value', baseline);
+        setInitialVerseTextValue('existing', baseline);
       }
       addTranslationButton.textContent = 'Add New Translation';
       syncSaveState();
@@ -156,33 +246,39 @@
       });
     }
 
-    if (translationSelect) {
+    if (translationSelect && existingVerseText) {
       translationSelect.addEventListener('change', function () {
-        if (!verseText) {
-          return;
-        }
         const value = translationSelect.value;
         if (selectedTranslationInput) {
           selectedTranslationInput.value = value;
         }
+        let nextValue = '';
         if (value && Object.prototype.hasOwnProperty.call(translationData, value)) {
-          verseText.value = translationData[value];
-        } else {
-          verseText.value = '';
+          nextValue = translationData[value];
         }
-        verseText.setAttribute('data-initial-value', verseText.value);
-        initialVerseText = verseText.value;
+        existingVerseText.value = nextValue;
+        existingVerseText.setAttribute('data-initial-value', nextValue);
+        setInitialVerseTextValue('existing', nextValue);
+        lastSelectedTranslation = value;
         syncSaveState();
       });
     }
 
-    if (verseText && !verseText.readOnly) {
-      verseText.addEventListener('input', syncSaveState);
-    }
+    [existingVerseText, newVerseText].forEach(function (el) {
+      if (!el) {
+        return;
+      }
+      el.addEventListener('input', function () {
+        syncSaveState();
+      });
+    });
 
     if (noteInput) {
       const updatePreview = function () {
         renderMarkdown(noteInput.value, notePreview);
+        if (noteEmptyHint) {
+          noteEmptyHint.hidden = !!noteInput.value.trim();
+        }
         syncSaveState();
       };
       noteInput.addEventListener('input', updatePreview);
@@ -190,7 +286,9 @@
     }
 
     if (noteDisplay && noteOriginalInput) {
-      renderMarkdown(noteOriginalInput.value || '', noteDisplay);
+      const originalText = noteOriginalInput.value || '';
+      renderMarkdown(originalText, noteDisplay);
+      noteDisplay.hidden = !originalText.trim();
     }
 
     if (noteEditButton && noteEditor && noteView) {
@@ -216,13 +314,23 @@
         noteCancelButton.hidden = true;
         initialNoteText = noteInput.value;
         noteInput.setAttribute('data-initial-value', initialNoteText);
+        if (noteEmptyHint) {
+          noteEmptyHint.hidden = !!noteInput.value.trim();
+        }
+        if (noteDisplay) {
+          noteDisplay.hidden = !noteInput.value.trim();
+          renderMarkdown(noteInput.value, noteDisplay);
+        }
         syncSaveState();
       });
     }
 
-    if (verseText && verseText.readOnly) {
-      saveButton && (saveButton.disabled = true);
-      saveButton && saveButton.setAttribute('aria-disabled', 'true');
+    const initialActiveVerse = getActiveVerseElement();
+    if (initialActiveVerse && initialActiveVerse.readOnly) {
+      if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.setAttribute('aria-disabled', 'true');
+      }
     } else {
       syncSaveState();
     }
@@ -232,17 +340,18 @@
       if (selectedTranslationInput) {
         selectedTranslationInput.value = current;
       }
-      if (verseText && Object.prototype.hasOwnProperty.call(translationData, current)) {
-        verseText.value = translationData[current];
-        verseText.setAttribute('data-initial-value', verseText.value);
-        initialVerseText = verseText.value;
+      if (existingVerseText && Object.prototype.hasOwnProperty.call(translationData, current)) {
+        const textValue = translationData[current];
+        existingVerseText.value = textValue;
+        existingVerseText.setAttribute('data-initial-value', textValue);
+        setInitialVerseTextValue('existing', textValue);
       }
     }
 
     const forceNewTranslation = form.getAttribute('data-force-new-translation') === 'true';
     if ((Object.keys(translationData).length === 0 || forceNewTranslation) && addTranslationButton && !addTranslationButton.disabled) {
       const initialName = newTranslationInput ? newTranslationInput.value : '';
-      const initialText = verseText ? verseText.value : '';
+      const initialText = newVerseText ? newVerseText.getAttribute('data-initial-value') || newVerseText.value || '' : '';
       enterNewTranslationMode(initialName, initialText);
     }
   });

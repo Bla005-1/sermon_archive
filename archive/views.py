@@ -1,6 +1,7 @@
 """View logic for the sermon archive application."""
 
 import logging
+import re
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -36,11 +37,16 @@ SERMON_FIELDS = ['preached_on', 'title', 'speaker_name', 'series_name', 'locatio
 
 PREFERRED_TRANSLATIONS = ('NIV', 'ESV', 'KJV')
 _SUPERSCRIPT_DIGITS = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
+_SUPERSCRIPT_PATTERN = re.compile(r'[\u00B2\u00B3\u00B9\u2070-\u209F]')
 _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
 
 
 def _superscript_number(number: int) -> str:
     return ''.join(_SUPERSCRIPT_DIGITS.get(ch, ch) for ch in str(number))
+
+
+def _strip_superscripts(text: str) -> str:
+    return _SUPERSCRIPT_PATTERN.sub('', text or '')
 
 
 def _determine_available_translations(verse_ids, translation_map):
@@ -119,12 +125,13 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
     notes_payload = []
     for verse in verses:
         note_obj = note_map.get(verse.verse_id)
-        notes_payload.append(
-            {
-                'label': f'{verse.book.name} {verse.chapter}:{verse.verse}',
-                'html': _render_markdown(note_obj.note_md) if note_obj and note_obj.note_md else '',
-            }
-        )
+        if note_obj and note_obj.note_md:
+            notes_payload.append(
+                {
+                    'label': f'{verse.book.name} {verse.chapter}:{verse.verse}',
+                    'html': _render_markdown(note_obj.note_md),
+                }
+            )
 
     note_entry = note_map.get(verses[0].verse_id) if verses else None
     result = {
@@ -143,6 +150,7 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
         'note_html': _render_markdown(note_entry.note_md) if note_entry and note_entry.note_md else '',
         'force_new_translation': False,
         'new_translation_name': '',
+        'new_translation_text': '',
     }
     return result, ''
 
@@ -268,7 +276,8 @@ def verse_editor(request):
             else:
                 verse = get_object_or_404(BibleVerse, pk=result['start_verse_id'])
                 translation_mode = request.POST.get('translation_mode', 'existing')
-                verse_text_value = request.POST.get('verse_text', '')
+                raw_verse_text = request.POST.get('verse_text', '')
+                verse_text_value = _strip_superscripts(raw_verse_text)
                 note_md = request.POST.get('note_md')
                 note_original = request.POST.get('note_original', '')
                 if translation_mode == 'new':
@@ -312,10 +321,12 @@ def verse_editor(request):
                     if translation_mode == 'new':
                         result['selected_translation'] = ''
                         result['new_translation_name'] = translation_name
-                        result['verse_text'] = verse_text_value
+                        result['verse_text'] = ''
+                        result['new_translation_text'] = verse_text_value
                     else:
                         result['selected_translation'] = translation_name
                         result['verse_text'] = verse_text_value
+                        result['new_translation_text'] = ''
                         if translation_name:
                             result['translation_payload'][translation_name] = verse_text_value
                     if note_md is not None:
@@ -334,6 +345,7 @@ def verse_editor(request):
     if result and request.method != 'POST':
         # Ensure note preview reflects stored markdown when landing from redirect.
         result['note_html'] = _render_markdown(result['note_text']) if result['note_text'] else ''
+        result['new_translation_text'] = ''
 
     book_suggestions = [
         {'name': book.name, 'normalized': normalize_book(book.name)}

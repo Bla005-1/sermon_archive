@@ -56,10 +56,12 @@
               <input class="input" type="text" name="new_translation_name" value="{{ result.new_translation_name|default:'' }}" data-new-translation-input>
             </label>
           </div>
-          <label class="field">Text
-            <textarea class="input" name="verse_text" rows="6" data-verse-text{% if result.is_read_only %} readonly{% endif %}
-                      data-initial-value="{{ result.verse_text|default:'' }}">{{ result.verse_text|default:'' }}</textarea>
-          </label>
+          <div class="field" data-existing-translation-field>
+            <label class="field">Text
+              <textarea class="input verse-textarea" name="verse_text" rows="6" data-verse-text-existing{% if result.is_read_only %} readonly{% endif %}
+                        data-initial-value="{{ result.verse_text|default:'' }}">{{ result.verse_text|default:'' }}</textarea>
+            </label>
+          </div>
           {% if result.is_read_only %}
             <p class="muted">Passage text is view-only. Select an individual verse to edit or add translations.</p>
           {% endif %}
@@ -72,15 +74,11 @@
           {% if result.notes %}
             <div class="stack gap-md">
               {% for note in result.notes %}
-                <div class="note-preview">
+                <div class="note-preview stack gap-sm">
                   <div class="note-preview__header">
                     <span class="badge">{{ note.label }}</span>
                   </div>
-                  {% if note.html %}
-                    <div class="prose">{{ note.html|safe }}</div>
-                  {% else %}
-                    <p class="muted">No notes for this verse.</p>
-                  {% endif %}
+                  <div class="preview notes-preview__markdown prose">{{ note.html|safe }}</div>
                 </div>
               {% endfor %}
             </div>
@@ -94,11 +92,7 @@
               <span class="badge">{{ result.single_label }}</span>
               <button class="btn btn-ghost" type="button" data-note-edit-button>Edit</button>
             </div>
-            {% if result.note_html %}
-              <div class="prose" data-note-display>{{ result.note_html|safe }}</div>
-            {% else %}
-              <p class="muted">No notes saved yet.</p>
-            {% endif %}
+            <div class="preview notes-preview__markdown prose" data-note-display{% if not result.note_html %} hidden{% endif %}>{{ result.note_html|safe }}</div>
           </div>
           <div class="field notes-field" data-note-editor{% if result.note_text %} hidden{% endif %}>
             <div class="notes-field__header">
@@ -108,6 +102,9 @@
             <textarea class="input" id="id_note_md" name="note_md" rows="8" data-note-input
                       data-initial-value="{{ result.note_text|default:'' }}">{{ result.note_text|default:'' }}</textarea>
             <div class="preview notes-preview__markdown prose" data-note-preview></div>
+            {% if not result.note_text %}
+              <p class="muted" data-note-empty-hint>Start typing to add a note. The preview updates live.</p>
+            {% endif %}
           </div>
         {% endif %}
       </div>
