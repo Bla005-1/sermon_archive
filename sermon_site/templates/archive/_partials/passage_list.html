@@ -1,21 +1,86 @@
 <div id="passage-list" class="list">
   <ul class="bullet-list">
     {% with ps=passages|default:sermon.passages.all %}
+    {% with can_edit=can_edit_sermons|default:False %}
     {% for p in ps %}
       <li>
-        {{ p.ref_display }}
-        {% if p.context_note %} - {{ p.context_note }}{% endif %}
-        <button class="btn btn-ghost btn-danger"
-          hx-get='{% url "passage_delete" sermon.pk p.ord %}'
-          hx-target='#passage-list'
-          hx-swap='outerHTML'
-          hx-confirm='Delete this passage?'>
-          Delete
-        </button>
+        {% if editing_passage and editing_passage.pk == p.pk %}
+          <form
+            hx-post='{% url "passage_edit" sermon.pk p.ord %}'
+            hx-target='#passage-list'
+            hx-swap='outerHTML'
+            class="stack gap-xs"
+          >
+            {% csrf_token %}
+            <div><strong>{{ p.ref_display }}</strong></div>
+            <label class="sr-only" for='id_context_note_{{ p.ord }}'>Context note</label>
+            <input
+              id='id_context_note_{{ p.ord }}'
+              type="text"
+              name="context_note"
+              class="input"
+              maxlength="512"
+              value="{{ editing_passage.context_note|default_if_none:'' }}"
+            >
+            <div class="btn-group">
+              <button type="submit" class="btn btn-primary">Save</button>
+              <button
+                type="button"
+                class="btn btn-ghost"
+                hx-get='{% url "passage_edit" sermon.pk p.ord %}?cancel=1'
+                hx-target='#passage-list'
+                hx-swap='outerHTML'
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-danger"
+                hx-get='{% url "passage_delete" sermon.pk p.ord %}'
+                hx-target='#passage-list'
+                hx-swap='outerHTML'
+                hx-confirm='Delete this passage?'
+              >
+                Delete
+              </button>
+            </div>
+          </form>
+        {% else %}
+          <div class="flex align-center justify-between gap-sm">
+            <span>
+              {{ p.ref_display }}
+              {% if p.context_note %}
+                <span class="muted"> - {{ p.context_note }}</span>
+              {% endif %}
+            </span>
+            {% if can_edit %}
+              <div class="btn-group">
+                <button
+                  class="btn btn-ghost"
+                  hx-get='{% url "passage_edit" sermon.pk p.ord %}'
+                  hx-target='#passage-list'
+                  hx-swap='outerHTML'
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn btn-ghost btn-danger"
+                  hx-get='{% url "passage_delete" sermon.pk p.ord %}'
+                  hx-target='#passage-list'
+                  hx-swap='outerHTML'
+                  hx-confirm='Delete this passage?'
+                >
+                  Delete
+                </button>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
       </li>
     {% empty %}
       <li class="empty">No passages yet.</li>
     {% endfor %}
+    {% endwith %}
     {% endwith %}
   </ul>
 </div>

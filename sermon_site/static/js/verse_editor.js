@@ -37,6 +37,15 @@
     return (value || '').replace(SUPERSCRIPT_PATTERN, '').trim();
   }
 
+  function autosizeTextarea(el) {
+    if (!el) {
+      return;
+    }
+    el.style.height = 'auto';
+    el.style.overflowY = 'hidden';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
   ready(function () {
     const form = document.querySelector('[data-verse-editor-form]');
     if (!form) {
@@ -149,6 +158,7 @@
       verseText.disabled = false;
       verseText.readOnly = false;
       verseText.value = textValue;
+      autosizeTextarea(verseText);
       verseText.setAttribute('data-initial-value', textValue);
       initialNewTranslationText = normalizeVerseText(textValue);
       addTranslationButton.textContent = 'Cancel New Translation';
@@ -188,6 +198,7 @@
         verseText.value = baseline;
         verseText.setAttribute('data-initial-value', baseline);
         initialExistingText = normalizeVerseText(baseline);
+        autosizeTextarea(verseText);
       }
       initialNewTranslationText = '';
       addTranslationButton.textContent = 'Add New Translation';
@@ -218,12 +229,15 @@
         verseText.setAttribute('data-initial-value', nextValue);
         initialExistingText = normalizeVerseText(nextValue);
         lastSelectedTranslation = value;
+        autosizeTextarea(verseText);
         syncSaveState();
       });
     }
 
     if (verseText) {
+      autosizeTextarea(verseText);
       verseText.addEventListener('input', function () {
+        autosizeTextarea(verseText);
         syncSaveState();
       });
     }
@@ -299,6 +313,7 @@
         verseText.value = textValue;
         verseText.setAttribute('data-initial-value', textValue);
         initialExistingText = normalizeVerseText(textValue);
+        autosizeTextarea(verseText);
       }
     }
 

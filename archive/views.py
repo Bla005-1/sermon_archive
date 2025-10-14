@@ -11,7 +11,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.db import DatabaseError, transaction
 from django.db.models import F, Max
 from django.db.models.functions import Coalesce
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.urls import reverse
@@ -40,6 +40,16 @@ PREFERRED_TRANSLATIONS = ('NIV', 'ESV', 'KJV')
 _SUPERSCRIPT_DIGITS = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
 _SUPERSCRIPT_PATTERN = re.compile(r'[\u00B2\u00B3\u00B9\u2070-\u209F]')
 _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
+
+
+def _user_can_edit_sermons(user) -> bool:
+    return user.is_authenticated and user.has_perm('archive.change_sermon')
+
+
+def _passage_list_context(request, sermon, **extra):
+    ctx = {'sermon': sermon, 'can_edit_sermons': _user_can_edit_sermons(request.user)}
+    ctx.update(extra)
+    return ctx
 
 
 def _superscript_number(number: int) -> str:
@@ -320,6 +330,7 @@ def sermon_detail(request, pk: int):
         'book_suggestions': book_suggestions,
         'book_aliases': BOOK_ALIASES,
         'back_to_results_url': back_to_results,
+        'can_edit_sermons': _user_can_edit_sermons(request.user),
     }
     return render(request, 'archive/sermon_detail.html', ctx)
 
@@ -511,6 +522,8 @@ def passage_preview(request, pk: int):
 @require_POST
 def passage_add(request, pk: int):
     sermon = get_object_or_404(Sermon, pk=pk)
+    if not _user_can_edit_sermons(request.user):
+        return HttpResponseForbidden('You do not have permission to edit sermons.')
     ref_text = request.POST.get('ref_text', '').strip()
     context_note = request.POST.get('context_note', '').strip()
     try:
@@ -528,18 +541,64 @@ def passage_add(request, pk: int):
         logger.exception('Database error adding passage "%s" to sermon %s', ref_text, sermon.pk)
         return HttpResponseBadRequest('We ran into a problem while saving that passage. Please try again.')
     logger.info('User %s added passage "%s" to sermon %s', request.user, ref_text, sermon.pk)
-    return render(request, 'archive/_partials/passage_list.html', {'sermon': sermon})
+    return render(
+        request,
+        'archive/_partials/passage_list.html',
+        _passage_list_context(request, sermon),
+    )
 
 @login_required
 def passage_delete(request, pk: int, ord: int):
     sermon = get_object_or_404(Sermon, pk=pk)
+    if not _user_can_edit_sermons(request.user):
+        return HttpResponseForbidden('You do not have permission to edit sermons.')
     deleted, _ = SermonPassage.objects.filter(sermon=sermon, ord=ord).delete()
     logger.debug('User %s requested passage delete (sermon=%s, ord=%s, deleted=%s)', request.user, sermon.pk, ord, deleted)
     for i, sp in enumerate(sermon.passages.order_by('ord'), start=1):
         if sp.ord != i:
             sp.ord = i
             sp.save(update_fields=['ord'])
-    return render(request, 'archive/_partials/passage_list.html', {'sermon': sermon})
+    return render(
+        request,
+        'archive/_partials/passage_list.html',
+        _passage_list_context(request, sermon),
+    )
+
+@login_required
+def passage_edit(request, pk: int, ord: int):
+    sermon = get_object_or_404(Sermon, pk=pk)
+    if not _user_can_edit_sermons(request.user):
+        return HttpResponseForbidden('You do not have permission to edit sermons.')
+    passage = get_object_or_404(SermonPassage, sermon=sermon, ord=ord)
+
+    if request.method == 'POST':
+        context_note = request.POST.get('context_note', '').strip()
+        passage.context_note = context_note
+        try:
+            passage.save(update_fields=['context_note'])
+        except DatabaseError:
+            logger.exception('Database error updating passage %s on sermon %s', passage.pk, sermon.pk)
+            return HttpResponseBadRequest('We could not save the passage note. Please try again.')
+        logger.info('User %s updated passage %s note for sermon %s', request.user, passage.pk, sermon.pk)
+        return render(
+            request,
+            'archive/_partials/passage_list.html',
+            _passage_list_context(request, sermon),
+        )
+
+    if request.GET.get('cancel'):
+        return render(
+            request,
+            'archive/_partials/passage_list.html',
+            _passage_list_context(request, sermon),
+        )
+
+    return render(
+        request,
+        'archive/_partials/passage_list.html',
+        _passage_list_context(request, sermon, editing_passage=passage),
+    )
+
 
 @login_required
 @require_POST

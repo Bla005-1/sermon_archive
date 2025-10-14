@@ -9,6 +9,7 @@ urlpatterns = [
     path('sermons/<int:pk>/edit', views.sermon_edit, name='sermon_edit'),
     path('sermons/<int:pk>/ui/passage/preview', views.passage_preview, name='passage_preview'),
     path('sermons/<int:pk>/ui/passage/add', views.passage_add, name='passage_add'),
+    path('sermons/<int:pk>/ui/passage/<int:ord>/edit', views.passage_edit, name='passage_edit'),
     path('sermons/<int:pk>/ui/passage/<int:ord>/delete', views.passage_delete, name='passage_delete'),
     path('sermons/<int:pk>/attachments', views.attachment_upload, name='attachment_upload'),
     path('sermons/<int:pk>/attachments/<int:att_id>/delete', views.attachment_delete, name='attachment_delete'),

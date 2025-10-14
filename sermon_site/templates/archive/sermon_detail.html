@@ -19,7 +19,9 @@
     </div>
   </div>
   <div class="detail-actions">
-    <a class="btn" href="{% url 'sermon_edit' sermon.pk %}">Edit sermon</a>
+    {% if can_edit_sermons %}
+      <a class="btn" href="{% url 'sermon_edit' sermon.pk %}">Edit sermon</a>
+    {% endif %}
   </div>
 </section>
 
@@ -37,29 +39,31 @@
 
 <section class="panel">
   <h2 class="panel-title">Passages</h2>
-  <div class="stack gap-sm" id="passage-tools">
-    {% csrf_token %}
-    <div class="grid-two">
-      <div class="input-with-suggestions" data-passage-suggestion-container>
-        <input class="input" id="ref" type="text" placeholder="e.g., John 10:11-14" name="ref_text"
-               data-passage-input
-               hx-on:keyup="document.getElementById('add-btn').disabled = !(/\S+\s+\d+:\d+/.test(this.value))"
-               hx-on:change="document.getElementById('add-btn').disabled = !(/\S+\s+\d+:\d+/.test(this.value))">
-        <div class="suggestions-panel" data-passage-suggestions hidden></div>
+  {% if can_edit_sermons %}
+    <div class="stack gap-sm" id="passage-tools">
+      {% csrf_token %}
+      <div class="grid-two">
+        <div class="input-with-suggestions" data-passage-suggestion-container>
+          <input class="input" id="ref" type="text" placeholder="e.g., John 10:11-14" name="ref_text"
+                 data-passage-input
+                 hx-on:keyup="document.getElementById('add-btn').disabled = !(/\S+\s+\d+:\d+/.test(this.value))"
+                 hx-on:change="document.getElementById('add-btn').disabled = !(/\S+\s+\d+:\d+/.test(this.value))">
+          <div class="suggestions-panel" data-passage-suggestions hidden></div>
+        </div>
+        <input class="input" id="context_note" type="text" placeholder="Context (optional)" name="context_note">
       </div>
-      <input class="input" id="context_note" type="text" placeholder="Context (optional)" name="context_note">
+      <div class="row">
+        <button id="add-btn" class="btn btn-primary" disabled
+          hx-post="{% url 'passage_add' sermon.pk %}"
+          hx-include="#ref, #context_note, input[name=csrfmiddlewaretoken]"
+          hx-target="#passage-list"
+          hx-swap="outerHTML">
+          + Add passage
+        </button>
+        <span class="htmx-indicator" aria-hidden="true"></span>
+      </div>
     </div>
-    <div class="row">
-      <button id="add-btn" class="btn btn-primary" disabled
-        hx-post="{% url 'passage_add' sermon.pk %}"
-        hx-include="#ref, #context_note, input[name=csrfmiddlewaretoken]"
-        hx-target="#passage-list"
-        hx-swap="outerHTML">
-        + Add passage
-      </button>
-      <span class="htmx-indicator" aria-hidden="true"></span>
-    </div>
-  </div>
+  {% endif %}
   {% include 'archive/_partials/passage_list.html' %}
 </section>
 
