@@ -1,0 +1,41 @@
+/* ---------- Optional "compact" page layout for forms/details ---------- */
+.page--compact .container{ padding: 0 8px; }
+@media (min-width: 641px){
+  .page--compact .container{ padding: 0 18px; }
+}
+
+.page--compact .form-card,
+.page--compact .panel{ padding: 16px; }
+
+.page--compact .form-card{ width: min(100%, 680px); }
+
+@media (max-width: 720px){
+  .page--compact .form-card{
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 640px){
+  .page--compact .form-card,
+  .page--compact .panel{ padding: 10px 12px; }
+}
+
+@media (max-width: 480px){
+  .page--compact .form-card,
+  .page--compact .panel{ padding: 8px 10px; }
+}
+
+.page--compact .form,
+.page--compact .row,
+.page--compact .stack{ gap: 12px; }
+
+.page--compact .grid-two{ gap: 12px; }
+
+.page--compact .preview,
+.page--compact .notes-panel .preview,
+.page--compact .prose{ padding: 8px 10px; }
+.page--compact .input,
+.page--compact textarea{ padding: 9px 11px; }
