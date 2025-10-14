@@ -57,8 +57,13 @@
           </div>
           <div class="field" data-verse-field>
             <label class="field">Text
+              {% if result and result.verse_display_text %}
+                <div class="verse-display" data-verse-display{% if not result.is_read_only %} hidden{% endif %}>{{ result.verse_display_text|safe }}</div>
+              {% else %}
+                <div class="verse-display" data-verse-display hidden></div>
+              {% endif %}
               <textarea class="input verse-textarea" name="verse_text" rows="6" data-verse-text{% if result.is_read_only %} readonly{% endif %}
-                        data-initial-value="{{ result.verse_text|default:'' }}">{{ result.verse_text|default:'' }}</textarea>
+                        data-initial-value="{{ result.verse_text|default:'' }}"{% if result.is_read_only %} hidden aria-hidden="true"{% endif %}>{{ result.verse_text|default:'' }}</textarea>
             </label>
           </div>
           {% if result.is_read_only %}
@@ -145,5 +150,6 @@
 {{ book_aliases|json_script:"passage-book-aliases" }}
 {% if result %}
   {{ result.translation_payload|json_script:"verse-translation-data" }}
+  {{ result.translation_display_payload|json_script:"verse-translation-display-data" }}
 {% endif %}
 {% endblock %}

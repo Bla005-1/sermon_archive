@@ -32,9 +32,16 @@
   }
 
   const SUPERSCRIPT_PATTERN = /[\u00B2\u00B3\u00B9\u2070-\u209F]/g;
+  const SUPERSCRIPT_SPAN_PATTERN = /<span[^>]*class=["']sup["'][^>]*>.*?<\/span>/gi;
 
   function normalizeVerseText(value) {
-    return (value || '').replace(SUPERSCRIPT_PATTERN, '').trim();
+    if (!value) {
+      return '';
+    }
+    return value
+      .replace(SUPERSCRIPT_SPAN_PATTERN, '')
+      .replace(SUPERSCRIPT_PATTERN, '')
+      .trim();
   }
 
   function autosizeTextarea(el) {
@@ -53,11 +60,13 @@
     }
 
     const translationData = parseJSONScript('verse-translation-data');
+    const translationDisplayData = parseJSONScript('verse-translation-display-data');
     const translationSelect = form.querySelector('[data-translation-select]');
     const selectedTranslationInput = form.querySelector('[data-selected-translation]');
     const translationModeInput = form.querySelector('[data-translation-mode]');
     const translationSelectField = form.querySelector('[data-translation-select-field]');
     const verseText = form.querySelector('[data-verse-text]');
+    const verseDisplay = form.querySelector('[data-verse-display]');
     const saveButton = form.querySelector('[data-save-button]');
     const addTranslationButton = form.querySelector('[data-add-translation]');
     const newTranslationField = form.querySelector('[data-new-translation-field]');
@@ -121,17 +130,45 @@
       }
     }
 
-    function setTranslationMode(newMode) {
-      if (!translationModeInput) {
-        return;
-      }
-      translationModeInput.value = newMode;
+  function setTranslationMode(newMode) {
+    if (!translationModeInput) {
+      return;
     }
+    translationModeInput.value = newMode;
+  }
 
-    function enterNewTranslationMode(initialName, initialText) {
-      if (!addTranslationButton || !newTranslationField || !verseText) {
-        return;
-      }
+  function refreshVerseDisplay(value, forceHide) {
+    if (!verseDisplay) {
+      return;
+    }
+    if (forceHide || (verseText && !verseText.readOnly)) {
+      verseDisplay.hidden = true;
+      verseDisplay.innerHTML = '';
+      return;
+    }
+    if (value) {
+      verseDisplay.innerHTML = value;
+      verseDisplay.hidden = false;
+    } else {
+      verseDisplay.hidden = true;
+      verseDisplay.innerHTML = '';
+    }
+  }
+
+  function resolveDisplayValue(key) {
+    if (!key) {
+      return '';
+    }
+    if (Object.prototype.hasOwnProperty.call(translationDisplayData, key)) {
+      return translationDisplayData[key];
+    }
+    return '';
+  }
+
+  function enterNewTranslationMode(initialName, initialText) {
+    if (!addTranslationButton || !newTranslationField || !verseText) {
+      return;
+    }
       isNewTranslation = true;
       setTranslationMode('new');
       if (translationSelectField) {
@@ -162,6 +199,7 @@
       verseText.setAttribute('data-initial-value', textValue);
       initialNewTranslationText = normalizeVerseText(textValue);
       addTranslationButton.textContent = 'Cancel New Translation';
+      refreshVerseDisplay('', true);
       syncSaveState();
     }
 
@@ -202,6 +240,10 @@
       }
       initialNewTranslationText = '';
       addTranslationButton.textContent = 'Add New Translation';
+      if (baseVerseReadOnly) {
+        const displayValue = resolveDisplayValue(translationSelect ? translationSelect.value : '');
+        refreshVerseDisplay(displayValue, !displayValue);
+      }
       syncSaveState();
     }
 
@@ -230,6 +272,8 @@
         initialExistingText = normalizeVerseText(nextValue);
         lastSelectedTranslation = value;
         autosizeTextarea(verseText);
+        const displayValue = resolveDisplayValue(value);
+        refreshVerseDisplay(displayValue, !displayValue && !verseText.readOnly);
         syncSaveState();
       });
     }
@@ -315,6 +359,8 @@
         initialExistingText = normalizeVerseText(textValue);
         autosizeTextarea(verseText);
       }
+      const initialDisplay = resolveDisplayValue(current);
+      refreshVerseDisplay(initialDisplay, !initialDisplay && !verseText.readOnly);
     }
 
     const forceNewTranslation = form.getAttribute('data-force-new-translation') === 'true';
@@ -322,5 +368,11 @@
       const initialName = newTranslationInput ? newTranslationInput.value : '';
       enterNewTranslationMode(initialName, '');
     }
+
+    if (verseDisplay && verseText && verseText.readOnly && translationSelect && translationSelect.value) {
+      const displayValue = resolveDisplayValue(translationSelect.value);
+      refreshVerseDisplay(displayValue, !displayValue);
+    }
   });
 })();
+

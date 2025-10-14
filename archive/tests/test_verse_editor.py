@@ -29,22 +29,32 @@ class VerseEditorHelperTests(unittest.TestCase):
         self.assertEqual(views._select_default_translation(['KJV', 'NLT']), 'KJV')
         self.assertIsNone(views._select_default_translation([]))
 
-    def test_join_passage_text_includes_superscript_markers(self):
+    def test_join_passage_text_returns_plain_and_display_versions(self):
         verses = [
             SimpleNamespace(verse_id=1, verse=16),
             SimpleNamespace(verse_id=2, verse=17),
         ]
         lookup = {1: 'For God so loved the world', 2: 'For God did not send his Son'}
 
-        joined = views._join_passage_text(verses, lookup)
+        plain, display = views._join_passage_text(verses, lookup)
 
         self.assertEqual(
-            joined,
-            '¹⁶ For God so loved the world ¹⁷ For God did not send his Son',
+            plain,
+            'For God so loved the world For God did not send his Son',
+        )
+        self.assertEqual(
+            display,
+            '<span class="sup">16</span> For God so loved the world '
+            '<span class="sup">17</span> For God did not send his Son',
         )
 
     def test_strip_superscripts_removes_unicode_markers(self):
         text = '¹⁶ For God so loved the world ⁴²'
+
+        self.assertEqual(views._strip_superscripts(text), ' For God so loved the world ')
+
+    def test_strip_superscripts_removes_sup_span_markup(self):
+        text = '<span class="sup">16</span> For God so loved the world <span class="sup">17</span>'
 
         self.assertEqual(views._strip_superscripts(text), ' For God so loved the world ')
 

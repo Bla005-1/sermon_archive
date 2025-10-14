@@ -14,6 +14,7 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.html import escape
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from markdown2 import Markdown
@@ -37,8 +38,8 @@ logger = logging.getLogger(__name__)
 SERMON_FIELDS = ['preached_on', 'title', 'speaker_name', 'series_name', 'location_name', 'notes_md']
 
 PREFERRED_TRANSLATIONS = ('NIV', 'ESV', 'KJV')
-_SUPERSCRIPT_DIGITS = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
-_SUPERSCRIPT_PATTERN = re.compile(r'[\u00B2\u00B3\u00B9\u2070-\u209F]')
+_UNICODE_SUPERSCRIPT_PATTERN = re.compile(r'[\u00B2\u00B3\u00B9\u2070-\u209F]')
+_SUPERSCRIPT_SPAN_PATTERN = re.compile(r'<span[^>]*class=["\']sup["\'][^>]*>.*?</span>', re.IGNORECASE | re.DOTALL)
 _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
 
 
@@ -53,11 +54,14 @@ def _passage_list_context(request, sermon, **extra):
 
 
 def _superscript_number(number: int) -> str:
-    return ''.join(_SUPERSCRIPT_DIGITS.get(ch, ch) for ch in str(number))
+    return f'<span class="sup">{number}</span>'
 
 
 def _strip_superscripts(text: str) -> str:
-    return _SUPERSCRIPT_PATTERN.sub('', text or '')
+    if not text:
+        return ''
+    without_unicode = _UNICODE_SUPERSCRIPT_PATTERN.sub('', text)
+    return _SUPERSCRIPT_SPAN_PATTERN.sub('', without_unicode)
 
 
 def _determine_available_translations(verse_ids, translation_map):
@@ -76,15 +80,20 @@ def _select_default_translation(available):
 
 
 def _join_passage_text(verses, verse_text_lookup):
-    parts = []
+    plain_parts = []
+    display_parts = []
     for verse in verses:
-        text = verse_text_lookup.get(verse.verse_id, '')
+        text = (verse_text_lookup.get(verse.verse_id, '') or '').strip()
         marker = _superscript_number(verse.verse)
         if text:
-            parts.append(f'{marker} {text}')
-        else:
-            parts.append(marker)
-    return ' '.join(p.strip() for p in parts if p).strip()
+            escaped_text = escape(text)
+            display_parts.append(f'{marker} {escaped_text}')
+            plain_parts.append(text)
+        elif marker:
+            display_parts.append(marker)
+    plain_text = ' '.join(part for part in plain_parts if part).strip()
+    display_text = ' '.join(part.strip() for part in display_parts if part).strip()
+    return plain_text, display_text
 
 
 def _render_markdown(text: str) -> str:
@@ -124,12 +133,16 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
     else:
         selected_translation = _select_default_translation(available_translations)
 
-    translation_payload = {
-        name: _join_passage_text(verses, verse_lookup)
-        for name, verse_lookup in translation_map.items()
-        if name in available_translations
-    }
+    translation_payload = {}
+    translation_display_payload = {}
+    for name, verse_lookup in translation_map.items():
+        if name not in available_translations:
+            continue
+        plain_text, display_text = _join_passage_text(verses, verse_lookup)
+        translation_payload[name] = plain_text
+        translation_display_payload[name] = display_text
     verse_text = translation_payload.get(selected_translation, '')
+    verse_display_text = translation_display_payload.get(selected_translation, '')
 
     note_map = {n.verse.verse_id: n for n in VerseNote.objects.filter(verse__in=verses)}
     is_range = len(verses) > 1
@@ -151,8 +164,11 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
         'available_translations': available_translations,
         'selected_translation': selected_translation or '',
         'translation_payload': translation_payload,
+        'translation_display_payload': translation_display_payload,
         'verse_text': verse_text,
+        'verse_display_text': verse_display_text if is_range else '',
         'is_read_only': is_range,
+        'verse_numbers': [verse.verse for verse in verses],
         'notes': notes_payload,
         'heading': _format_reference(start_v, end_v),
         'description': 'Compare translations across the passage.' if is_range else 'Edit translation text and notes for this verse.',
@@ -452,12 +468,26 @@ def verse_editor(request):
                         result['new_translation_name'] = translation_name
                         result['verse_text'] = ''
                         result['new_translation_text'] = verse_text_value
+                        result['verse_display_text'] = ''
                     else:
                         result['selected_translation'] = translation_name
                         result['verse_text'] = verse_text_value
                         result['new_translation_text'] = ''
                         if translation_name:
                             result['translation_payload'][translation_name] = verse_text_value
+                            display_payload = result.setdefault('translation_display_payload', {})
+                            verse_numbers = result.get('verse_numbers') or []
+                            display_marker = (
+                                _superscript_number(verse_numbers[0]) if len(verse_numbers) == 1 else ''
+                            )
+                            display_value = verse_text_value.strip()
+                            if display_marker and display_value:
+                                display_value = f'{display_marker} {display_value}'
+                            elif display_marker:
+                                display_value = display_marker
+                            display_payload[translation_name] = display_value
+                            if result.get('is_read_only'):
+                                result['verse_display_text'] = display_value
                     if note_md is not None:
                         result['note_text'] = note_md
                         result['note_html'] = _render_markdown(note_md) if note_md else ''
