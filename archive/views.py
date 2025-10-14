@@ -90,7 +90,7 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
     try:
         start_v, end_v = tolerant_parse_reference(reference_text)
     except ValueError as exc:
-        return None, str(exc)
+        return {}, str(exc)
 
     verses = list(
         BibleVerse.objects.filter(
@@ -104,7 +104,7 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
     verse_texts = VerseText.objects.filter(verse__in=verses).order_by('translation', 'verse__verse')
     translation_map = {}
     for vt in verse_texts:
-        translation_map.setdefault(vt.translation, {})[vt.verse_id] = vt.text
+        translation_map.setdefault(vt.translation, {})[vt.verse.verse_id] = vt.text
 
     available_translations = _determine_available_translations(verse_ids, translation_map)
     selected_translation = ''
@@ -120,7 +120,7 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
     }
     verse_text = translation_payload.get(selected_translation, '')
 
-    note_map = {n.verse_id: n for n in VerseNote.objects.filter(verse__in=verses)}
+    note_map = {n.verse.verse_id: n for n in VerseNote.objects.filter(verse__in=verses)}
     is_range = len(verses) > 1
     notes_payload = []
     for verse in verses:
@@ -396,7 +396,7 @@ def passage_add(request, pk: int):
     try:
         SermonPassage.objects.create(
             sermon=sermon, start_verse=start_v, end_verse=end_v,
-            context_note=context_note, ord=next_ord
+            context_note=context_note, ord=next_ord, ref_text=ref_text
         )
     except DatabaseError:
         logger.exception('Database error adding passage "%s" to sermon %s', ref_text, sermon.pk)
