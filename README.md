@@ -80,35 +80,6 @@ Visit http://127.0.0.1:8000/ and log in.
 
 ---
 
-## App Structure
-
-```
-.
-├─ manage.py
-├─ sermon_site/
-│  ├─ settings.py
-│  ├─ urls.py
-│  ├─ wsgi.py / asgi.py
-│  ├─ static/
-│  │  └─ css/app.css
-│  ├─ media/                 # runtime uploads
-│  └─ templates/
-│     ├─ base.html
-│     ├─ locked_out.html
-│     ├─ auth/login.html
-│     └─ archive/
-│        ├─ sermon_list.html
-│        ├─ sermon_form.html
-│        ├─ sermon_detail.html
-│        └─ _partials/
-│           ├─ attachment_list.html
-│           ├─ passage_list.html
-│           └─ passage_preview.html
-└─ archive/
-   ├─ apps.py / admin.py / models.py / urls.py / views.py
-   ├─ storage.py              # attachment storage helpers
-   └─ verse_parser.py         # parse 'Book ch:vs-vs' into canonical IDs
-```
 
 **Primary Django app**: `archive`  
 **Project**: `sermon_site`
@@ -165,49 +136,9 @@ poetry run python manage.py check
 
 ---
 
-## Production Notes
-
-- Use `DEBUG=False`, a strong `SECRET_KEY`, and set `ALLOWED_HOSTS`.
-- Serve static files from `STATIC_ROOT` via Nginx.
-- Serve media files from `MEDIA_ROOT` via Nginx (read/write by Gunicorn user).
-- Run via `gunicorn sermon_site.wsgi:application` behind Nginx; add HTTPS (Certbot).
-
-Example Nginx snippets (conceptual):
-```nginx
-location /static/ { alias /srv/sermon-archive/staticfiles/; }
-location /media/  { alias /srv/sermon-archive/media/; }
-proxy_set_header X-Forwarded-Proto $scheme;
-```
-
----
-
 ## Developer Tips
 
 - Keep translations separate in `verse_texts`. Don’t create duplicate rows in `bible_verses` for new translations; only add `verse_texts` rows.
 - Use `sermon_passages.ord` to control the display order of passages.
 - Prefer `utf8mb4` at the DB and connection level.
 - For import routines, build once-off scripts that join `(book_id, chapter, verse)` to map raw source data to your canonical IDs.
-
----
-
-## Roadmap (Short List)
-
-- Verse auto-extraction from notes, with confirm UI.
-- Full-text search across sermons and illustrations.
-- Summaries and “top themes / top verses” analytics.
-- Public export (read-only) generator.
-- Optional tags for sermons and illustrations.
-
----
-
-## License
-
-MIT (or your choice). See `LICENSE`.
-
----
-
-## Troubleshooting
-
-- **Static files not loading**: ensure `{% load static %}`, correct file path, and `DEBUG=True` in dev. In prod, run `collectstatic` and serve via Nginx.
-- **DB connection errors**: verify credentials, host/port, and that MySQL is running with utf8mb4. Check `settings.py` DATABASES block.
-- **File uploads fail**: check that `MEDIA_ROOT` exists and is writable by your app user.
