@@ -2,6 +2,7 @@ import os
 from datetime import date
 from types import SimpleNamespace
 import unittest
+from unittest import mock
 
 import django
 
@@ -112,3 +113,47 @@ class RelatedSermonSerializationTests(unittest.TestCase):
             [item['ref_text'] for item in serialized],
             ['John 3:16–18', 'John 3:15–19', 'John 3:16–17', 'John 3:16–4:2'],
         )
+
+
+class ReferenceResolutionTests(unittest.TestCase):
+    def test_resolve_reference_from_ids_returns_single_verse(self):
+        verse = SimpleNamespace(verse_id=101, book=SimpleNamespace(name='John'), chapter=3, verse=16)
+        manager = mock.Mock()
+        manager.select_related.return_value = manager
+        manager.get.return_value = verse
+
+        with mock.patch.object(views, 'BibleVerse') as mock_bible_verse:
+            mock_bible_verse.objects = manager
+            mock_bible_verse.DoesNotExist = Exception
+
+            resolved = views._resolve_reference_from_ids('101', '', '')
+
+        self.assertEqual(resolved, 'John 3:16')
+
+    def test_resolve_reference_from_ids_handles_range(self):
+        start = SimpleNamespace(verse_id=200, book=SimpleNamespace(name='John'), chapter=3, verse=16)
+        end = SimpleNamespace(verse_id=202, book=SimpleNamespace(name='John'), chapter=3, verse=18)
+        manager = mock.Mock()
+        manager.select_related.return_value = manager
+        manager.get.side_effect = [start, end]
+
+        with mock.patch.object(views, 'BibleVerse') as mock_bible_verse:
+            mock_bible_verse.objects = manager
+            mock_bible_verse.DoesNotExist = Exception
+
+            resolved = views._resolve_reference_from_ids('', '200', '202')
+
+        self.assertEqual(resolved, 'John 3:16–18')
+
+    def test_resolve_reference_from_ids_returns_empty_on_error(self):
+        manager = mock.Mock()
+        manager.select_related.return_value = manager
+        manager.get.side_effect = Exception
+
+        with mock.patch.object(views, 'BibleVerse') as mock_bible_verse:
+            mock_bible_verse.objects = manager
+            mock_bible_verse.DoesNotExist = Exception
+
+            resolved = views._resolve_reference_from_ids('not-a-number', '', '')
+
+        self.assertEqual(resolved, '')

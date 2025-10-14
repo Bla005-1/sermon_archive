@@ -46,6 +46,23 @@ CREATE TABLE verse_notes (
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Cross references between verses
+CREATE TABLE verse_crossrefs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  from_verse_id BIGINT UNSIGNED NOT NULL,
+  to_start_verse_id BIGINT UNSIGNED NOT NULL,
+  to_end_verse_id BIGINT UNSIGNED DEFAULT NULL,
+  votes INT,
+  note VARCHAR(255),
+  UNIQUE KEY uq_cross (from_verse_id, to_start_verse_id, to_end_verse_id),
+  FOREIGN KEY (from_verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  FOREIGN KEY (to_start_verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  FOREIGN KEY (to_end_verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- ------------------------------------------------------------
 -- 2. Sermon data tables
 -- ------------------------------------------------------------

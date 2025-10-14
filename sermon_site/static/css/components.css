@@ -58,7 +58,7 @@ textarea{min-height:180px;resize:vertical}
 .btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
 .btn-primary{background:linear-gradient(135deg, var(--brand), var(--brand-strong));border-color:transparent;color:var(--brand-fg);box-shadow:var(--shadow-sm);isolation: isolate;}
 .btn-primary:hover{filter:brightness(1.03)}
-.btn-ghost{border-color:transparent;background:transparent;box-shadow:none}
+.btn-ghost{border-color:transparent;background:var(--action-bg);box-shadow:none}
 .btn-danger{color:var(--danger)}
 .suggestions-panel{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:20;background:var(--surface-strong);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;overflow:hidden}
 .suggestions-panel[hidden]{display:none}
@@ -82,8 +82,13 @@ textarea{min-height:180px;resize:vertical}
 .bullet-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .bullet-list li{border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:18px}
 .bullet-list .empty{color:var(--muted);justify-content:center}
+.cross-reference-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.cross-reference-item{border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;background:var(--surface);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:6px}
+.cross-reference-item__ref{font-weight:600;font-size:1.05rem}
+.cross-reference-item__text{margin:0;color:var(--muted);line-height:1.5}
 .panel{border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;background:var(--surface);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:18px}
 .panel-title{margin:0;font-size:1.35rem}
+.panel-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .detail-header, .detail-hero{display:flex;flex-direction:column;gap:20px}
 .detail-back{margin-bottom:16px}
 @media (min-width: 860px){.detail-hero{flex-direction:row;justify-content:space-between;align-items:flex-end}}

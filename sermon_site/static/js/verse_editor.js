@@ -61,6 +61,7 @@
 
     const translationData = parseJSONScript('verse-translation-data');
     const translationDisplayData = parseJSONScript('verse-translation-display-data');
+    const crossReferenceData = parseJSONScript('crossref-items-data');
     const translationSelect = form.querySelector('[data-translation-select]');
     const selectedTranslationInput = form.querySelector('[data-selected-translation]');
     const translationModeInput = form.querySelector('[data-translation-mode]');
@@ -372,6 +373,57 @@
     if (verseDisplay && verseText && verseText.readOnly && translationSelect && translationSelect.value) {
       const displayValue = resolveDisplayValue(translationSelect.value);
       refreshVerseDisplay(displayValue, !displayValue);
+    }
+
+    const crossrefContainer = document.querySelector('[data-crossref-container]');
+    if (crossrefContainer) {
+      const listEl = crossrefContainer.querySelector('[data-crossref-list]');
+      const emptyEl = crossrefContainer.querySelector('[data-crossref-empty]');
+      const selectEl = crossrefContainer.querySelector('[data-crossref-select]');
+      const defaultActive = crossrefContainer.getAttribute('data-active-verse') || '';
+
+      const renderCrossReferences = function (verseId) {
+        if (!listEl) {
+          return;
+        }
+        const key = String(verseId || '');
+        const items = (crossReferenceData && crossReferenceData[key]) || [];
+        listEl.innerHTML = '';
+        if (items.length === 0) {
+          listEl.hidden = true;
+          if (emptyEl) {
+            emptyEl.hidden = false;
+          }
+          return;
+        }
+        for (const item of items) {
+          const li = document.createElement('li');
+          li.className = 'cross-reference-item';
+          const refEl = document.createElement('div');
+          refEl.className = 'cross-reference-item__ref';
+          refEl.textContent = item.reference || '';
+          const textEl = document.createElement('p');
+          textEl.className = 'cross-reference-item__text';
+          textEl.textContent = item.text || '';
+          li.appendChild(refEl);
+          li.appendChild(textEl);
+          listEl.appendChild(li);
+        }
+        listEl.hidden = false;
+        if (emptyEl) {
+          emptyEl.hidden = true;
+        }
+      };
+
+      if (selectEl) {
+        selectEl.addEventListener('change', function () {
+          renderCrossReferences(selectEl.value);
+        });
+        const initial = selectEl.value || defaultActive;
+        renderCrossReferences(initial);
+      } else {
+        renderCrossReferences(defaultActive);
+      }
     }
   });
 })();

@@ -25,6 +25,7 @@ from .models import (
     BibleVerse,
     Sermon,
     SermonPassage,
+    VerseCrossReference,
     VerseNote,
     VerseText,
 )
@@ -106,6 +107,131 @@ def _format_reference(start, end):
     return f'{start.book.name} {start.chapter}:{start.verse}–{end.verse}'
 
 
+def _resolve_reference_from_ids(verse_id_param: str, start_param: str, end_param: str) -> str:
+    verse_id_param = (verse_id_param or '').strip()
+    start_param = (start_param or '').strip()
+    end_param = (end_param or '').strip()
+
+    if verse_id_param:
+        try:
+            verse_id = int(verse_id_param)
+            verse = BibleVerse.objects.select_related('book').get(pk=verse_id)
+            return f'{verse.book.name} {verse.chapter}:{verse.verse}'
+        except (ValueError, BibleVerse.DoesNotExist):
+            return ''
+
+    if start_param:
+        try:
+            start_id = int(start_param)
+        except ValueError:
+            return ''
+        try:
+            start_verse = BibleVerse.objects.select_related('book').get(pk=start_id)
+        except BibleVerse.DoesNotExist:
+            return ''
+        end_verse = start_verse
+        if end_param:
+            try:
+                end_id = int(end_param)
+                end_verse = BibleVerse.objects.select_related('book').get(pk=end_id)
+            except (ValueError, BibleVerse.DoesNotExist):
+                end_verse = start_verse
+        if end_verse.verse_id < start_verse.verse_id:
+            start_verse, end_verse = end_verse, start_verse
+        return _format_reference(start_verse, end_verse)
+
+    return ''
+
+
+def _build_cross_reference_context(verses):
+    if not verses:
+        return {
+            'has_any': False,
+            'is_passage': False,
+            'active_verse_id': None,
+            'verse_options': [],
+            'items_by_verse': {},
+        }
+
+    verse_ids = [verse.verse_id for verse in verses]
+    crossrefs = list(
+        VerseCrossReference.objects.select_related(
+            'to_start_verse__book',
+            'to_end_verse__book',
+        )
+        .filter(from_verse_id__in=verse_ids)
+        .annotate(vote_score=Coalesce('votes', 0))
+        .order_by(
+            'from_verse_id',
+            '-vote_score',
+            'to_start_verse__book__order_num',
+            'to_start_verse__chapter',
+            'to_start_verse__verse',
+            'to_end_verse__chapter',
+            'to_end_verse__verse',
+        )
+    )
+
+    range_text_cache = {}
+
+    def resolve_range_text(start_id: int, end_id: int):
+        key = (min(start_id, end_id), max(start_id, end_id))
+        if key in range_text_cache:
+            return range_text_cache[key]
+        verses_in_range = list(
+            BibleVerse.objects.select_related('book')
+            .filter(verse_id__gte=key[0], verse_id__lte=key[1])
+            .order_by('verse_id')
+        )
+        verse_text_lookup = {}
+        if verses_in_range:
+            verse_text_qs = VerseText.objects.filter(
+                verse__in=verses_in_range, translation='KJV'
+            )
+            for vt in verse_text_qs:
+                verse_text_lookup[vt.verse.verse_id] = vt.text
+        plain_text, display_text = _join_passage_text(verses_in_range, verse_text_lookup)
+        range_text_cache[key] = {
+            'plain_text': plain_text,
+            'display_text': display_text,
+        }
+        return range_text_cache[key]
+
+    items_by_verse = {vid: [] for vid in verse_ids}
+
+    for crossref in crossrefs:
+        to_start = crossref.to_start_verse
+        to_end = crossref.to_end_verse or to_start
+        text_info = resolve_range_text(to_start.verse_id, to_end.verse_id)
+        items_by_verse.setdefault(crossref.from_verse.verse_id, []).append(
+            {
+                'reference': _format_reference(to_start, to_end),
+                'text': text_info['plain_text'],
+                'votes': crossref.votes or 0,
+                'note': crossref.note or '',
+            }
+        )
+
+    verse_options = [
+        {
+            'id': verse.verse_id,
+            'label': f'{verse.book.name} {verse.chapter}:{verse.verse}',
+        }
+        for verse in verses
+    ]
+
+    has_any = any(items_by_verse.get(vid) for vid in verse_ids)
+    active_verse_id = verse_ids[0]
+    return {
+        'has_any': has_any,
+        'is_passage': len(verses) > 1,
+        'active_verse_id': active_verse_id,
+        'verse_options': verse_options,
+        'items_by_verse': items_by_verse,
+        'initial_items': items_by_verse.get(active_verse_id, []),
+    }
+
+
 def _load_passage_context(reference_text: str, forced_translation: str = ''):
     try:
         start_v, end_v = tolerant_parse_reference(reference_text)
@@ -178,6 +304,7 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
         'force_new_translation': False,
         'new_translation_name': '',
         'new_translation_text': '',
+        'cross_references': _build_cross_reference_context(verses),
     }
     return result, ''
 
@@ -405,6 +532,14 @@ def sermon_edit(request, pk: int):
 def verse_editor(request):
     reference = request.GET.get('ref', '').strip()
     translation_hint = request.GET.get('translation', '').strip()
+    if not reference:
+        reference_from_ids = _resolve_reference_from_ids(
+            request.GET.get('verse_id', ''),
+            request.GET.get('start_verse_id', ''),
+            request.GET.get('end_verse_id', ''),
+        )
+        if reference_from_ids:
+            reference = reference_from_ids
     error_message = ''
     result = None
 

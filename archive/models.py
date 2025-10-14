@@ -183,6 +183,30 @@ class VerseNote(models.Model):
         db_table = 'verse_notes'
 
 
+class VerseCrossReference(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    from_verse = models.ForeignKey(BibleVerse, models.DO_NOTHING, related_name='cross_references')
+    to_start_verse = models.ForeignKey(
+        BibleVerse,
+        models.DO_NOTHING,
+        related_name='cross_reference_sources_start',
+    )
+    to_end_verse = models.ForeignKey(
+        BibleVerse,
+        models.DO_NOTHING,
+        related_name='cross_reference_sources_end',
+        blank=True,
+        null=True,
+    )
+    votes = models.IntegerField(blank=True, null=True)
+    note = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'verse_crossrefs'
+        unique_together = (('from_verse', 'to_start_verse', 'to_end_verse'),)
+
+
 # ----------------------------
 # Sermon data tables
 # ----------------------------

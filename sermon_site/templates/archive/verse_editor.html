@@ -73,7 +73,10 @@
       </div>
 
       <div class="panel stack" data-notes-section>
-        <h2 class="panel-title">Notes</h2>
+        <div class="panel-header">
+          <h2 class="panel-title">Notes</h2>
+          <button class="btn btn-primary" type="submit" name="form_action" value="save" data-save-button disabled{% if result.is_read_only %} aria-disabled="true"{% endif %}>Save changes</button>
+        </div>
         {% if result.is_read_only %}
           {% if result.notes %}
             <div class="stack gap-md">
@@ -139,9 +142,37 @@
       </div>
       {% endif %}
 
-      <div class="detail-actions">
-        <button class="btn btn-primary" type="submit" name="form_action" value="save" data-save-button disabled{% if result.is_read_only %} aria-disabled="true"{% endif %}>Save changes</button>
+      {% if result.cross_references.has_any %}
+      <div class="panel stack" id="cross-references" data-crossref-container data-active-verse="{{ result.cross_references.active_verse_id }}">
+        <div class="stack gap-sm">
+          <h2 class="panel-title">Cross References</h2>
+          <p class="muted">See supporting verses from the KJV translation.</p>
+        </div>
+        {% if result.cross_references.is_passage %}
+          <div class="field field--inline">
+            <label class="field">
+              <span class="field-label">Show references for</span>
+              <select class="input" data-crossref-select>
+                {% for option in result.cross_references.verse_options %}
+                  <option value="{{ option.id }}"{% if option.id == result.cross_references.active_verse_id %} selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+        {% endif %}
+        <ul class="cross-reference-list" data-crossref-list{% if not result.cross_references.initial_items %} hidden{% endif %}>
+          {% for item in result.cross_references.initial_items %}
+            <li class="cross-reference-item">
+              <div class="cross-reference-item__ref">{{ item.reference }}</div>
+              <p class="cross-reference-item__text">{{ item.text }}</p>
+            </li>
+          {% endfor %}
+        </ul>
+        <p class="muted" data-crossref-empty{% if result.cross_references.initial_items %} hidden{% endif %}>No cross references for this verse yet.</p>
       </div>
+      {% endif %}
+
+      
     {% endif %}
   </form>
 </div>
@@ -151,5 +182,6 @@
 {% if result %}
   {{ result.translation_payload|json_script:"verse-translation-data" }}
   {{ result.translation_display_payload|json_script:"verse-translation-display-data" }}
+  {{ result.cross_references.items_by_verse|json_script:"crossref-items-data" }}
 {% endif %}
 {% endblock %}
