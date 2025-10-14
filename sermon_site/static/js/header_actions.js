@@ -57,10 +57,18 @@
     const headerInner = headerActions.closest('.header-inner');
     const brandBlock = headerInner ? headerInner.querySelector('.brand-block') : null;
 
+    function isNavVisuallyHidden(){
+      if (nav.hasAttribute('hidden')) return true;
+      const style = window.getComputedStyle(nav);
+      return style.display === 'none' || style.visibility === 'hidden';
+    }
+
     function closeMenu(){
       headerActions.classList.remove('is-open');
       toggle.setAttribute('aria-expanded', 'false');
-      if (collapsed){
+      // If layout is collapsed (JS or CSS fallback), keep nav hidden by attribute
+      const cssCollapsed = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+      if (collapsed || headerActions.classList.contains('is-collapsed') || cssCollapsed){
         nav.setAttribute('hidden', '');
       } else {
         nav.removeAttribute('hidden');
@@ -136,8 +144,14 @@
     }
 
     toggle.addEventListener('click', function(){
-      if (!collapsed) return;
+      // Allow toggling when JS thinks not collapsed but CSS fallback hides the nav
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      const cssCollapsed = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+      const canToggle = collapsed || headerActions.classList.contains('is-collapsed') || cssCollapsed || isNavVisuallyHidden();
+      if (!canToggle && !expanded){
+        // Not in a collapsed state, nothing to toggle
+        return;
+      }
       if (expanded){
         closeMenu();
       } else {
@@ -155,13 +169,15 @@
     });
 
     document.addEventListener('click', function(ev){
-      if (!collapsed) return;
+      const cssCollapsed = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+      if (!collapsed && !headerActions.classList.contains('is-collapsed') && !cssCollapsed) return;
       if (headerActions.contains(ev.target)) return;
       closeMenu();
     });
 
     document.addEventListener('keydown', function(ev){
-      if (!collapsed) return;
+      const cssCollapsed = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+      if (!collapsed && !headerActions.classList.contains('is-collapsed') && !cssCollapsed) return;
       if (ev.key === 'Escape' && headerActions.classList.contains('is-open')){
         closeMenu();
         toggle.focus();

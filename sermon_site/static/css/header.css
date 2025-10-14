@@ -1,11 +1,11 @@
 .site-header{position:sticky;top:0;z-index:50;backdrop-filter:blur(var(--blur));background:var(--header-surface);border-bottom:1px solid var(--border);box-shadow:0 10px 30px rgba(15, 23, 42, 0.08)}
-.header-inner{display:flex;align-items:center;gap:20px;min-height:72px;padding:10px 0}
+.header-inner{display:flex;align-items:center;gap:20px;min-height:72px;padding:10px 0;min-width:0}
 .brand-block{display:flex;flex-direction:column;gap:4px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:1.16rem;letter-spacing:-0.02em}
 .brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:11px;background:linear-gradient(135deg, var(--brand), var(--brand-strong));color:var(--brand-fg);font-weight:600;box-shadow:var(--shadow-sm)}
-.brand-text{display:inline-flex;align-items:center;gap:8px}
+.brand-text{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand-tagline{margin:0;color:var(--muted);font-size:.9rem}
-.header-actions{margin-left:auto;display:flex;align-items:center;gap:12px;padding:4px;background:transparent;border:none;box-shadow:none;border-radius:999px;position:relative}
+.header-actions{margin-left:auto;display:flex;align-items:center;gap:12px;padding:4px;background:transparent;border:none;box-shadow:none;border-radius:999px;position:relative;min-width:0}
 .header-nav{display:flex;align-items:center;gap:12px}
 .header-menu-toggle{
   display:none;
@@ -44,6 +44,9 @@
   box-shadow:var(--shadow-lg);
   min-width:190px;
   z-index:60;
+  max-width:calc(100vw - 24px);
+  inline-size:max-content;
+  overflow-wrap:anywhere;
 }
 .header-actions.is-collapsed.is-open .header-nav{display:flex}
 .header-actions.is-collapsed .header-action{width:100%;justify-content:flex-start}
@@ -73,3 +76,10 @@
 .header-action:focus{outline:none;box-shadow:0 0 0 4px var(--accent)}
 .header-action[type=submit]{cursor:pointer;appearance:none}
 .logout{margin:0;display:flex}
+
+/* Fallback: ensure collapse on small screens even if JS timing misses */
+@media (max-width: 720px){
+  .header-actions .header-menu-toggle{display:inline-flex}
+  .header-actions .header-nav{display:none;position:absolute;top:calc(100% + 10px);right:0;flex-direction:column;gap:8px;padding:14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface-strong);box-shadow:var(--shadow-lg);min-width:190px;z-index:60;max-width:calc(100vw - 24px);inline-size:max-content;overflow-wrap:anywhere}
+  .header-actions.is-open .header-nav{display:flex}
+}

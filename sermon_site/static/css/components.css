@@ -4,6 +4,8 @@
 .muted{color:var(--muted)}
 .sep{opacity:.55;padding:0 8px}
 hr{border:none;border-top:1px solid var(--border)}
+/* Ensure accessible base size for form controls to avoid mobile auto-zoom */
+input, textarea, select{font-size:16px}
 .hero{display:grid;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px 34px;box-shadow:var(--shadow-lg);backdrop-filter:blur(calc(var(--blur) * .8));overflow:hidden;position:relative}
 .hero::after{content:"";position:absolute;inset:auto -20% -40%;height:220px;opacity:0.5;pointer-events:none}
 .hero-eyebrow{text-transform:uppercase;letter-spacing:0.22em;font-size:.78rem;color:var(--muted);margin:0}
@@ -24,6 +26,11 @@ hr{border:none;border-top:1px solid var(--border)}
 .stack.gap-sm{gap:10px}
 .grid-two{display:grid;grid-template-columns:1fr;gap:18px}
 @media (min-width: 720px){.grid-two{grid-template-columns:repeat(2, minmax(0,1fr))}}
+.translation-controls{display:flex;align-items:flex-end;gap:12px;flex-wrap:nowrap}
+.translation-controls [data-translation-select-field]{flex:1 1 auto;min-width:0}
+.translation-controls [data-translation-select-field] .input{width:100%;min-width:0}
+.translation-controls .field--submit{flex:0 0 auto}
+.translation-controls .btn{white-space:nowrap}
 .field{display:flex;flex-direction:column;gap:8px;font-weight:500}
 .input, textarea{padding:13px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-strong);color:inherit;transition:border var(--transition), box-shadow var(--transition), transform var(--transition);box-shadow:0 1px 2px rgba(15, 23, 42, 0.08)}
 .input-with-suggestions{position:relative;display:flex;flex-direction:column;gap:8px}
@@ -49,6 +56,8 @@ textarea{min-height:180px;resize:vertical}
 .suggestion-option:hover,.suggestion-option:focus{outline:none;background:var(--action-bg)}
 .card-grid{display:grid;grid-template-columns:1fr;gap:22px;margin:0;padding:0;list-style:none}
 @media (min-width: 700px){.card-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}}
+.card-grid--single{grid-template-columns:1fr}
+@media (min-width: 700px){.card-grid--single{grid-template-columns:1fr}}
 .card-grid .empty{padding:36px;border-radius:var(--radius-lg);border:1px dashed var(--border);background:var(--surface);text-align:center;color:var(--muted);box-shadow:var(--shadow-sm)}
 .card{position:relative;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);backdrop-filter:blur(calc(var(--blur)*.7));box-shadow:var(--shadow-sm);overflow:hidden;transition:transform var(--transition), box-shadow var(--transition)}
 .card::before{content:"";position:absolute;inset:0;background:linear-gradient(160deg, rgba(108, 99, 255, 0.16), transparent 55%);opacity:0;transition:opacity var(--transition)}

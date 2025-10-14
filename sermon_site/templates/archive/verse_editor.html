@@ -5,7 +5,7 @@
 <div class="form-card" data-verse-editor>
   <div class="detail-heading">
     <p class="hero-eyebrow">Scripture tools</p>
-    <h1 class="page-title">Verse Tools</h1>
+    <h1 class="page-title">Verse Lookup</h1>
     <p class="muted">Search for a verse or passage to view translations and notes.</p>
   </div>
   <form class="form" method="post" data-verse-editor-form{% if result and result.force_new_translation %} data-force-new-translation="true"{% endif %}>
@@ -35,10 +35,9 @@
       <div class="panel stack">
         <div class="stack gap-sm">
           <h2 class="panel-title">{{ result.heading }}</h2>
-          <p class="muted">{{ result.description }}</p>
         </div>
         <div class="stack gap-md">
-          <div class="grid-two">
+          <div class="translation-controls">
             <label class="field" data-translation-select-field>Translation
               <select class="input" name="translation" data-translation-select{% if result.is_read_only %} disabled{% endif %}>
                 {% for t in result.available_translations %}
@@ -115,7 +114,7 @@
           <h2 class="panel-title">Related Sermons</h2>
           <p class="muted">Explore how this passage has been preached before.</p>
         </div>
-        <ul class="card-grid">
+        <ul class="card-grid card-grid--single">
           {% for related in result.related_sermons %}
           <li class="card">
             <a class="card-link" href="{{ related.detail_url }}">
