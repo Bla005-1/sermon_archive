@@ -28,7 +28,7 @@
   {% endif %}
 
     {% if result %}
-  <form class="form" method="post" data-verse-editor-form>
+  <form class="form verse-tools-results" method="post" data-verse-editor-form>
       {% csrf_token %}
       <input type="hidden" name="reference" value="{{ reference|default:'' }}">
       <input type="hidden" name="start_verse_id" value="{{ result.start_verse_id }}">

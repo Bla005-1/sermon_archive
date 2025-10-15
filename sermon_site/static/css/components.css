@@ -42,13 +42,20 @@ textarea{min-height:180px;resize:vertical}
   font-family:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size:1.05rem;
   line-height:1.6;
-  padding:13px 16px;
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  background:var(--surface-strong);
-  box-shadow:0 1px 2px rgba(15, 23, 42, 0.08);
+  padding:0;
+  border:none;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
   white-space:pre-wrap;
+  font-weight:350;
 }
+/* Verse display content spacing and markers */
+.verse-display p{margin:0 0 .8em}
+.verse-display p:last-child{margin-bottom:0}
+.verse-display .sup{position:relative;top:-0.45em;font-size:.72em;line-height:0;vertical-align:baseline;margin-right:.2em}
+/* Gap between search form and results form */
+.verse-tools-results{margin-top:16px}
 .form-django p{margin:0 0 14px;display:flex;flex-direction:column;gap:8px;font-weight:500}
 .form-django label{font-weight:500}
 .form-django input{padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-strong);color:inherit}
