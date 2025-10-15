@@ -1,0 +1,237 @@
+(function () {
+  function ready(fn) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fn);
+    } else {
+      fn();
+    }
+  }
+
+  function parseJSONScript(id) {
+    const el = document.getElementById(id);
+    if (!el) {
+      return {};
+    }
+    try {
+      return JSON.parse(el.textContent || '{}');
+    } catch (err) {
+      console.error('Failed to parse JSON script', err);
+      return {};
+    }
+  }
+
+  function renderMarkdown(text, target) {
+    if (!target) {
+      return;
+    }
+    if (window.marked) {
+      target.innerHTML = window.marked.parse(text || '');
+    } else {
+      target.textContent = text || '';
+    }
+  }
+
+  ready(function () {
+    const form = document.querySelector('[data-verse-editor-form]');
+    if (!form) {
+      return;
+    }
+
+    const translationData = parseJSONScript('verse-translation-data');
+    const translationDisplayData = parseJSONScript('verse-translation-display-data');
+    const crossReferenceData = parseJSONScript('crossref-items-data');
+
+    const translationSelect = form.querySelector('[data-translation-select]');
+    const selectedTranslationInput = form.querySelector('[data-selected-translation]');
+    const verseDisplay = form.querySelector('[data-verse-display]');
+    const emptyDisplayText = verseDisplay ? verseDisplay.getAttribute('data-empty-text') || '' : '';
+    const saveButton = form.querySelector('[data-save-button]');
+
+    const noteEditor = form.querySelector('[data-note-editor]');
+    const noteView = form.querySelector('[data-note-view]');
+    const noteInput = form.querySelector('[data-note-input]');
+    const notePreview = form.querySelector('[data-note-preview]');
+    const noteDisplay = form.querySelector('[data-note-display]');
+    const noteOriginalInput = form.querySelector('[data-note-original]');
+    const noteEditButton = form.querySelector('[data-note-edit-button]');
+    const noteCancelButton = form.querySelector('[data-note-cancel-button]');
+    const noteEmptyHint = form.querySelector('[data-note-empty-hint]');
+
+    let initialNoteText = noteInput ? noteInput.getAttribute('data-initial-value') || '' : '';
+
+    function syncSaveState() {
+      if (!saveButton) {
+        return;
+      }
+      let dirty = false;
+      if (noteInput && noteEditor && !noteEditor.hasAttribute('hidden')) {
+        dirty = noteInput.value !== initialNoteText;
+      }
+      saveButton.disabled = !dirty;
+      if (dirty) {
+        saveButton.removeAttribute('aria-disabled');
+      } else {
+        saveButton.setAttribute('aria-disabled', 'true');
+      }
+    }
+
+    function updateVerseDisplayFor(key) {
+      if (!verseDisplay) {
+        return;
+      }
+      let htmlValue = '';
+      if (key && Object.prototype.hasOwnProperty.call(translationDisplayData, key)) {
+        htmlValue = translationDisplayData[key];
+      }
+      if (htmlValue) {
+        verseDisplay.innerHTML = htmlValue;
+        return;
+      }
+      let plainText = '';
+      if (key && Object.prototype.hasOwnProperty.call(translationData, key)) {
+        plainText = translationData[key] || '';
+      }
+      if (plainText) {
+        verseDisplay.textContent = plainText;
+      } else if (emptyDisplayText) {
+        verseDisplay.textContent = emptyDisplayText;
+      } else {
+        verseDisplay.textContent = '';
+      }
+    }
+
+    if (translationSelect) {
+      translationSelect.addEventListener('change', function () {
+        const value = translationSelect.value;
+        if (selectedTranslationInput) {
+          selectedTranslationInput.value = value;
+        }
+        updateVerseDisplayFor(value);
+      });
+
+      if (selectedTranslationInput) {
+        selectedTranslationInput.value = translationSelect.value || '';
+      }
+      updateVerseDisplayFor(translationSelect.value || '');
+    }
+
+    if (noteInput) {
+      const updatePreview = function () {
+        renderMarkdown(noteInput.value, notePreview);
+        if (noteEmptyHint) {
+          noteEmptyHint.hidden = !!noteInput.value.trim();
+        }
+        syncSaveState();
+      };
+      noteInput.addEventListener('input', updatePreview);
+      updatePreview();
+    }
+
+    if (noteDisplay && noteOriginalInput) {
+      const originalText = noteOriginalInput.value || '';
+      renderMarkdown(originalText, noteDisplay);
+      noteDisplay.hidden = !originalText.trim();
+    }
+
+    if (noteEditButton && noteEditor && noteView) {
+      noteEditButton.addEventListener('click', function () {
+        noteEditor.hidden = false;
+        noteView.hidden = true;
+        if (noteCancelButton) {
+          noteCancelButton.hidden = false;
+        }
+        if (noteInput) {
+          noteInput.focus();
+        }
+        syncSaveState();
+      });
+    }
+
+    if (noteCancelButton && noteEditor && noteView && noteOriginalInput && noteInput) {
+      noteCancelButton.addEventListener('click', function () {
+        noteInput.value = noteOriginalInput.value || '';
+        renderMarkdown(noteInput.value, notePreview);
+        noteEditor.hidden = true;
+        noteView.hidden = false;
+        noteCancelButton.hidden = true;
+        initialNoteText = noteInput.value;
+        noteInput.setAttribute('data-initial-value', initialNoteText);
+        if (noteEmptyHint) {
+          noteEmptyHint.hidden = !!noteInput.value.trim();
+        }
+        if (noteDisplay) {
+          noteDisplay.hidden = !noteInput.value.trim();
+          renderMarkdown(noteInput.value, noteDisplay);
+        }
+        syncSaveState();
+      });
+    }
+
+    syncSaveState();
+
+    const crossrefContainer = document.querySelector('[data-crossref-container]');
+    if (crossrefContainer) {
+      const listEl = crossrefContainer.querySelector('[data-crossref-list]');
+      const emptyEl = crossrefContainer.querySelector('[data-crossref-empty]');
+      const selectEl = crossrefContainer.querySelector('[data-crossref-select]');
+      const defaultActive = crossrefContainer.getAttribute('data-active-verse') || '';
+      const verseToolsUrl = crossrefContainer.getAttribute('data-verse-tools-url') || '';
+
+      const buildVerseToolsLink = function (reference) {
+        if (!verseToolsUrl || !reference) {
+          return '';
+        }
+        const joiner = verseToolsUrl.includes('?') ? '&' : '?';
+        return `${verseToolsUrl}${joiner}ref=${encodeURIComponent(reference)}`;
+      };
+
+      const renderCrossReferences = function (verseId) {
+        if (!listEl) {
+          return;
+        }
+        const key = String(verseId || '');
+        const items = (crossReferenceData && crossReferenceData[key]) || [];
+        listEl.innerHTML = '';
+        if (items.length === 0) {
+          listEl.hidden = true;
+          if (emptyEl) {
+            emptyEl.hidden = false;
+          }
+          return;
+        }
+        for (const item of items) {
+          const li = document.createElement('li');
+          li.className = 'cross-reference-item';
+          const refEl = document.createElement('a');
+          refEl.className = 'cross-reference-item__ref';
+          const referenceText = item.reference || '';
+          refEl.textContent = referenceText;
+          const link = buildVerseToolsLink(referenceText);
+          if (link) {
+            refEl.href = link;
+          }
+          const textEl = document.createElement('p');
+          textEl.className = 'cross-reference-item__text';
+          textEl.textContent = item.text || '';
+          li.appendChild(refEl);
+          li.appendChild(textEl);
+          listEl.appendChild(li);
+        }
+        listEl.hidden = false;
+        if (emptyEl) {
+          emptyEl.hidden = true;
+        }
+      };
+
+      if (selectEl) {
+        selectEl.addEventListener('change', function () {
+          renderCrossReferences(selectEl.value);
+        });
+        const initial = selectEl.value || defaultActive;
+        renderCrossReferences(initial);
+      } else {
+        renderCrossReferences(defaultActive);
+      }
+    }
+  });
+})();

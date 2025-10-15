@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 SERMON_FIELDS = ['preached_on', 'title', 'speaker_name', 'series_name', 'location_name', 'notes_md']
 
-PREFERRED_TRANSLATIONS = ('NIV', 'ESV', 'KJV')
+PREFERRED_TRANSLATIONS = ('ESV', 'NIV', 'KJV')
 _UNICODE_SUPERSCRIPT_PATTERN = re.compile(r'[\u00B2\u00B3\u00B9\u2070-\u209F]')
 _SUPERSCRIPT_SPAN_PATTERN = re.compile(r'<span[^>]*class=["\']sup["\'][^>]*>.*?</span>', re.IGNORECASE | re.DOTALL)
 _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
@@ -185,11 +185,17 @@ def _build_cross_reference_context(verses):
         )
         verse_text_lookup = {}
         if verses_in_range:
-            verse_text_qs = VerseText.objects.filter(
-                verse__in=verses_in_range, translation='KJV'
+            verse_text_qs = list(
+                VerseText.objects.filter(
+                    verse__in=verses_in_range, translation='ESV'
+                ).order_by('verse__verse')
             )
+            if not verse_text_qs:
+                verse_text_qs = VerseText.objects.filter(verse__in=verses_in_range).order_by(
+                    'translation', 'verse__verse'
+                )
             for vt in verse_text_qs:
-                verse_text_lookup[vt.verse.verse_id] = vt.text
+                verse_text_lookup.setdefault(vt.verse.verse_id, vt.text)
         plain_text, display_text = _join_passage_text(verses_in_range, verse_text_lookup)
         range_text_cache[key] = {
             'plain_text': plain_text,
@@ -292,18 +298,15 @@ def _load_passage_context(reference_text: str, forced_translation: str = ''):
         'translation_payload': translation_payload,
         'translation_display_payload': translation_display_payload,
         'verse_text': verse_text,
-        'verse_display_text': verse_display_text if is_range else '',
+        'verse_display_text': verse_display_text,
         'is_read_only': is_range,
         'verse_numbers': [verse.verse for verse in verses],
         'notes': notes_payload,
         'heading': _format_reference(start_v, end_v),
-        'description': 'Compare translations across the passage.' if is_range else 'Edit translation text and notes for this verse.',
+        'description': 'Compare translations across the passage.' if is_range else 'View translation text and notes for this verse.',
         'single_label': f'{start_v.book.name} {start_v.chapter}:{start_v.verse}',
         'note_text': note_entry.note_md if note_entry and note_entry.note_md else '',
         'note_html': _render_markdown(note_entry.note_md) if note_entry and note_entry.note_md else '',
-        'force_new_translation': False,
-        'new_translation_name': '',
-        'new_translation_text': '',
         'cross_references': _build_cross_reference_context(verses),
     }
     return result, ''
@@ -467,7 +470,7 @@ def sermon_detail(request, pk: int):
         if back_translation:
             params['translation'] = back_translation
         query = urlencode(params)
-        back_to_results = f"{reverse('verse_editor')}?{query}#related-sermons"
+        back_to_results = f"{reverse('verse_tools')}?{query}#related-sermons"
     ctx = {
         'sermon': sermon,
         'book_suggestions': book_suggestions,
@@ -529,7 +532,7 @@ def sermon_edit(request, pk: int):
 
 
 @login_required
-def verse_editor(request):
+def verse_tools(request):
     reference = request.GET.get('ref', '').strip()
     translation_hint = request.GET.get('translation', '').strip()
     if not reference:
@@ -552,80 +555,34 @@ def verse_editor(request):
             if error_message:
                 messages.error(request, error_message)
             elif result['is_read_only']:
-                messages.error(request, 'Passages are view-only. Please select a single verse to edit translation text or notes.')
+                messages.error(request, 'Passages are view-only. Please select a single verse to update notes.')
             else:
                 verse = get_object_or_404(BibleVerse, pk=result['start_verse_id'])
-                translation_mode = request.POST.get('translation_mode', 'existing')
-                raw_verse_text = request.POST.get('verse_text', '')
-                verse_text_value = _strip_superscripts(raw_verse_text)
                 note_md = request.POST.get('note_md')
                 note_original = request.POST.get('note_original', '')
-                if translation_mode == 'new':
-                    translation_name = request.POST.get('new_translation_name', '').strip().upper()
-                else:
-                    translation_name = request.POST.get('translation', '').strip()
-
-                existing_lower = {name.lower() for name in result['available_translations']}
-
-                if translation_mode == 'new' and not translation_name:
-                    messages.error(request, 'Please provide a translation label for the new text.')
-                elif translation_mode != 'new' and not translation_name:
-                    messages.error(request, 'Select a translation to update or choose “Add New Translation”.')
-                elif not verse_text_value.strip():
-                    messages.error(request, 'Please enter the verse text before saving.')
-                elif translation_mode == 'new' and translation_name.lower() in existing_lower:
-                    messages.error(request, f'The translation "{translation_name}" already exists for this verse.')
-                else:
+                if note_md is not None and note_md != note_original:
                     with transaction.atomic():
-                        VerseText.objects.update_or_create(
+                        VerseNote.objects.update_or_create(
                             verse=verse,
-                            translation=translation_name,
-                            defaults={'text': verse_text_value.strip()},
+                            defaults={
+                                'note_md': note_md,
+                                'updated_at': timezone.now(),
+                            },
                         )
-                        if note_md is not None and note_md != note_original:
-                            VerseNote.objects.update_or_create(
-                                verse=verse,
-                                defaults={
-                                    'note_md': note_md,
-                                    'updated_at': timezone.now(),
-                                },
-                            )
-                    messages.success(request, 'Verse details saved successfully.')
-                    logger.info('User %s updated verse %s (%s)', request.user, verse.pk, translation_name)
-                    query = urlencode({'ref': reference, 'translation': translation_name})
-                    redirect_url = f"{reverse('verse_editor')}?{query}"
+                    messages.success(request, 'Notes saved successfully.')
+                    logger.info('User %s updated notes for verse %s', request.user, verse.pk)
+                    query_params = {'ref': reference}
+                    selected = result.get('selected_translation') or translation_hint
+                    if selected:
+                        query_params['translation'] = selected
+                    query = urlencode(query_params)
+                    redirect_url = reverse('verse_tools')
+                    if query:
+                        redirect_url = f"{redirect_url}?{query}"
                     return redirect(redirect_url)
-
-                if result:
-                    result['force_new_translation'] = translation_mode == 'new'
-                    if translation_mode == 'new':
-                        result['selected_translation'] = ''
-                        result['new_translation_name'] = translation_name
-                        result['verse_text'] = ''
-                        result['new_translation_text'] = verse_text_value
-                        result['verse_display_text'] = ''
-                    else:
-                        result['selected_translation'] = translation_name
-                        result['verse_text'] = verse_text_value
-                        result['new_translation_text'] = ''
-                        if translation_name:
-                            result['translation_payload'][translation_name] = verse_text_value
-                            display_payload = result.setdefault('translation_display_payload', {})
-                            verse_numbers = result.get('verse_numbers') or []
-                            display_marker = (
-                                _superscript_number(verse_numbers[0]) if len(verse_numbers) == 1 else ''
-                            )
-                            display_value = verse_text_value.strip()
-                            if display_marker and display_value:
-                                display_value = f'{display_marker} {display_value}'
-                            elif display_marker:
-                                display_value = display_marker
-                            display_payload[translation_name] = display_value
-                            if result.get('is_read_only'):
-                                result['verse_display_text'] = display_value
-                    if note_md is not None:
-                        result['note_text'] = note_md
-                        result['note_html'] = _render_markdown(note_md) if note_md else ''
+                if result is not None and note_md is not None:
+                    result['note_text'] = note_md
+                    result['note_html'] = _render_markdown(note_md) if note_md else ''
         else:
             result, error_message = _load_passage_context(reference, translation_hint)
             if error_message:
@@ -639,7 +596,6 @@ def verse_editor(request):
     if result and request.method != 'POST':
         # Ensure note preview reflects stored markdown when landing from redirect.
         result['note_html'] = _render_markdown(result['note_text']) if result['note_text'] else ''
-        result['new_translation_text'] = ''
 
     if result:
         result['related_sermons'] = _build_related_sermons(
@@ -660,7 +616,7 @@ def verse_editor(request):
         'book_suggestions': book_suggestions,
         'book_aliases': BOOK_ALIASES,
     }
-    return render(request, 'archive/verse_editor.html', ctx)
+    return render(request, 'archive/verse_tools.html', ctx)
 
 @login_required
 def passage_preview(request, pk: int):

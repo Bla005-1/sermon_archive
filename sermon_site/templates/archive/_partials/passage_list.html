@@ -14,7 +14,7 @@
           >
             {% csrf_token %}
             <div class="passage-list__content">
-              <a class="passage-list__ref cross-reference-item__ref" href="{% url 'verse_editor' %}?ref={{ link_ref|urlencode }}">{{ p.ref_display }}</a>
+              <a class="passage-list__ref cross-reference-item__ref" href="{% url 'verse_tools' %}?ref={{ link_ref|urlencode }}">{{ p.ref_display }}</a>
             </div>
             <label class="sr-only" for='id_context_note_{{ p.ord }}'>Context note</label>
             <input
@@ -50,7 +50,7 @@
           </form>
         {% else %}
           <div class="passage-list__content">
-            <a class="passage-list__ref cross-reference-item__ref" href="{% url 'verse_editor' %}?ref={{ link_ref|urlencode }}">{{ p.ref_display }}</a>
+            <a class="passage-list__ref cross-reference-item__ref" href="{% url 'verse_tools' %}?ref={{ link_ref|urlencode }}">{{ p.ref_display }}</a>
             {% if p.context_note %}
               <p class="passage-list__context muted">{{ p.context_note }}</p>
             {% endif %}

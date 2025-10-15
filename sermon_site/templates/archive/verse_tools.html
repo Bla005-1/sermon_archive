@@ -1,74 +1,60 @@
 {% extends 'base.html' %}
 {% block page_class %}page--compact{% endblock %}
-{% block title %}Add Verse{% endblock %}
+{% block title %}Verse Tools{% endblock %}
 {% block content %}
 <div class="form-card" data-verse-editor>
   <div class="detail-heading">
     <p class="hero-eyebrow">Scripture tools</p>
-    <h1 class="page-title">Verse Lookup</h1>
-    <p class="muted">Search for a verse or passage to view translations and notes.</p>
+    <h1 class="page-title">Verse Tools</h1>
+    <p class="muted">Search for a verse or passage to explore the ESV text, notes, and cross references.</p>
   </div>
-  <form class="form" method="post" data-verse-editor-form{% if result and result.force_new_translation %} data-force-new-translation="true"{% endif %}>
-    {% csrf_token %}
+  <form class="form" method="get" action="{% url 'verse_tools' %}" data-verse-search-form>
     <div class="grid-two">
       <label class="field">Reference
         <div class="input-with-suggestions" data-passage-suggestion-container>
-          <input class="input" type="text" name="reference" value="{{ reference|default:'' }}" required
+          <input class="input" type="text" name="ref" value="{{ reference|default:'' }}" required
                  placeholder="e.g., John 3:16-17" autocomplete="off" data-passage-input>
           <div class="suggestions-panel" data-passage-suggestions hidden></div>
         </div>
       </label>
       <div class="field field--submit">
         <span class="field-label" aria-hidden="true">&nbsp;</span>
-        <button class="btn btn-primary" type="submit" name="form_action" value="search">Search</button>
+        <button class="btn btn-primary" type="submit">Search</button>
       </div>
     </div>
-    {% if error_message %}
-    <div class="alert alert--error">{{ error_message }}</div>
-    {% endif %}
+  </form>
+  {% if error_message %}
+  <div class="alert alert--error">{{ error_message }}</div>
+  {% endif %}
 
     {% if result %}
+  <form class="form" method="post" data-verse-editor-form>
+      {% csrf_token %}
+      <input type="hidden" name="reference" value="{{ reference|default:'' }}">
       <input type="hidden" name="start_verse_id" value="{{ result.start_verse_id }}">
       <input type="hidden" name="end_verse_id" value="{{ result.end_verse_id }}">
       <input type="hidden" name="selected_translation" value="{{ result.selected_translation|default:'' }}" data-selected-translation>
-      <input type="hidden" name="translation_mode" value="existing" data-translation-mode>
       <div class="panel stack">
         <div class="stack gap-sm">
           <h2 class="panel-title">{{ result.heading }}</h2>
         </div>
         <div class="stack gap-md">
-          <div class="translation-controls">
-            <label class="field" data-translation-select-field>Translation
-              <select class="input" name="translation" data-translation-select{% if result.is_read_only %} disabled{% endif %}>
-                {% for t in result.available_translations %}
-                  <option value="{{ t }}"{% if t == result.selected_translation %} selected{% endif %}>{{ t }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <div class="field field--submit">
-              <span class="field-label" aria-hidden="true">&nbsp;</span>
-              <button class="btn btn-ghost" type="button" data-add-translation{% if result.is_read_only %} disabled{% endif %}>Add New Translation</button>
-            </div>
-          </div>
-          <div class="field" data-new-translation-field hidden>
-            <label class="field">New translation label
-              <input class="input" type="text" name="new_translation_name" value="{{ result.new_translation_name|default:'' }}" data-new-translation-input>
-            </label>
-          </div>
           <div class="field" data-verse-field>
-            <label class="field">Text
+            <label class="field">
               {% if result and result.verse_display_text %}
-                <div class="verse-display" data-verse-display{% if not result.is_read_only %} hidden{% endif %}>{{ result.verse_display_text|safe }}</div>
+                <div class="verse-display" data-verse-display data-empty-text="No text is available for this translation.">{{ result.verse_display_text|safe }}</div>
               {% else %}
-                <div class="verse-display" data-verse-display hidden></div>
+                <div class="verse-display" data-verse-display data-empty-text="No text is available for this translation.">No text is available for this translation.</div>
               {% endif %}
-              <textarea class="input verse-textarea" name="verse_text" rows="6" data-verse-text{% if result.is_read_only %} readonly{% endif %}
-                        data-initial-value="{{ result.verse_text|default:'' }}"{% if result.is_read_only %} hidden aria-hidden="true"{% endif %}>{{ result.verse_text|default:'' }}</textarea>
             </label>
           </div>
-          {% if result.is_read_only %}
-            <p class="muted">Passage text is view-only. Select an individual verse to edit or add translations.</p>
-          {% endif %}
+          <label class="field" data-translation-select-field>Translation
+            <select class="input" name="translation" data-translation-select>
+              {% for t in result.available_translations %}
+                <option value="{{ t }}"{% if t == result.selected_translation %} selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+          </label>
         </div>
       </div>
 
@@ -143,10 +129,10 @@
       {% endif %}
 
       {% if result.cross_references.has_any %}
-      <div class="panel stack" id="cross-references" data-crossref-container data-active-verse="{{ result.cross_references.active_verse_id }}" data-verse-editor-url="{% url 'verse_editor' %}">
+      <div class="panel stack" id="cross-references" data-crossref-container data-active-verse="{{ result.cross_references.active_verse_id }}" data-verse-tools-url="{% url 'verse_tools' %}">
         <div class="stack gap-sm">
           <h2 class="panel-title">Cross References</h2>
-          <p class="muted">See supporting verses from the KJV translation.</p>
+          <p class="muted">See supporting verses from the ESV translation.</p>
         </div>
         {% if result.cross_references.is_passage %}
           <div class="field field--inline">
@@ -163,7 +149,7 @@
         <ul class="cross-reference-list" data-crossref-list{% if not result.cross_references.initial_items %} hidden{% endif %}>
           {% for item in result.cross_references.initial_items %}
             <li class="cross-reference-item">
-              <a class="cross-reference-item__ref" href="{% url 'verse_editor' %}?ref={{ item.reference|urlencode }}">{{ item.reference }}</a>
+              <a class="cross-reference-item__ref" href="{% url 'verse_tools' %}?ref={{ item.reference|urlencode }}">{{ item.reference }}</a>
               <p class="cross-reference-item__text">{{ item.text }}</p>
             </li>
           {% endfor %}
@@ -171,10 +157,8 @@
         <p class="muted" data-crossref-empty{% if result.cross_references.initial_items %} hidden{% endif %}>No cross references for this verse yet.</p>
       </div>
       {% endif %}
-
-      
-    {% endif %}
   </form>
+    {% endif %}
 </div>
 
 {{ book_suggestions|json_script:"passage-book-data" }}

@@ -13,7 +13,7 @@ urlpatterns = [
     path('sermons/<int:pk>/ui/passage/<int:ord>/delete', views.passage_delete, name='passage_delete'),
     path('sermons/<int:pk>/attachments', views.attachment_upload, name='attachment_upload'),
     path('sermons/<int:pk>/attachments/<int:att_id>/delete', views.attachment_delete, name='attachment_delete'),
-    path('verses/add', views.verse_editor, name='verse_editor'),
+    path('verses/tools', views.verse_tools, name='verse_tools'),
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 ]
