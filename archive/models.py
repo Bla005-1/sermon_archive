@@ -162,11 +162,11 @@ class VerseText(models.Model):
     verse_text_id = models.BigAutoField(primary_key=True)
     verse = models.ForeignKey(BibleVerse, models.DO_NOTHING)
     translation = models.CharField(max_length=16)
-    text = models.TextField()
-
+    plain_text = models.TextField()
+    marked_text = models.TextField()
     class Meta:
         managed = False
-        db_table = 'verse_texts'
+        db_table = 'verse_texts_marked'
         unique_together = (('verse', 'translation'),)
 
 

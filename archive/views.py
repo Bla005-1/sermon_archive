@@ -1,9 +1,5 @@
-"""View logic for the sermon archive application."""
-
 import logging
-import re
 from urllib.parse import urlencode
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -14,23 +10,19 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.utils.html import escape
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from markdown2 import Markdown
-
 from .models import (
     Attachment,
     BibleBook,
     BibleVerse,
     Sermon,
     SermonPassage,
-    VerseCrossReference,
     VerseNote,
-    VerseText,
 )
 from .storage import AttachmentStorageError, save_attachment_file
-from .verse_parser import BOOK_ALIASES, normalize_book, tolerant_parse_reference
+from .utils.reference_parser import build_passage_context, format_ref, normalize_book, tolerant_parse_reference, BOOK_ALIASES
 
 
 logger = logging.getLogger(__name__)
@@ -39,8 +31,6 @@ logger = logging.getLogger(__name__)
 SERMON_FIELDS = ['preached_on', 'title', 'speaker_name', 'series_name', 'location_name', 'notes_md']
 
 PREFERRED_TRANSLATIONS = ('ESV', 'NIV', 'KJV')
-_UNICODE_SUPERSCRIPT_PATTERN = re.compile(r'[\u00B2\u00B3\u00B9\u2070-\u209F]')
-_SUPERSCRIPT_SPAN_PATTERN = re.compile(r'<span[^>]*class=["\']sup["\'][^>]*>.*?</span>', re.IGNORECASE | re.DOTALL)
 _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
 
 
@@ -58,53 +48,8 @@ def _superscript_number(number: int) -> str:
     return f'<span class="sup">{number}</span>'
 
 
-def _strip_superscripts(text: str) -> str:
-    if not text:
-        return ''
-    without_unicode = _UNICODE_SUPERSCRIPT_PATTERN.sub('', text)
-    return _SUPERSCRIPT_SPAN_PATTERN.sub('', without_unicode)
-
-
-def _determine_available_translations(verse_ids, translation_map):
-    available = []
-    for name, verse_texts in translation_map.items():
-        if all(vid in verse_texts for vid in verse_ids):
-            available.append(name)
-    return available
-
-
-def _select_default_translation(available):
-    for candidate in PREFERRED_TRANSLATIONS:
-        if candidate in available:
-            return candidate
-    return available[0] if available else None
-
-
-def _join_passage_text(verses, verse_text_lookup):
-    plain_parts = []
-    display_parts = []
-    for verse in verses:
-        text = (verse_text_lookup.get(verse.verse_id, '') or '').strip()
-        marker = _superscript_number(verse.verse)
-        if text:
-            escaped_text = escape(text)
-            display_parts.append(f'{marker} {escaped_text}')
-            plain_parts.append(text)
-        elif marker:
-            display_parts.append(marker)
-    plain_text = ' '.join(part for part in plain_parts if part).strip()
-    display_text = ' '.join(part.strip() for part in display_parts if part).strip()
-    return plain_text, display_text
-
-
 def _render_markdown(text: str) -> str:
     return _markdown_renderer.convert(text or '')
-
-
-def _format_reference(start, end):
-    if start.verse_id == end.verse_id:
-        return f'{start.book.name} {start.chapter}:{start.verse}'
-    return f'{start.book.name} {start.chapter}:{start.verse}–{end.verse}'
 
 
 def _resolve_reference_from_ids(verse_id_param: str, start_param: str, end_param: str) -> str:
@@ -138,178 +83,21 @@ def _resolve_reference_from_ids(verse_id_param: str, start_param: str, end_param
                 end_verse = start_verse
         if end_verse.verse_id < start_verse.verse_id:
             start_verse, end_verse = end_verse, start_verse
-        return _format_reference(start_verse, end_verse)
+        return format_ref(start_verse, end_verse)
 
     return ''
 
 
-def _build_cross_reference_context(verses):
-    if not verses:
-        return {
-            'has_any': False,
-            'is_passage': False,
-            'active_verse_id': None,
-            'verse_options': [],
-            'items_by_verse': {},
-        }
-
-    verse_ids = [verse.verse_id for verse in verses]
-    crossrefs = list(
-        VerseCrossReference.objects.select_related(
-            'to_start_verse__book',
-            'to_end_verse__book',
-        )
-        .filter(from_verse_id__in=verse_ids)
-        .annotate(vote_score=Coalesce('votes', 0))
-        .order_by(
-            'from_verse_id',
-            '-vote_score',
-            'to_start_verse__book__order_num',
-            'to_start_verse__chapter',
-            'to_start_verse__verse',
-            'to_end_verse__chapter',
-            'to_end_verse__verse',
-        )
-    )
-
-    range_text_cache = {}
-
-    def resolve_range_text(start_id: int, end_id: int):
-        key = (min(start_id, end_id), max(start_id, end_id))
-        if key in range_text_cache:
-            return range_text_cache[key]
-        verses_in_range = list(
-            BibleVerse.objects.select_related('book')
-            .filter(verse_id__gte=key[0], verse_id__lte=key[1])
-            .order_by('verse_id')
-        )
-        verse_text_lookup = {}
-        if verses_in_range:
-            verse_text_qs = list(
-                VerseText.objects.filter(
-                    verse__in=verses_in_range, translation='ESV'
-                ).order_by('verse__verse')
-            )
-            if not verse_text_qs:
-                verse_text_qs = VerseText.objects.filter(verse__in=verses_in_range).order_by(
-                    'translation', 'verse__verse'
-                )
-            for vt in verse_text_qs:
-                verse_text_lookup.setdefault(vt.verse.verse_id, vt.text)
-        plain_text, display_text = _join_passage_text(verses_in_range, verse_text_lookup)
-        range_text_cache[key] = {
-            'plain_text': plain_text,
-            'display_text': display_text,
-        }
-        return range_text_cache[key]
-
-    items_by_verse = {vid: [] for vid in verse_ids}
-
-    for crossref in crossrefs:
-        to_start = crossref.to_start_verse
-        to_end = crossref.to_end_verse or to_start
-        text_info = resolve_range_text(to_start.verse_id, to_end.verse_id)
-        items_by_verse.setdefault(crossref.from_verse.verse_id, []).append(
-            {
-                'reference': _format_reference(to_start, to_end),
-                'text': text_info['plain_text'],
-                'votes': crossref.votes or 0,
-                'note': crossref.note or '',
-            }
-        )
-
-    verse_options = [
-        {
-            'id': verse.verse_id,
-            'label': f'{verse.book.name} {verse.chapter}:{verse.verse}',
-        }
-        for verse in verses
-    ]
-
-    has_any = any(items_by_verse.get(vid) for vid in verse_ids)
-    active_verse_id = verse_ids[0]
-    return {
-        'has_any': has_any,
-        'is_passage': len(verses) > 1,
-        'active_verse_id': active_verse_id,
-        'verse_options': verse_options,
-        'items_by_verse': items_by_verse,
-        'initial_items': items_by_verse.get(active_verse_id, []),
-    }
-
-
 def _load_passage_context(reference_text: str, forced_translation: str = ''):
-    try:
-        start_v, end_v = tolerant_parse_reference(reference_text)
-    except ValueError as exc:
-        return {}, str(exc)
-
-    verses = list(
-        BibleVerse.objects.filter(
-            book=start_v.book,
-            chapter=start_v.chapter,
-            verse__gte=start_v.verse,
-            verse__lte=end_v.verse,
-        ).order_by('verse')
+    # Delegate to shared utils to build the same payload shape.
+    result, error = build_passage_context(
+        reference_text,
+        forced_translation=forced_translation,
+        preferred_translations=PREFERRED_TRANSLATIONS,
+        markdown_renderer=_markdown_renderer,
+        superscript_fn=_superscript_number,
     )
-    verse_ids = [v.verse_id for v in verses]
-    verse_texts = VerseText.objects.filter(verse__in=verses).order_by('translation', 'verse__verse')
-    translation_map = {}
-    for vt in verse_texts:
-        translation_map.setdefault(vt.translation, {})[vt.verse.verse_id] = vt.text
-
-    available_translations = _determine_available_translations(verse_ids, translation_map)
-    selected_translation = ''
-    if forced_translation and forced_translation in available_translations:
-        selected_translation = forced_translation
-    else:
-        selected_translation = _select_default_translation(available_translations)
-
-    translation_payload = {}
-    translation_display_payload = {}
-    for name, verse_lookup in translation_map.items():
-        if name not in available_translations:
-            continue
-        plain_text, display_text = _join_passage_text(verses, verse_lookup)
-        translation_payload[name] = plain_text
-        translation_display_payload[name] = display_text
-    verse_text = translation_payload.get(selected_translation, '')
-    verse_display_text = translation_display_payload.get(selected_translation, '')
-
-    note_map = {n.verse.verse_id: n for n in VerseNote.objects.filter(verse__in=verses)}
-    is_range = len(verses) > 1
-    notes_payload = []
-    for verse in verses:
-        note_obj = note_map.get(verse.verse_id)
-        if note_obj and note_obj.note_md:
-            notes_payload.append(
-                {
-                    'label': f'{verse.book.name} {verse.chapter}:{verse.verse}',
-                    'html': _render_markdown(note_obj.note_md),
-                }
-            )
-
-    note_entry = note_map.get(verses[0].verse_id) if verses else None
-    result = {
-        'start_verse_id': verses[0].verse_id if verses else None,
-        'end_verse_id': verses[-1].verse_id if verses else None,
-        'available_translations': available_translations,
-        'selected_translation': selected_translation or '',
-        'translation_payload': translation_payload,
-        'translation_display_payload': translation_display_payload,
-        'verse_text': verse_text,
-        'verse_display_text': verse_display_text,
-        'is_read_only': is_range,
-        'verse_numbers': [verse.verse for verse in verses],
-        'notes': notes_payload,
-        'heading': _format_reference(start_v, end_v),
-        'description': 'Compare translations across the passage.' if is_range else 'View translation text and notes for this verse.',
-        'single_label': f'{start_v.book.name} {start_v.chapter}:{start_v.verse}',
-        'note_text': note_entry.note_md if note_entry and note_entry.note_md else '',
-        'note_html': _render_markdown(note_entry.note_md) if note_entry and note_entry.note_md else '',
-        'cross_references': _build_cross_reference_context(verses),
-    }
-    return result, ''
+    return result, error
 
 
 def _serialize_related_passages(back_params, query_start, query_end, passages):

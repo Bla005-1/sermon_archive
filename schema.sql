@@ -34,6 +34,17 @@ CREATE TABLE verse_texts (
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE verse_texts_marked (
+  verse_text_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  verse_id BIGINT UNSIGNED NOT NULL,
+  translation VARCHAR(16) NOT NULL,
+  marked_text LONGTEXT NOT NULL,  -- original with markers
+  plain_text LONGTEXT NOT NULL,  -- marker-free text for display/search
+  FOREIGN KEY (verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  UNIQUE KEY uq_translation_verse (translation, verse_id)
+) ENGINE=InnoDB;
+
 -- Personal or study notes on verses
 CREATE TABLE verse_notes (
   note_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
