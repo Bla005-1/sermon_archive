@@ -1,4 +1,5 @@
 import logging
+import re
 from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -17,12 +18,22 @@ from .models import (
     Attachment,
     BibleBook,
     BibleVerse,
+    BibleWidgetVerse,
     Sermon,
     SermonPassage,
     VerseNote,
 )
 from .storage import AttachmentStorageError, save_attachment_file
-from .utils.reference_parser import build_passage_context, format_ref, normalize_book, tolerant_parse_reference, BOOK_ALIASES
+from .utils.reference_parser import (
+    BOOK_ALIASES,
+    build_passage_context,
+    determine_available_translations,
+    format_ref,
+    join_passage_text,
+    normalize_book,
+    select_default_translation,
+    tolerant_parse_reference,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -32,6 +43,24 @@ SERMON_FIELDS = ['preached_on', 'title', 'speaker_name', 'series_name', 'locatio
 
 PREFERRED_TRANSLATIONS = ('ESV', 'NIV', 'KJV')
 _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
+
+
+_determine_available_translations = determine_available_translations
+_select_default_translation = select_default_translation
+_join_passage_text = join_passage_text
+
+_SUPERSCRIPT_DIGIT_RE = re.compile(r'[\u2070\u00B9\u00B2\u00B3\u2074-\u2079]')
+_SUPERSCRIPT_SPAN_RE = re.compile(r'<span[^>]*class="sup"[^>]*>.*?</span>', re.IGNORECASE)
+
+BIBLE_WIDGET_WARNING_LENGTH = 155
+
+
+def _strip_superscripts(text: str) -> str:
+    if not text:
+        return ''
+    cleaned = _SUPERSCRIPT_SPAN_RE.sub(' ', text)
+    cleaned = _SUPERSCRIPT_DIGIT_RE.sub(' ', cleaned)
+    return cleaned
 
 
 def _user_can_edit_sermons(user) -> bool:
@@ -371,6 +400,44 @@ def verse_tools(request):
                 if result is not None and note_md is not None:
                     result['note_text'] = note_md
                     result['note_html'] = _render_markdown(note_md) if note_md else ''
+        elif action == 'add_to_widget':
+            result, error_message = _load_passage_context(reference, translation_hint)
+            if error_message:
+                messages.error(request, error_message)
+            elif result['is_read_only']:
+                messages.error(request, 'Please select a single verse before adding it to the BibleWidget.')
+            else:
+                selected = (result.get('selected_translation') or translation_hint or '').strip()
+                translation_map = result.get('translation_payload') or {}
+                verse_text = (translation_map.get(selected) or '').strip()
+                if not selected:
+                    messages.error(request, 'Select a translation before adding to the BibleWidget.')
+                elif not verse_text:
+                    messages.error(request, 'No verse text is available for the selected translation.')
+                else:
+                    verse = get_object_or_404(BibleVerse, pk=result['start_verse_id'])
+                    defaults = {
+                        'translation': selected,
+                        'ref': result.get('heading') or reference,
+                        'display_text': verse_text,
+                    }
+                    try:
+                        entry, created = BibleWidgetVerse.objects.update_or_create(verse=verse, defaults=defaults)
+                    except DatabaseError:
+                        logger.exception('Failed to save BibleWidget verse %s', verse.pk)
+                        messages.error(request, 'We could not save that verse to the BibleWidget. Please try again.')
+                    else:
+                        action_word = 'Added' if created else 'Updated'
+                        message_text = 'Added verse to the BibleWidget.' if created else 'Updated verse in the BibleWidget.'
+                        messages.success(request, message_text)
+                        logger.info('User %s %s BibleWidget verse %s (translation=%s)', request.user, action_word.lower(), verse.pk, selected)
+                        plain_length = len(_strip_superscripts(verse_text))
+                        if plain_length > BIBLE_WIDGET_WARNING_LENGTH:
+                            messages.warning(
+                                request,
+                                'This verse is %s characters long. The BibleWidget works best with about %s characters or fewer.'
+                                % (plain_length, BIBLE_WIDGET_WARNING_LENGTH),
+                            )
         else:
             result, error_message = _load_passage_context(reference, translation_hint)
             if error_message:
@@ -405,6 +472,81 @@ def verse_tools(request):
         'book_aliases': BOOK_ALIASES,
     }
     return render(request, 'archive/verse_tools.html', ctx)
+
+
+@login_required
+def bible_widget_list(request):
+    if request.method == 'POST':
+        action = (request.POST.get('action') or '').strip()
+        entry_id = (request.POST.get('entry_id') or '').strip()
+        if not entry_id:
+            messages.error(request, 'We could not determine which verse to update.')
+            return redirect('bible_widget_list')
+
+        entry = get_object_or_404(BibleWidgetVerse, pk=entry_id)
+
+        if action == 'update_text':
+            new_text = (request.POST.get('display_text') or '').strip()
+            if not new_text:
+                messages.error(request, 'Display text cannot be empty.')
+                return redirect('bible_widget_list')
+            entry.display_text = new_text
+            try:
+                entry.save(update_fields=['display_text'])
+            except DatabaseError:
+                logger.exception('Failed to update BibleWidget text for verse %s', entry.verse.verse_id)
+                messages.error(request, 'We could not update the display text. Please try again.')
+            else:
+                messages.success(request, f'Updated display text for {entry.ref}.')
+                logger.info('User %s updated BibleWidget display text for verse %s', request.user, entry.verse.verse_id)
+            return redirect('bible_widget_list')
+
+        if action == 'weight_up':
+            entry.weight = min(entry.weight + 1, 65535)
+            try:
+                entry.save(update_fields=['weight'])
+            except DatabaseError:
+                logger.exception('Failed to increase BibleWidget weight for verse %s', entry.verse.verse_id)
+                messages.error(request, 'We could not update the weight. Please try again.')
+            else:
+                messages.success(request, f'Increased weight to {entry.weight} for {entry.ref}.')
+                logger.info('User %s increased BibleWidget weight for verse %s to %s', request.user, entry.verse.verse_id, entry.weight)
+            return redirect('bible_widget_list')
+
+        if action == 'weight_down':
+            if entry.weight <= 1:
+                messages.info(request, 'Weight is already at the minimum value of 1.')
+                return redirect('bible_widget_list')
+            entry.weight = max(1, entry.weight - 1)
+            try:
+                entry.save(update_fields=['weight'])
+            except DatabaseError:
+                logger.exception('Failed to decrease BibleWidget weight for verse %s', entry.verse.verse_id)
+                messages.error(request, 'We could not update the weight. Please try again.')
+            else:
+                messages.success(request, f'Decreased weight to {entry.weight} for {entry.ref}.')
+                logger.info('User %s decreased BibleWidget weight for verse %s to %s', request.user, entry.verse.verse_id, entry.weight)
+            return redirect('bible_widget_list')
+
+        if action == 'delete':
+            try:
+                entry.delete()
+            except DatabaseError:
+                logger.exception('Failed to delete BibleWidget verse %s', entry.verse.verse_id)
+                messages.error(request, 'We could not remove that verse. Please try again.')
+            else:
+                messages.success(request, f'Removed {entry.ref} from the BibleWidget pool.')
+                logger.info('User %s deleted BibleWidget verse %s', request.user, entry.verse.verse_id)
+            return redirect('bible_widget_list')
+
+        messages.error(request, 'Unsupported action for the BibleWidget verse list.')
+        return redirect('bible_widget_list')
+
+    entries = (
+        BibleWidgetVerse.objects.select_related('verse__book')
+        .order_by('-weight', 'ref')
+    )
+    return render(request, 'archive/bible_widget_list.html', {'entries': entries})
 
 @login_required
 def passage_preview(request, pk: int):

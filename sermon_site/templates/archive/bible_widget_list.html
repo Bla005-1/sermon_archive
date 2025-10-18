@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block page_class %}page--compact{% endblock %}
+{% block title %}BibleWidget Verses{% endblock %}
+{% block content %}
+<div class="form-card">
+  <div class="detail-heading">
+    <p class="hero-eyebrow">BibleWidget</p>
+    <h1 class="page-title">Widget Verse Pool</h1>
+    <p class="muted">Curate and tune the verses that appear in the BibleWidget rotation.</p>
+  </div>
+
+  {% if entries %}
+    <div class="stack gap-md">
+      {% for entry in entries %}
+        <article class="panel stack gap-md widget-entry">
+          <header class="widget-entry__header">
+            <div class="widget-entry__ref stack gap-xs">
+              <h2 class="panel-title">{{ entry.ref }}</h2>
+              <span class="badge">{{ entry.translation }}</span>
+            </div>
+            <form class="widget-entry__weight-form" method="post">
+              {% csrf_token %}
+              <input type="hidden" name="entry_id" value="{{ entry.pk }}">
+              <button class="btn btn-ghost" type="submit" name="action" value="weight_down" aria-label="Decrease weight">
+                &minus;
+              </button>
+              <span class="widget-entry__weight">Weight: {{ entry.weight }}</span>
+              <button class="btn btn-ghost" type="submit" name="action" value="weight_up" aria-label="Increase weight">
+                &#43;
+              </button>
+            </form>
+          </header>
+          <form class="stack gap-sm widget-entry__text-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="entry_id" value="{{ entry.pk }}">
+            <label class="field">Display text
+              <textarea class="input" name="display_text" rows="3">{{ entry.display_text }}</textarea>
+            </label>
+            <div class="widget-entry__actions">
+              <button class="btn btn-primary" type="submit" name="action" value="update_text">Save text</button>
+              <button class="btn btn-ghost" type="submit" name="action" value="delete">Delete verse</button>
+            </div>
+          </form>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No verses have been added to the BibleWidget yet. Use the Verse Tools page to add your first verse.</p>
+  {% endif %}
+</div>
+{% endblock %}

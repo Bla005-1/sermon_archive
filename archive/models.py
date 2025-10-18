@@ -318,4 +318,33 @@ class SermonPassage(models.Model):
                 return f'{s.book.name} {s.chapter}:{s.verse}–{e.verse}'
             return f'{s.book.name} {s.chapter}:{s.verse}–{e.chapter}:{e.verse}'
         return f'{s.book.name} {s.chapter}:{s.verse} – {e.book.name} {e.chapter}:{e.verse}'
+
+
+# ----------------------------
+# Bible widget tables
+# ----------------------------
+
+
+class BibleWidgetVerse(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    verse = models.OneToOneField(
+        BibleVerse,
+        models.CASCADE,
+        db_column='verse_id',
+        related_name='widget_entry',
+    )
+    translation = models.CharField(max_length=16)
+    ref = models.CharField(max_length=64)
+    display_text = models.TextField()
+    weight = models.PositiveSmallIntegerField(default=1)
+    created_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
+    updated_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'bible_widget_verses'
+        ordering = ('-weight', 'ref')
+
+    def __str__(self):
+        return f'{self.ref} ({self.translation})'
     

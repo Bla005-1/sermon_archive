@@ -55,6 +55,12 @@
               {% endfor %}
             </select>
           </label>
+          <div class="field verse-widget-actions">
+            <button class="btn" type="submit" name="form_action" value="add_to_widget"
+              {% if result.is_read_only or not result.selected_translation %}disabled aria-disabled="true"{% endif %}>
+              Add to BibleWidget
+            </button>
+          </div>
         </div>
       </div>
 

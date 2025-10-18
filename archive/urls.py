@@ -14,6 +14,7 @@ urlpatterns = [
     path('sermons/<int:pk>/attachments', views.attachment_upload, name='attachment_upload'),
     path('sermons/<int:pk>/attachments/<int:att_id>/delete', views.attachment_delete, name='attachment_delete'),
     path('verses/tools', views.verse_tools, name='verse_tools'),
+    path('verses/widget', views.bible_widget_list, name='bible_widget_list'),
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 ]
