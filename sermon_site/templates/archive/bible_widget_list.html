@@ -10,40 +10,38 @@
   </div>
 
   {% if entries %}
-    <div class="stack gap-md">
+    <ul class="widget-list">
       {% for entry in entries %}
-        <article class="panel stack gap-md widget-entry">
-          <header class="widget-entry__header">
-            <div class="widget-entry__ref stack gap-xs">
-              <h2 class="panel-title">{{ entry.ref }}</h2>
-              <span class="badge">{{ entry.translation }}</span>
+        <li class="widget-list__item">
+          <header class="widget-list__header">
+            <div class="widget-list__meta">
+              <h2 class="widget-list__ref">{{ entry.ref }}</h2>
+              <span class="widget-list__translation">{{ entry.translation }}</span>
             </div>
-            <form class="widget-entry__weight-form" method="post">
+            <form class="widget-list__weight-form" method="post">
               {% csrf_token %}
               <input type="hidden" name="entry_id" value="{{ entry.pk }}">
-              <button class="btn btn-ghost" type="submit" name="action" value="weight_down" aria-label="Decrease weight">
+              <button class="btn btn-subtle btn--compact" type="submit" name="action" value="weight_down" aria-label="Decrease weight">
                 &minus;
               </button>
-              <span class="widget-entry__weight">Weight: {{ entry.weight }}</span>
-              <button class="btn btn-ghost" type="submit" name="action" value="weight_up" aria-label="Increase weight">
+              <span class="widget-list__weight" aria-live="polite">Weight {{ entry.weight }}</span>
+              <button class="btn btn-subtle btn--compact" type="submit" name="action" value="weight_up" aria-label="Increase weight">
                 &#43;
               </button>
             </form>
           </header>
-          <form class="stack gap-sm widget-entry__text-form" method="post">
+          <form class="widget-list__body" method="post">
             {% csrf_token %}
             <input type="hidden" name="entry_id" value="{{ entry.pk }}">
-            <label class="field">Display text
-              <textarea class="input" name="display_text" rows="3">{{ entry.display_text }}</textarea>
-            </label>
-            <div class="widget-entry__actions">
-              <button class="btn btn-primary" type="submit" name="action" value="update_text">Save text</button>
-              <button class="btn btn-ghost" type="submit" name="action" value="delete">Delete verse</button>
+            <textarea class="input widget-list__textarea" id="display_text_{{ entry.pk }}" name="display_text" rows="2">{{ entry.display_text }}</textarea>
+            <div class="widget-list__actions">
+              <button class="btn btn-primary btn--compact" type="submit" name="action" value="update_text">Save text</button>
+              <button class="btn btn-subtle btn--compact" type="submit" name="action" value="delete">Delete</button>
             </div>
           </form>
-        </article>
+        </li>
       {% endfor %}
-    </div>
+    </ul>
   {% else %}
     <p class="muted">No verses have been added to the BibleWidget yet. Use the Verse Tools page to add your first verse.</p>
   {% endif %}

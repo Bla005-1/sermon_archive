@@ -48,18 +48,20 @@
               {% endif %}
             </label>
           </div>
-          <label class="field" data-translation-select-field>Translation
-            <select class="input" name="translation" data-translation-select>
-              {% for t in result.available_translations %}
-                <option value="{{ t }}"{% if t == result.selected_translation %} selected{% endif %}>{{ t }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <div class="field verse-widget-actions">
-            <button class="btn" type="submit" name="form_action" value="add_to_widget"
-              {% if result.is_read_only or not result.selected_translation %}disabled aria-disabled="true"{% endif %}>
-              Add to BibleWidget
-            </button>
+          <div class="translation-controls" data-translation-controls>
+            <label class="field translation-controls__field" data-translation-select-field>Translation
+              <select class="input" name="translation" data-translation-select>
+                {% for t in result.available_translations %}
+                  <option value="{{ t }}"{% if t == result.selected_translation %} selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="translation-controls__actions">
+              <button class="btn btn-primary" type="submit" name="form_action" value="add_to_widget"
+                {% if not result.selected_translation %}disabled aria-disabled="true"{% endif %}>
+                Add to BibleWidget
+              </button>
+            </div>
           </div>
         </div>
       </div>

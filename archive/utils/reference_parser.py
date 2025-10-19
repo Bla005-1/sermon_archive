@@ -350,6 +350,12 @@ def build_passage_context(
         if name not in available_translations:
             continue
         plain_text, display_text = join_passage_text(verses, verse_lookup, superscript_fn=superscript_fn)
+        # Tighten spacing after superscript for UI rendering by removing the
+        # literal space that follows the superscript span; CSS will control gap.
+        try:
+            display_text = re.sub(r"</span>\s+", "</span>", display_text)
+        except Exception:
+            pass
         translation_payload[name] = plain_text
         translation_display_payload[name] = display_text
     verse_text = translation_payload.get(selected_translation, '')

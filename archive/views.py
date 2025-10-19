@@ -22,16 +22,14 @@ from .models import (
     Sermon,
     SermonPassage,
     VerseNote,
+    VerseText,
 )
 from .storage import AttachmentStorageError, save_attachment_file
 from .utils.reference_parser import (
     BOOK_ALIASES,
     build_passage_context,
-    determine_available_translations,
     format_ref,
-    join_passage_text,
     normalize_book,
-    select_default_translation,
     tolerant_parse_reference,
 )
 
@@ -44,10 +42,6 @@ SERMON_FIELDS = ['preached_on', 'title', 'speaker_name', 'series_name', 'locatio
 PREFERRED_TRANSLATIONS = ('ESV', 'NIV', 'KJV')
 _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
 
-
-_determine_available_translations = determine_available_translations
-_select_default_translation = select_default_translation
-_join_passage_text = join_passage_text
 
 _SUPERSCRIPT_DIGIT_RE = re.compile(r'[\u2070\u00B9\u00B2\u00B3\u2074-\u2079]')
 _SUPERSCRIPT_SPAN_RE = re.compile(r'<span[^>]*class="sup"[^>]*>.*?</span>', re.IGNORECASE)
@@ -404,8 +398,6 @@ def verse_tools(request):
             result, error_message = _load_passage_context(reference, translation_hint)
             if error_message:
                 messages.error(request, error_message)
-            elif result['is_read_only']:
-                messages.error(request, 'Please select a single verse before adding it to the BibleWidget.')
             else:
                 selected = (result.get('selected_translation') or translation_hint or '').strip()
                 translation_map = result.get('translation_payload') or {}
@@ -415,23 +407,48 @@ def verse_tools(request):
                 elif not verse_text:
                     messages.error(request, 'No verse text is available for the selected translation.')
                 else:
-                    verse = get_object_or_404(BibleVerse, pk=result['start_verse_id'])
+                    # Build display_text; for passages, join verses as "[x] text" chunks
+                    start_id = int(result.get('start_verse_id') or 0)
+                    end_id = int(result.get('end_verse_id') or 0)
+                    verse = get_object_or_404(BibleVerse, pk=start_id) if start_id else None
+                    display_text = verse_text
+                    if start_id and end_id and end_id != start_id:
+                        a, b = (min(start_id, end_id), max(start_id, end_id))
+                        verses_in_range = list(
+                            BibleVerse.objects.filter(verse_id__gte=a, verse_id__lte=b).order_by('verse_id')
+                        )
+                        vt_rows = list(
+                            VerseText.objects.filter(verse__in=verses_in_range, translation=selected).order_by('verse__verse')
+                        )
+                        # Fallback: if no rows for selected, any translation per verse order
+                        if not vt_rows:
+                            vt_rows = list(VerseText.objects.filter(verse__in=verses_in_range).order_by('translation', 'verse__verse'))
+                        lookup = {}
+                        for r in vt_rows:
+                            lookup.setdefault(r.verse.verse_id, r.plain_text)
+                        parts = []
+                        for v in verses_in_range:
+                            t = (lookup.get(v.verse_id) or '').strip()
+                            if not t:
+                                continue
+                            parts.append(f'[{v.verse}]{t}')
+                        display_text = ' '.join(parts).strip() or verse_text
                     defaults = {
                         'translation': selected,
                         'ref': result.get('heading') or reference,
-                        'display_text': verse_text,
+                        'display_text': display_text,
                     }
                     try:
                         entry, created = BibleWidgetVerse.objects.update_or_create(verse=verse, defaults=defaults)
                     except DatabaseError:
-                        logger.exception('Failed to save BibleWidget verse %s', verse.pk)
+                        logger.exception('Failed to save BibleWidget verse %s', getattr(verse, 'pk', 'unknown'))
                         messages.error(request, 'We could not save that verse to the BibleWidget. Please try again.')
                     else:
                         action_word = 'Added' if created else 'Updated'
                         message_text = 'Added verse to the BibleWidget.' if created else 'Updated verse in the BibleWidget.'
                         messages.success(request, message_text)
-                        logger.info('User %s %s BibleWidget verse %s (translation=%s)', request.user, action_word.lower(), verse.pk, selected)
-                        plain_length = len(_strip_superscripts(verse_text))
+                        logger.info('User %s %s BibleWidget verse %s (translation=%s)', request.user, action_word.lower(), getattr(verse, 'pk', 'unknown'), selected)
+                        plain_length = len(_strip_superscripts(display_text))
                         if plain_length > BIBLE_WIDGET_WARNING_LENGTH:
                             messages.warning(
                                 request,
@@ -677,7 +694,7 @@ def attachment_upload(request, pk: int):
 @login_required
 def attachment_delete(request, pk: int, att_id: int):
     sermon = get_object_or_404(Sermon, pk=pk)
-    deleted, _ = Attachment.objects.filter(sermon=sermon, id=att_id).delete()
+    deleted, _ = Attachment.objects.filter(sermon=sermon, pk=att_id).delete()
     logger.debug('User %s deleted attachment %s from sermon %s (deleted=%s)', request.user, att_id, sermon.pk, deleted)
     return render(request, 'archive/_partials/attachment_list.html', {'sermon': sermon})
 
