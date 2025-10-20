@@ -561,7 +561,7 @@ def bible_widget_list(request):
 
     entries = (
         BibleWidgetVerse.objects.select_related('verse__book')
-        .order_by('-weight', 'ref')
+        .order_by('-weight', '-updated_at')
     )
     return render(request, 'archive/bible_widget_list.html', {'entries': entries})
 

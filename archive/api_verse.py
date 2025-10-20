@@ -2,6 +2,7 @@ from typing import List, Optional
 from ninja import NinjaAPI, Schema
 from django.http import Http404
 from .utils.reference_parser import build_api_verse_response, tolerant_parse_reference
+from .models import BibleWidgetVerse
 api = NinjaAPI()
 
 class VerseNoteOut(Schema):
@@ -43,3 +44,32 @@ def verse_lookup(request, ref: str, translation: Optional[str] = 'ESV'):
 
     payload = build_api_verse_response(ref, translation_hint=translation)
     return payload
+
+
+class BibleWidgetOut(Schema):
+    id: int
+    verse_id: int
+    translation: str
+    ref: str
+    display_text: Optional[str]
+    weight: int
+    created_at: str
+    updated_at: str
+
+@api.get('/biblewidget', response=List[BibleWidgetOut])
+def biblewidget_list(request):
+    """Return all BibleWidget verses as a simple JSON list."""
+    verses = BibleWidgetVerse.objects.all().order_by('-weight', 'id')
+    return [
+        BibleWidgetOut(
+            id=v.id,
+            verse_id=v.verse.verse_id,
+            translation=v.translation,
+            ref=v.ref,
+            display_text=v.display_text,
+            weight=v.weight,
+            created_at=str(v.created_at),
+            updated_at=str(v.updated_at),
+        )
+        for v in verses
+    ]
