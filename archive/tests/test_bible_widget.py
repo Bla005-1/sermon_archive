@@ -59,7 +59,14 @@ class BibleWidgetViewTests(SimpleTestCase):
             'translation_display_payload': {'ESV': long_text},
             'note_text': '',
             'note_html': '',
-            'cross_references': {'has_any': False, 'items_by_verse': {}, 'active_verse_id': None},
+            'cross_references': {
+                'has_any': False,
+                'items_by_verse': {},
+                'active_verse_id': 101,
+                'is_passage': False,
+                'verse_options': [{'id': 101, 'label': 'John 3:16'}],
+                'initial_items': [],
+            },
         }
 
         manager = mock.Mock()
@@ -103,7 +110,17 @@ class BibleWidgetViewTests(SimpleTestCase):
             'translation_display_payload': {'ESV': 'text'},
             'note_text': '',
             'note_html': '',
-            'cross_references': {'has_any': False, 'items_by_verse': {}, 'active_verse_id': None},
+            'cross_references': {
+                'has_any': False,
+                'items_by_verse': {},
+                'active_verse_id': 101,
+                'is_passage': True,
+                'verse_options': [
+                    {'id': 101, 'label': 'John 3:16'},
+                    {'id': 102, 'label': 'John 3:17'},
+                ],
+                'initial_items': [],
+            },
         }
 
         manager = mock.Mock()

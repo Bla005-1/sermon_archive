@@ -39,8 +39,6 @@
 
     const translationData = parseJSONScript('verse-translation-data');
     const translationDisplayData = parseJSONScript('verse-translation-display-data');
-    const crossReferenceData = parseJSONScript('crossref-items-data');
-
     const translationSelect = form.querySelector('[data-translation-select]');
     const selectedTranslationInput = form.querySelector('[data-selected-translation]');
     const verseDisplay = form.querySelector('[data-verse-display]');
@@ -173,9 +171,16 @@
     if (crossrefContainer) {
       const listEl = crossrefContainer.querySelector('[data-crossref-list]');
       const emptyEl = crossrefContainer.querySelector('[data-crossref-empty]');
+      const loadingEl = crossrefContainer.querySelector('[data-crossref-loading]');
       const selectEl = crossrefContainer.querySelector('[data-crossref-select]');
       const defaultActive = crossrefContainer.getAttribute('data-active-verse') || '';
       const verseToolsUrl = crossrefContainer.getAttribute('data-verse-tools-url') || '';
+      const apiUrl = crossrefContainer.getAttribute('data-crossref-api-url') || '';
+      const queryRef = crossrefContainer.getAttribute('data-crossref-ref') || '';
+      const queryTranslation = crossrefContainer.getAttribute('data-crossref-translation') || '';
+
+      let crossReferenceData = {};
+      let hasLoaded = false;
 
       const buildVerseToolsLink = function (reference) {
         if (!verseToolsUrl || !reference) {
@@ -185,8 +190,32 @@
         return `${verseToolsUrl}${joiner}ref=${encodeURIComponent(reference)}`;
       };
 
+      const setLoadingState = function (isLoading) {
+        if (loadingEl) {
+          loadingEl.hidden = !isLoading;
+        }
+        if (isLoading) {
+          if (listEl) {
+            listEl.hidden = true;
+          }
+          if (emptyEl) {
+            emptyEl.hidden = true;
+          }
+          if (selectEl) {
+            selectEl.disabled = true;
+            selectEl.setAttribute('aria-disabled', 'true');
+          }
+        } else if (selectEl) {
+          selectEl.disabled = false;
+          selectEl.removeAttribute('aria-disabled');
+        }
+      };
+
       const renderCrossReferences = function (verseId) {
         if (!listEl) {
+          return;
+        }
+        if (!hasLoaded) {
           return;
         }
         const key = String(verseId || '');
@@ -223,15 +252,78 @@
         }
       };
 
-      if (selectEl) {
-        selectEl.addEventListener('change', function () {
-          renderCrossReferences(selectEl.value);
-        });
-        const initial = selectEl.value || defaultActive;
-        renderCrossReferences(initial);
-      } else {
-        renderCrossReferences(defaultActive);
-      }
+      const handleError = function () {
+        if (emptyEl) {
+          emptyEl.hidden = false;
+          emptyEl.textContent = 'Cross references could not be loaded.';
+        }
+        if (listEl) {
+          listEl.hidden = true;
+          listEl.innerHTML = '';
+        }
+        hasLoaded = false;
+        setLoadingState(false);
+      };
+
+      const loadCrossReferences = function () {
+        if (!apiUrl || !queryRef) {
+          handleError();
+          return Promise.resolve();
+        }
+        setLoadingState(true);
+        const params = new URLSearchParams();
+        params.set('ref', queryRef);
+        if (queryTranslation) {
+          params.set('translation', queryTranslation);
+        }
+        const requestUrl = `${apiUrl}?${params.toString()}`;
+        return fetch(requestUrl, { credentials: 'same-origin' })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error('Cross references request failed');
+            }
+            return response.json();
+          })
+          .then(function (payload) {
+            const results = (payload && payload.results) || [];
+            const data = {};
+            let hasAny = false;
+            results.forEach(function (item) {
+              const key = String(item.verse_id);
+              const refs = Array.isArray(item.cross_refs) ? item.cross_refs : [];
+              data[key] = refs.map(function (refItem) {
+                return {
+                  reference: refItem.reference || '',
+                  text: refItem.preview_text || '',
+                };
+              });
+              if (data[key].length > 0) {
+                hasAny = true;
+              }
+            });
+            crossReferenceData = data;
+            hasLoaded = true;
+            setLoadingState(false);
+            const initial = (selectEl && (selectEl.value || defaultActive)) || defaultActive;
+            if (!hasAny && emptyEl) {
+              emptyEl.hidden = false;
+              emptyEl.textContent = 'No cross references for this verse yet.';
+            }
+            if (selectEl) {
+              selectEl.addEventListener('change', function () {
+                renderCrossReferences(selectEl.value);
+              });
+            }
+            const initialKey = initial || Object.keys(crossReferenceData)[0] || '';
+            renderCrossReferences(initialKey);
+          })
+          .catch(function (err) {
+            console.error(err);
+            handleError();
+          });
+      };
+
+      loadCrossReferences();
     }
   });
 })();

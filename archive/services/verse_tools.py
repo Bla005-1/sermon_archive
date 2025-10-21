@@ -54,6 +54,7 @@ def load_passage_context(reference_text: str, forced_translation: str = ''):
         preferred_translations=PREFERRED_TRANSLATIONS,
         markdown_renderer=_markdown_renderer,
         superscript_fn=superscript_number,
+        include_cross_references=False,
     )
     return result, error
 

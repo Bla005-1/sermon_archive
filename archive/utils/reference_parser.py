@@ -216,6 +216,35 @@ def join_passage_text(verses: Sequence[BibleVerse], verse_text_lookup: Dict[int,
     return plain_text, display_text
 
 
+def build_cross_reference_metadata(verses: Sequence[BibleVerse]) -> dict:
+    if not verses:
+        return {
+            'has_any': False,
+            'is_passage': False,
+            'active_verse_id': None,
+            'verse_options': [],
+            'items_by_verse': {},
+            'initial_items': [],
+        }
+
+    verse_options = [
+        {
+            'id': verse.verse_id,
+            'label': f'{verse.book.name} {verse.chapter}:{verse.verse}',
+        }
+        for verse in verses
+    ]
+
+    return {
+        'has_any': False,
+        'is_passage': len(verses) > 1,
+        'active_verse_id': verses[0].verse_id,
+        'verse_options': verse_options,
+        'items_by_verse': {},
+        'initial_items': [],
+    }
+
+
 def build_cross_reference_context(verses: Sequence[BibleVerse]) -> dict:
     if not verses:
         return {
@@ -290,24 +319,17 @@ def build_cross_reference_context(verses: Sequence[BibleVerse]) -> dict:
             }
         )
 
-    verse_options = [
-        {
-            'id': verse.verse_id,
-            'label': f'{verse.book.name} {verse.chapter}:{verse.verse}',
-        }
-        for verse in verses
-    ]
-
+    meta = build_cross_reference_metadata(verses)
     has_any = any(items_by_verse.get(vid) for vid in verse_ids)
-    active_verse_id = verse_ids[0]
-    return {
-        'has_any': has_any,
-        'is_passage': len(verses) > 1,
-        'active_verse_id': active_verse_id,
-        'verse_options': verse_options,
-        'items_by_verse': items_by_verse,
-        'initial_items': items_by_verse.get(active_verse_id, []),
-    }
+    active_verse_id = meta['active_verse_id']
+    meta.update(
+        {
+            'has_any': has_any,
+            'items_by_verse': items_by_verse,
+            'initial_items': items_by_verse.get(active_verse_id, []) if active_verse_id else [],
+        }
+    )
+    return meta
 
 
 def build_passage_context(
@@ -317,6 +339,7 @@ def build_passage_context(
     preferred_translations: Sequence[str] = ("ESV", "NIV", "KJV"),
     markdown_renderer: Optional[Markdown] = None,
     superscript_fn: Optional[Callable[[int], str]] = None,
+    include_cross_references: bool = True,
 ) -> Tuple[dict, str]:
     try:
         start_v, end_v = tolerant_parse_reference(reference_text)
@@ -395,7 +418,8 @@ def build_passage_context(
         'single_label': f'{start_v.book.name} {start_v.chapter}:{start_v.verse}',
         'note_text': note_entry.note_md if note_entry and note_entry.note_md else '',
         'note_html': (markdown_renderer.convert(note_entry.note_md) if markdown_renderer and note_entry and note_entry.note_md else ''),
-        'cross_references': build_cross_reference_context(verses),
+        'cross_references': build_cross_reference_context(verses) if include_cross_references else build_cross_reference_metadata(verses),
+        'cross_reference_ref': format_ref(start_v, end_v),
     }
     return result, ''
 
