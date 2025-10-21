@@ -89,17 +89,20 @@ def verse_tools(request):
                     if not display_text:
                         messages.error(request, 'No verse text is available for the selected translation.')
                     else:
-                        start_id = int(result.get('start_verse_id') or 0)
-                        verse = get_object_or_404(BibleVerse, pk=start_id) if start_id else None
+                        start_id = int(result.get('start_verse_id', 0))
+                        end_id = int(result.get('end_verse_id', 0))
+                        start_verse = get_object_or_404(BibleVerse, pk=start_id)
+                        end_verse = get_object_or_404(BibleVerse, pk=end_id)
                         try:
                             entry, created = ensure_entry(
-                                verse,
+                                start_verse,
+                                end_verse,
                                 selected,
                                 result.get('heading') or reference,
                                 display_text,
                             )
                         except BibleWidgetPersistenceError:
-                            logger.exception('Failed to save BibleWidget verse %s', getattr(verse, 'pk', 'unknown'))
+                            logger.exception('Failed to save BibleWidget verse %s', getattr(start_verse, 'pk', 'unknown'))
                             messages.error(request, 'We could not save that verse to the BibleWidget. Please try again.')
                         else:
                             action_word = 'Added' if created else 'Updated'
@@ -109,7 +112,7 @@ def verse_tools(request):
                                 'User %s %s BibleWidget verse %s (translation=%s)',
                                 request.user,
                                 action_word.lower(),
-                                getattr(verse, 'pk', 'unknown'),
+                                getattr(start_verse, 'pk', 'unknown'),
                                 selected,
                             )
                             plain_length = len(strip_superscripts(display_text))
@@ -173,11 +176,11 @@ def bible_widget_list(request):
             try:
                 update_display_text(entry, new_text)
             except BibleWidgetPersistenceError:
-                logger.exception('Failed to update BibleWidget text for verse %s', entry.verse.verse_id)
+                logger.exception('Failed to update BibleWidget text for verse %s', entry.start_verse.verse_id)
                 messages.error(request, 'We could not update the display text. Please try again.')
             else:
                 messages.success(request, f'Updated display text for {entry.ref}.')
-                logger.info('User %s updated BibleWidget display text for verse %s', request.user, entry.verse.verse_id)
+                logger.info('User %s updated BibleWidget display text for verse %s', request.user, entry.start_verse.verse_id)
             return redirect('bible_widget_list')
 
         if action == 'weight_up':
@@ -185,14 +188,14 @@ def bible_widget_list(request):
             try:
                 updated = adjust_weight(entry, 1)
             except BibleWidgetPersistenceError:
-                logger.exception('Failed to increase BibleWidget weight for verse %s', entry.verse.verse_id)
+                logger.exception('Failed to increase BibleWidget weight for verse %s', entry.start_verse.verse_id)
                 messages.error(request, 'We could not update the weight. Please try again.')
             else:
                 if updated.weight == old_weight:
                     messages.info(request, f'Weight is already at the maximum value of {old_weight}.')
                 else:
                     messages.success(request, f'Increased weight to {updated.weight} for {entry.ref}.')
-                    logger.info('User %s increased BibleWidget weight for verse %s to %s', request.user, entry.verse.verse_id, updated.weight)
+                    logger.info('User %s increased BibleWidget weight for verse %s to %s', request.user, entry.start_verse.verse_id, updated.weight)
             return redirect('bible_widget_list')
 
         if action == 'weight_down':
@@ -203,32 +206,32 @@ def bible_widget_list(request):
             try:
                 updated = adjust_weight(entry, -1)
             except BibleWidgetPersistenceError:
-                logger.exception('Failed to decrease BibleWidget weight for verse %s', entry.verse.verse_id)
+                logger.exception('Failed to decrease BibleWidget weight for verse %s', entry.start_verse.verse_id)
                 messages.error(request, 'We could not update the weight. Please try again.')
             else:
                 if updated.weight == old_weight:
                     messages.info(request, 'Weight is already at the minimum value of 1.')
                 else:
                     messages.success(request, f'Decreased weight to {updated.weight} for {entry.ref}.')
-                    logger.info('User %s decreased BibleWidget weight for verse %s to %s', request.user, entry.verse.verse_id, updated.weight)
+                    logger.info('User %s decreased BibleWidget weight for verse %s to %s', request.user, entry.start_verse.verse_id, updated.weight)
             return redirect('bible_widget_list')
 
         if action == 'delete':
             try:
                 delete_entry(entry)
             except BibleWidgetPersistenceError:
-                logger.exception('Failed to delete BibleWidget verse %s', entry.verse.verse_id)
+                logger.exception('Failed to delete BibleWidget verse %s', entry.start_verse.verse_id)
                 messages.error(request, 'We could not remove that verse. Please try again.')
             else:
                 messages.success(request, f'Removed {entry.ref} from the BibleWidget pool.')
-                logger.info('User %s deleted BibleWidget verse %s', request.user, entry.verse.verse_id)
+                logger.info('User %s deleted BibleWidget verse %s', request.user, entry.start_verse.verse_id)
             return redirect('bible_widget_list')
 
         messages.error(request, 'Unsupported action for the BibleWidget verse list.')
         return redirect('bible_widget_list')
 
     entries = (
-        BibleWidgetVerse.objects.select_related('verse__book')
+        BibleWidgetVerse.objects.select_related('start_verse__book')
         .order_by('-weight', '-updated_at')
     )
     return render(request, 'archive/bible_widget_list.html', {'entries': entries})

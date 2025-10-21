@@ -48,13 +48,15 @@ def verse_lookup(request, ref: str, translation: Optional[str] = 'ESV'):
 
 class BibleWidgetOut(Schema):
     id: int
-    verse_id: int
+    start_verse_id: int
+    end_verse_id: int
     translation: str
     ref: str
     display_text: Optional[str]
     weight: int
     created_at: str
     updated_at: str
+
 
 @api.get('/biblewidget', response=List[BibleWidgetOut])
 def biblewidget_list(request):
@@ -63,7 +65,8 @@ def biblewidget_list(request):
     return [
         BibleWidgetOut(
             id=v.id,
-            verse_id=v.verse.verse_id,
+            start_verse_id=v.start_verse.id,
+            end_verse_id=v.end_verse.id,
             translation=v.translation,
             ref=v.ref,
             display_text=v.display_text,

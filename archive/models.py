@@ -327,12 +327,21 @@ class SermonPassage(models.Model):
 
 class BibleWidgetVerse(models.Model):
     id = models.BigAutoField(primary_key=True)
-    verse = models.OneToOneField(
-        BibleVerse,
-        models.CASCADE,
-        db_column='verse_id',
-        related_name='widget_entry',
+
+    start_verse = models.ForeignKey(
+        'BibleVerse',
+        on_delete=models.CASCADE,
+        db_column='start_verse_id',
+        related_name='widget_start_entries',
     )
+
+    end_verse = models.ForeignKey(
+        'BibleVerse',
+        on_delete=models.CASCADE,
+        db_column='end_verse_id',
+        related_name='widget_end_entries',
+    )
+
     translation = models.CharField(max_length=16)
     ref = models.CharField(max_length=64)
     display_text = models.TextField()
@@ -344,6 +353,16 @@ class BibleWidgetVerse(models.Model):
         managed = False
         db_table = 'bible_widget_verses'
         ordering = ('-weight', 'ref')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['start_verse', 'end_verse', 'translation'],
+                name='uq_widget_passage_tr'
+            ),
+            models.CheckConstraint(
+                check=models.Q(start_verse__lte=models.F('end_verse')),
+                name='chk_start_le_end'
+            ),
+        ]
 
     def __str__(self):
         return f'{self.ref} ({self.translation})'

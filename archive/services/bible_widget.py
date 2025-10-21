@@ -16,7 +16,8 @@ class BibleWidgetPersistenceError(BibleWidgetError):
 
 
 def ensure_entry(
-    verse: BibleVerse,
+    start_verse: BibleVerse,
+    end_verse: BibleVerse,
     translation: str,
     ref_text: str,
     display_text: str,
@@ -27,7 +28,7 @@ def ensure_entry(
         'display_text': display_text,
     }
     try:
-        return BibleWidgetVerse.objects.update_or_create(verse=verse, defaults=defaults)
+        return BibleWidgetVerse.objects.update_or_create(start_verse=start_verse, end_verse=end_verse, defaults=defaults)
     except DatabaseError as exc:
         raise BibleWidgetPersistenceError('Unable to save BibleWidget verse.') from exc
 

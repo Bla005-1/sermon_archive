@@ -149,7 +149,8 @@ CREATE TABLE sermon_passages (
 
 CREATE TABLE bible_widget_verses (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  verse_id BIGINT UNSIGNED NOT NULL,
+  start_verse_id BIGINT UNSIGNED NOT NULL,
+  end_verse_id BIGINT UNSIGNED NOT NULL,
   translation VARCHAR(16) NOT NULL,
   ref VARCHAR(64) NOT NULL,
   display_text TEXT NOT NULL,
@@ -157,8 +158,10 @@ CREATE TABLE bible_widget_verses (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
              ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT uq_widget_verse UNIQUE (verse_id),
-  CONSTRAINT fk_widget_verse FOREIGN KEY (verse_id)
+  CONSTRAINT uq_widget_passage_tr UNIQUE (start_verse_id, end_verse_id, translation),
+  CONSTRAINT fk_widget_start_verse FOREIGN KEY (start_verse_id)
+    REFERENCES bible_verses(verse_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_widget_end_verse FOREIGN KEY (end_verse_id)
     REFERENCES bible_verses(verse_id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
