@@ -161,3 +161,33 @@ CREATE TABLE bible_widget_verses (
   CONSTRAINT fk_widget_verse FOREIGN KEY (verse_id)
     REFERENCES bible_verses(verse_id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
+
+-- Church Fathers metadata (one row per author folder)
+CREATE TABLE IF NOT EXISTS church_fathers (
+  father_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  default_year INT,
+  wiki_url VARCHAR(512),
+  UNIQUE KEY uq_church_fathers_name (name)
+) ENGINE=InnoDB;
+
+-- Individual commentary quotes
+CREATE TABLE IF NOT EXISTS commentaries (
+  commentary_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  father_id BIGINT UNSIGNED NOT NULL,
+  append_to_author_name VARCHAR(255),
+  book_id TINYINT UNSIGNED NOT NULL,    -- FK to bible_books
+  start_verse_id BIGINT UNSIGNED NOT NULL, -- FK to bible_verses
+  end_verse_id BIGINT UNSIGNED NOT NULL,   -- FK to bible_verses
+  txt LONGTEXT NOT NULL,
+  source_url VARCHAR(2048),
+  source_title VARCHAR(512),
+  FOREIGN KEY (father_id) REFERENCES church_fathers(father_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  FOREIGN KEY (book_id) REFERENCES bible_books(book_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  FOREIGN KEY (start_verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  FOREIGN KEY (end_verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB;
