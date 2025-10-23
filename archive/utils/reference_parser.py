@@ -502,6 +502,8 @@ def build_api_verse_response(ref: str, *, translation_hint: Optional[str] = 'ESV
 
     return {
         'query': {'ref': ref, 'translation': translation_hint or ''},
+        'parsed_ref': format_ref(start_v, end_v),
+        'verse_text': preview_text_for_range(start_v.verse_id, end_v.verse_id),
         'count': len(results),
         'results': results,
     }

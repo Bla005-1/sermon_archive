@@ -31,6 +31,8 @@ class VerseOut(Schema):
 
 class VerseResponse(Schema):
     query: dict
+    parsed_ref: str
+    verse_text: str
     count: int
     results: List[VerseOut]
 
@@ -65,8 +67,8 @@ def biblewidget_list(request):
     return [
         BibleWidgetOut(
             id=v.id,
-            start_verse_id=v.start_verse.id,
-            end_verse_id=v.end_verse.id,
+            start_verse_id=v.start_verse.verse_id,
+            end_verse_id=v.end_verse.verse_id,
             translation=v.translation,
             ref=v.ref,
             display_text=v.display_text,

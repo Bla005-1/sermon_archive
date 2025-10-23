@@ -246,7 +246,7 @@ class Attachment(models.Model):
     )
     rel_path = models.CharField(max_length=255)
     original_filename = models.CharField(max_length=255, blank=True, null=True)
-    mime_type = models.CharField(max_length=64, blank=True, null=True)
+    mime_type = models.CharField(max_length=255, blank=True, null=True)
     byte_size = models.PositiveBigIntegerField(blank=True, null=True)
     # Avoid NULL on insert
     created_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
