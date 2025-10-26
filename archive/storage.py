@@ -70,3 +70,13 @@ def save_attachment_file(sermon, uploaded_file):
     logger.debug('Attachment %s saved for sermon %s (%s)', uploaded_file.name, sermon.sermon_id, metadata)
     return rel_path, metadata
 
+
+def resolve_attachment_path(rel_path: str) -> str:
+    """Return the absolute filesystem path for a stored attachment."""
+
+    base_storage = os.path.abspath(_get_base_storage())
+    abs_path = os.path.abspath(os.path.join(base_storage, rel_path))
+    if os.path.commonpath([base_storage, abs_path]) != base_storage:
+        raise AttachmentStorageError('Resolved attachment path is outside the configured storage root.')
+    return abs_path
+

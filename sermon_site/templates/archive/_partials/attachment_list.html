@@ -2,7 +2,8 @@
   {% with atts=attachments|default:sermon.attachments.all %}
   {% for att in atts %}
     <li>
-      {{ att.original_filename }} ({{ att.byte_size }} bytes)
+      {{ att.original_filename }}
+      <a class="btn btn-ghost" href="{% url 'attachment_download' sermon.pk att.pk %}">Download</a>
       <button class="btn btn-ghost btn-danger"
         hx-get='{% url "attachment_delete" sermon.pk att.pk %}'
         hx-target='#attachment-list'

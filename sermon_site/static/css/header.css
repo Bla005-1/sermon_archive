@@ -3,7 +3,7 @@
 .brand-block{display:flex;flex-direction:column;gap:4px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:1.16rem;letter-spacing:-0.02em}
 .brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:11px;background:linear-gradient(135deg, var(--brand), var(--brand-strong));color:var(--brand-fg);font-weight:600;box-shadow:var(--shadow-sm)}
-.brand-text{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-text{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:14px}
 .brand-tagline{margin:0;color:var(--muted);font-size:.9rem}
 .header-actions{margin-left:auto;display:flex;align-items:center;gap:12px;padding:4px;background:transparent;border:none;box-shadow:none;border-radius:999px;position:relative;min-width:0}
 .header-nav{display:flex;align-items:center;gap:12px}
