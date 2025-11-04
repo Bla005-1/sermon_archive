@@ -169,6 +169,8 @@
 
     const crossrefContainer = document.querySelector('[data-crossref-container]');
     if (crossrefContainer) {
+      const toggleButton = crossrefContainer.querySelector('[data-crossref-toggle]');
+      const contentEl = crossrefContainer.querySelector('[data-crossref-content]');
       const listEl = crossrefContainer.querySelector('[data-crossref-list]');
       const emptyEl = crossrefContainer.querySelector('[data-crossref-empty]');
       const loadingEl = crossrefContainer.querySelector('[data-crossref-loading]');
@@ -181,6 +183,22 @@
 
       let crossReferenceData = {};
       let hasLoaded = false;
+
+      const setExpandedState = function (expanded) {
+        if (!toggleButton || !contentEl) {
+          return;
+        }
+        toggleButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        contentEl.hidden = !expanded;
+      };
+
+      if (toggleButton && contentEl) {
+        setExpandedState(false);
+        toggleButton.addEventListener('click', function () {
+          const currentlyExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
+          setExpandedState(!currentlyExpanded);
+        });
+      }
 
       const buildVerseToolsLink = function (reference) {
         if (!verseToolsUrl || !reference) {
