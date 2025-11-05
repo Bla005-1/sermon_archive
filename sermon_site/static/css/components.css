@@ -161,7 +161,8 @@ textarea{min-height:180px;resize:vertical}
 .list{display:flex;flex-direction:column;gap:12px}
 .preview{padding:16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm)}
 .prose{font-family:"SFMono-Regular", Consolas, "Liberation Mono", monospace;white-space:pre-wrap;background:var(--surface);border-radius:var(--radius);padding:18px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
-.form-card, .auth-card, .status-card{max-width:680px;margin:0 auto;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-lg);backdrop-filter:blur(calc(var(--blur)*.9))}
-.auth-card{max-width:420px}
-.status-card{max-width:520px}
+.form-card, .auth-card, .status-card{width:min(100%, var(--card-width, 960px));margin:0 auto;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-lg);backdrop-filter:blur(calc(var(--blur)*.9))}
+.form-card{--card-width: 960px}
+.auth-card{--card-width: 640px}
+.status-card{--card-width: 720px}
 
