@@ -109,6 +109,12 @@ textarea{min-height:180px;resize:vertical}
 .cross-reference-item__ref{font-weight:600;font-size:1.05rem;color:inherit;text-decoration:none;}
 .cross-reference-item__ref:focus,.cross-reference-item__ref:hover{color:inherit;text-decoration:none}
 .cross-reference-item__text{margin:0;color:var(--muted);line-height:1.5}
+.commentary-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.commentary-item{border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;background:var(--surface);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:10px}
+.commentary-item__header{display:flex;flex-direction:column;gap:4px}
+.commentary-item__author{font-weight:600;font-size:1.05rem}
+.commentary-item__reference{color:var(--muted);font-size:.95rem}
+.commentary-item__text{margin:0;color:var(--muted);line-height:1.6;white-space:pre-wrap}
 .widget-entry__header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .widget-entry__ref{display:flex;flex-direction:column;gap:6px;min-width:0}
 .widget-entry__weight-form{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}

@@ -19,6 +19,22 @@ class CrossRefItem(Schema):
     votes: int
     note: str
 
+
+class CommentaryItem(Schema):
+    commentary_id: int
+    father_id: int
+    father_name: str
+    display_name: str
+    append_to_author_name: Optional[str]
+    text: str
+    start_verse_id: int
+    end_verse_id: int
+    reference: str
+    source_url: Optional[str]
+    source_title: Optional[str]
+    default_year: Optional[int]
+    wiki_url: Optional[str]
+
 class VerseOut(Schema):
     verse_id: int
     book: str
@@ -28,6 +44,8 @@ class VerseOut(Schema):
     text: Optional[str]
     notes: List[VerseNoteOut]
     cross_refs: List[CrossRefItem]
+    commentaries: List[CommentaryItem]
+    commentary_count: int
 
 class VerseResponse(Schema):
     query: dict

@@ -67,6 +67,10 @@ class BibleWidgetViewTests(SimpleTestCase):
                 'verse_options': [{'id': 101, 'label': 'John 3:16'}],
                 'initial_items': [],
             },
+            'commentaries': {
+                'has_any': False,
+                'count': 0,
+            },
         }
 
         manager = mock.Mock()
@@ -120,6 +124,10 @@ class BibleWidgetViewTests(SimpleTestCase):
                     {'id': 102, 'label': 'John 3:17'},
                 ],
                 'initial_items': [],
+            },
+            'commentaries': {
+                'has_any': False,
+                'count': 0,
             },
         }
 

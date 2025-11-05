@@ -55,6 +55,7 @@ def load_passage_context(reference_text: str, forced_translation: str = ''):
         markdown_renderer=_markdown_renderer,
         superscript_fn=superscript_number,
         include_cross_references=False,
+        include_commentaries=False,
     )
     return result, error
 
@@ -221,7 +222,7 @@ def update_note_for_verse(verse: BibleVerse, note_md: str) -> VerseNote:
     return note
 
 
-def build_widget_display_text(result_payload: Mapping[str, object], translation: str) -> str:
+def build_widget_display_text(result_payload: Mapping, translation: str) -> str:
     translation_map: Mapping[str, str] = result_payload.get('translation_payload') or {}
     verse_text = (translation_map.get(translation) or '').strip()
     if not verse_text:

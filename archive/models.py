@@ -208,6 +208,53 @@ class VerseCrossReference(models.Model):
 
 
 # ----------------------------
+# Patristic commentary tables
+# ----------------------------
+
+
+class ChurchFather(models.Model):
+    father_id = models.BigAutoField(primary_key=True)
+    name = models.CharField(unique=True, max_length=128)
+    default_year = models.IntegerField(blank=True, null=True)
+    wiki_url = models.CharField(max_length=512, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'church_fathers'
+
+    def __str__(self):  # pragma: no cover - trivial string formatting
+        return self.name
+
+
+class Commentary(models.Model):
+    commentary_id = models.BigAutoField(primary_key=True)
+    father = models.ForeignKey(ChurchFather, models.DO_NOTHING)
+    append_to_author_name = models.CharField(max_length=255, blank=True, null=True)
+    book = models.ForeignKey(BibleBook, models.DO_NOTHING)
+    start_verse = models.ForeignKey(
+        BibleVerse,
+        models.DO_NOTHING,
+        related_name='commentary_start_entries',
+    )
+    end_verse = models.ForeignKey(
+        BibleVerse,
+        models.DO_NOTHING,
+        related_name='commentary_end_entries',
+    )
+    txt = models.TextField()
+    source_url = models.CharField(max_length=2048, blank=True, null=True)
+    source_title = models.CharField(max_length=512, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'commentaries'
+
+    def __str__(self):  # pragma: no cover - trivial string formatting
+        author = self.father.name if self.father.father_id else 'Commentary'
+        return f'{author} on {self.book.name}'
+
+
+# ----------------------------
 # Sermon data tables
 # ----------------------------
 

@@ -162,6 +162,20 @@
         </div>
       </div>
       {% endif %}
+      {% if result.commentaries %}
+      <div class="panel stack" id="commentaries" data-commentary-container data-commentary-ref="{{ result.cross_reference_ref|default:reference|default:'' }}" data-commentary-translation="{{ result.selected_translation|default:'ESV' }}" data-commentary-api-url="/api/verse">
+        <button class="panel-toggle" type="button" data-commentary-toggle aria-expanded="false" aria-controls="commentaries-content">
+          <span class="panel-toggle__label">Commentaries</span>
+          <span class="panel-toggle__icon" aria-hidden="true"></span>
+        </button>
+        <div class="stack gap-sm" id="commentaries-content" data-commentary-content hidden>
+          <p class="muted">Insights from the Church Fathers related to this passage.</p>
+          <div class="muted" data-commentary-loading>Loading commentaries…</div>
+          <ul class="commentary-list" data-commentary-list hidden></ul>
+          <p class="muted" data-commentary-empty hidden>No commentaries for this passage yet.</p>
+        </div>
+      </div>
+      {% endif %}
   </form>
     {% endif %}
 </div>

@@ -167,6 +167,138 @@
 
     syncSaveState();
 
+    const commentaryContainer = document.querySelector('[data-commentary-container]');
+    if (commentaryContainer) {
+      const toggleButton = commentaryContainer.querySelector('[data-commentary-toggle]');
+      const contentEl = commentaryContainer.querySelector('[data-commentary-content]');
+      const listEl = commentaryContainer.querySelector('[data-commentary-list]');
+      const emptyEl = commentaryContainer.querySelector('[data-commentary-empty]');
+      const loadingEl = commentaryContainer.querySelector('[data-commentary-loading]');
+      const apiUrl = commentaryContainer.getAttribute('data-commentary-api-url') || '';
+      const queryRef = commentaryContainer.getAttribute('data-commentary-ref') || '';
+      const queryTranslation = commentaryContainer.getAttribute('data-commentary-translation') || '';
+
+      const setExpandedState = function (expanded) {
+        if (!toggleButton || !contentEl) {
+          return;
+        }
+        toggleButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        contentEl.hidden = !expanded;
+      };
+
+      if (toggleButton && contentEl) {
+        setExpandedState(false);
+        toggleButton.addEventListener('click', function () {
+          const currentlyExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
+          setExpandedState(!currentlyExpanded);
+        });
+      }
+
+      const setLoadingState = function (isLoading) {
+        if (loadingEl) {
+          loadingEl.hidden = !isLoading;
+        }
+        if (isLoading) {
+          if (listEl) {
+            listEl.hidden = true;
+          }
+          if (emptyEl) {
+            emptyEl.hidden = true;
+          }
+        }
+      };
+
+      const renderCommentaries = function (items) {
+        if (!listEl) {
+          return;
+        }
+        listEl.innerHTML = '';
+        if (!Array.isArray(items) || items.length === 0) {
+          listEl.hidden = true;
+          if (emptyEl) {
+            emptyEl.hidden = false;
+            emptyEl.textContent = 'No commentaries for this passage yet.';
+          }
+          return;
+        }
+
+        items.forEach(function (item) {
+          const li = document.createElement('li');
+          li.className = 'commentary-item';
+
+          const header = document.createElement('div');
+          header.className = 'commentary-item__header';
+
+          const nameEl = document.createElement('span');
+          nameEl.className = 'commentary-item__author';
+          nameEl.textContent = item.display_name || item.father_name || 'Commentary';
+          header.appendChild(nameEl);
+
+          const referenceEl = document.createElement('span');
+          referenceEl.className = 'commentary-item__reference';
+          referenceEl.textContent = item.reference || '';
+          header.appendChild(referenceEl);
+
+          const textEl = document.createElement('p');
+          textEl.className = 'commentary-item__text';
+          textEl.textContent = item.text || '';
+
+          li.appendChild(header);
+          li.appendChild(textEl);
+          listEl.appendChild(li);
+        });
+
+        listEl.hidden = false;
+        if (emptyEl) {
+          emptyEl.hidden = true;
+        }
+      };
+
+      const handleError = function () {
+        if (emptyEl) {
+          emptyEl.hidden = false;
+          emptyEl.textContent = 'Commentaries could not be loaded.';
+        }
+        if (listEl) {
+          listEl.hidden = true;
+          listEl.innerHTML = '';
+        }
+        setLoadingState(false);
+      };
+
+      const loadCommentaries = function () {
+        if (!apiUrl || !queryRef) {
+          handleError();
+          return Promise.resolve();
+        }
+        setLoadingState(true);
+        const params = new URLSearchParams();
+        params.set('ref', queryRef);
+        if (queryTranslation) {
+          params.set('translation', queryTranslation);
+        }
+        const requestUrl = `${apiUrl}?${params.toString()}`;
+        return fetch(requestUrl, { credentials: 'same-origin' })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error('Commentaries request failed');
+            }
+            return response.json();
+          })
+          .then(function (payload) {
+            const items = (payload && payload.commentaries) || [];
+            setLoadingState(false);
+            renderCommentaries(items);
+          })
+          .catch(function (err) {
+            console.error(err);
+            handleError();
+          });
+      };
+
+      loadCommentaries();
+    }
+
     const crossrefContainer = document.querySelector('[data-crossref-container]');
     if (crossrefContainer) {
       const toggleButton = crossrefContainer.querySelector('[data-crossref-toggle]');

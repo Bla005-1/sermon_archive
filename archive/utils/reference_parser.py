@@ -3,7 +3,7 @@ import re
 from typing import Optional, Tuple, List, Dict, Sequence, Callable
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import F
-from ..models import BibleBook, BibleVerse, VerseText, VerseCrossReference, VerseNote
+from ..models import BibleBook, BibleVerse, VerseText, VerseCrossReference, VerseNote, Commentary
 from django.utils.html import escape
 from markdown2 import Markdown
 
@@ -173,10 +173,108 @@ def get_crossrefs_from(verses: Sequence[BibleVerse]) -> Dict[int, List[dict]]:
         })
     return out
 
+
+def _commentary_queryset_for_verses(verses: Sequence[BibleVerse]):
+    if not verses:
+        return Commentary.objects.none()
+    verse_ids = [v.verse_id for v in verses]
+    start_id = min(verse_ids)
+    end_id = max(verse_ids)
+    book_ids = {v.book.book_id for v in verses}
+    qs = Commentary.objects.filter(
+        start_verse__verse_id__lte=end_id,
+        end_verse__verse_id__gte=start_id,
+        book_id__in=book_ids,
+    )
+    return qs
+
+
+def build_commentary_metadata(verses: Sequence[BibleVerse]) -> dict:
+    if not verses:
+        return {
+            'has_any': False,
+            'count': 0,
+        }
+    qs = _commentary_queryset_for_verses(verses)
+    count = qs.count()
+    return {
+        'has_any': count > 0,
+        'count': count,
+    }
+
+
+def build_commentary_context(verses: Sequence[BibleVerse]) -> dict:
+    if not verses:
+        return {
+            'has_any': False,
+            'count': 0,
+            'items': [],
+        }
+
+    qs = (
+        _commentary_queryset_for_verses(verses)
+        .select_related('father', 'start_verse__book', 'end_verse__book')
+        .order_by('start_verse__verse_id', 'end_verse__verse_id', 'commentary_id')
+    )
+
+    items: List[dict] = []
+
+    for row in qs:
+        start = row.start_verse
+        end = row.end_verse or start
+        if start.verse_id > end.verse_id:
+            start, end = end, start
+        base_name = row.father.name if row.father.father_id else 'Commentary'
+        append = (row.append_to_author_name or '').strip()
+        display_name = f'{base_name} {append}'.strip() if append else base_name
+        reference = format_ref(start, end)
+        items.append(
+            {
+                'commentary_id': row.commentary_id,
+                'father_id': row.father.father_id,
+                'father_name': row.father.name if row.father.father_id else '',
+                'display_name': display_name,
+                'append_to_author_name': append,
+                'text': row.txt or '',
+                'book_id': row.book.book_id,
+                'start_verse_id': start.verse_id,
+                'end_verse_id': end.verse_id,
+                'reference': reference,
+                'source_url': row.source_url or '',
+                'source_title': row.source_title or '',
+                'default_year': row.father.default_year if row.father.father_id else None,
+                'wiki_url': row.father.wiki_url if row.father.father_id else '',
+                'start': {
+                    'book': start.book.name,
+                    'chapter': start.chapter,
+                    'verse': start.verse,
+                },
+                'end': {
+                    'book': end.book.name,
+                    'chapter': end.chapter,
+                    'verse': end.verse,
+                },
+            }
+        )
+
+    return {
+        'has_any': bool(items),
+        'count': len(items),
+        'items': items,
+    }
+
+
 def format_ref(start: BibleVerse, end: BibleVerse) -> str:
     if start.verse_id == end.verse_id:
         return f'{start.book.name} {start.chapter}:{start.verse}'
-    return f'{start.book.name} {start.chapter}:{start.verse}-{end.verse}'
+    if start.book.book_id == end.book.book_id:
+        if start.chapter == end.chapter:
+            return f'{start.book.name} {start.chapter}:{start.verse}-{end.verse}'
+        return f'{start.book.name} {start.chapter}:{start.verse}-{end.chapter}:{end.verse}'
+    return (
+        f'{start.book.name} {start.chapter}:{start.verse} '
+        f'– {end.book.name} {end.chapter}:{end.verse}'
+    )
 
 
 # ----------------------------
@@ -340,6 +438,7 @@ def build_passage_context(
     markdown_renderer: Optional[Markdown] = None,
     superscript_fn: Optional[Callable[[int], str]] = None,
     include_cross_references: bool = True,
+    include_commentaries: bool = True,
 ) -> Tuple[dict, str]:
     try:
         start_v, end_v = tolerant_parse_reference(reference_text)
@@ -419,6 +518,7 @@ def build_passage_context(
         'note_text': note_entry.note_md if note_entry and note_entry.note_md else '',
         'note_html': (markdown_renderer.convert(note_entry.note_md) if markdown_renderer and note_entry and note_entry.note_md else ''),
         'cross_references': build_cross_reference_context(verses) if include_cross_references else build_cross_reference_metadata(verses),
+        'commentaries': build_commentary_context(verses) if include_commentaries else build_commentary_metadata(verses),
         'cross_reference_ref': format_ref(start_v, end_v),
     }
     return result, ''
@@ -453,6 +553,20 @@ def build_api_verse_response(ref: str, *, translation_hint: Optional[str] = 'ESV
 
     # Cross-refs per verse; augment with preview_text
     cr_by_vid = get_crossrefs_from(verses)
+    commentary_context = build_commentary_context(verses)
+    commentary_items = commentary_context.get('items', [])
+
+    def commentaries_for_verse(verse: BibleVerse) -> List[dict]:
+        if not commentary_items:
+            return []
+        vid = verse.verse_id
+        items: List[dict] = []
+        for item in commentary_items:
+            start_id = min(item['start_verse_id'], item['end_verse_id'])
+            end_id = max(item['start_verse_id'], item['end_verse_id'])
+            if start_id <= vid <= end_id:
+                items.append(item)
+        return items
 
     def preview_text_for_range(to_start_id: int, to_end_id: int) -> str:
         a, b = (min(to_start_id, to_end_id), max(to_start_id, to_end_id))
@@ -489,6 +603,7 @@ def build_api_verse_response(ref: str, *, translation_hint: Optional[str] = 'ESV
                 'votes': cr['votes'],
                 'note': cr['note'],
             })
+        commentaries = commentaries_for_verse(v)
         results.append({
             'verse_id': v.verse_id,
             'book': v.book.name,
@@ -498,6 +613,8 @@ def build_api_verse_response(ref: str, *, translation_hint: Optional[str] = 'ESV
             'text': (selected_lookup.get(v.verse_id) or ''),
             'notes': notes_out,
             'cross_refs': cr_items,
+            'commentaries': commentaries,
+            'commentary_count': len(commentaries)
         })
 
     return {
