@@ -266,6 +266,30 @@
         setLoadingState(false);
       };
 
+      const collectCommentaries = function (payload) {
+        if (!payload || !Array.isArray(payload.results)) {
+          return [];
+        }
+        const seen = new Set();
+        const combined = [];
+        payload.results.forEach(function (result) {
+          const items = Array.isArray(result.commentaries) ? result.commentaries : [];
+          items.forEach(function (item) {
+            const key = item && typeof item === 'object' ? (item.commentary_id || JSON.stringify([item.display_name, item.reference, item.text])) : null;
+            if (!key || seen.has(key)) {
+              if (key) {
+                return;
+              }
+            }
+            if (key) {
+              seen.add(key);
+            }
+            combined.push(item);
+          });
+        });
+        return combined;
+      };
+
       const loadCommentaries = function () {
         if (!apiUrl || !queryRef) {
           handleError();
@@ -286,7 +310,7 @@
             return response.json();
           })
           .then(function (payload) {
-            const items = (payload && payload.commentaries) || [];
+            const items = collectCommentaries(payload);
             setLoadingState(false);
             renderCommentaries(items);
           })
