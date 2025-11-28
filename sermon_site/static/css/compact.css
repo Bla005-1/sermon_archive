@@ -1,32 +1,27 @@
 /* ---------- Optional "compact" page layout for forms/details ---------- */
-.page--compact .container{ padding: 0 8px; }
-@media (min-width: 641px){
-  .page--compact .container{ padding: 0 18px; }
-}
+.page--compact .container{ padding: 0 var(--page-gutter); }
 
 .page--compact .form-card,
-.page--compact .panel{ padding: 16px; }
-
-.page--compact .form-card{ --card-width: 960px; }
+.page--compact .panel{ padding: calc(var(--card-padding) - 4px); gap: var(--stack-gap); }
 
 @media (max-width: 640px){
   .page--compact .form-card,
-  .page--compact .panel{ padding: 10px 12px; }
+  .page--compact .panel{ padding: calc(var(--card-padding) - 8px); }
 }
 
 @media (max-width: 480px){
   .page--compact .form-card,
-  .page--compact .panel{ padding: 8px 10px; }
+  .page--compact .panel{ padding: calc(var(--card-padding) - 10px); }
 }
 
 .page--compact .form,
 .page--compact .row,
-.page--compact .stack{ gap: 12px; }
+.page--compact .stack{ gap: calc(var(--stack-gap) - 4px); }
 
-.page--compact .grid-two{ gap: 12px; }
+.page--compact .grid-two{ gap: calc(var(--stack-gap) - 4px); }
 
 .page--compact .preview,
 .page--compact .notes-panel .preview,
-.page--compact .prose{ padding: 8px 10px; }
+.page--compact .prose{ padding: calc(var(--card-padding) - 12px); }
 .page--compact .input,
-.page--compact textarea{ padding: 9px 11px; }
+.page--compact textarea{ padding: calc(var(--card-padding) - 13px); }

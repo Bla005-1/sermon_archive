@@ -1,8 +1,8 @@
-.site-header{position:sticky;top:0;z-index:50;backdrop-filter:blur(var(--blur));background:var(--header-surface);border-bottom:1px solid var(--border);box-shadow:0 10px 30px rgba(15, 23, 42, 0.08)}
+.site-header{position:sticky;top:0;z-index:50;backdrop-filter:blur(var(--blur));background:var(--header-surface);border-bottom:1px solid var(--border)}
 .header-inner{display:flex;align-items:center;gap:20px;min-height:72px;padding:10px 0;min-width:0}
 .brand-block{display:flex;flex-direction:column;gap:4px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:1.16rem;letter-spacing:-0.02em}
-.brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:11px;background:linear-gradient(135deg, var(--brand), var(--brand-strong));color:var(--brand-fg);font-weight:600;box-shadow:var(--shadow-sm)}
+.brand-mark{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:11px;background:var(--brand);color:var(--brand-fg);font-weight:600}
 .brand-text{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:14px}
 .brand-tagline{margin:0;color:var(--muted);font-size:.9rem}
 .header-actions{margin-left:auto;display:flex;align-items:center;gap:12px;padding:4px;background:transparent;border:none;box-shadow:none;border-radius:999px;position:relative;min-width:0}
@@ -18,14 +18,13 @@
   min-height:38px;
   min-width:44px;
   cursor:pointer;
-  box-shadow:var(--shadow-sm);
-  transition:transform var(--transition), box-shadow var(--transition), background var(--transition), color var(--transition);
+  transition:transform var(--transition), background var(--transition), color var(--transition), border-color var(--transition);
   align-items:center;
   justify-content:center;
   gap:0;
 }
 .header-menu-toggle:hover{background:var(--action-bg);color:var(--brand-strong);transform:translateY(-1px)}
-.header-menu-toggle:focus{outline:none;box-shadow:0 0 0 4px var(--accent)}
+.header-menu-toggle:focus{outline:2px solid var(--brand);outline-offset:2px}
 .header-menu-toggle .hamburger{display:inline-flex;flex-direction:column;gap:5px}
 .header-menu-toggle .hamburger span{display:block;width:18px;height:2px;border-radius:999px;background:currentColor}
 .header-actions.is-collapsed{gap:8px;padding:0}
@@ -41,7 +40,6 @@
   border-radius:var(--radius);
   border:1px solid var(--border);
   background:var(--surface-strong);
-  box-shadow:var(--shadow-lg);
   min-width:190px;
   z-index:60;
   max-width:calc(100vw - 24px);
@@ -69,17 +67,16 @@
   min-height:38px;
   line-height:1.2;
   text-decoration:none;
-  box-shadow:var(--shadow-sm);
-  transition:transform var(--transition), box-shadow var(--transition), background var(--transition), color var(--transition);
+  transition:transform var(--transition), background var(--transition), color var(--transition), border-color var(--transition);
 }
-.header-action:hover{background:var(--action-bg);color:var(--brand-strong);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
-.header-action:focus{outline:none;box-shadow:0 0 0 4px var(--accent)}
+.header-action:hover{background:var(--action-bg);color:var(--brand-strong);transform:translateY(-1px)}
+.header-action:focus{outline:2px solid var(--brand);outline-offset:2px}
 .header-action[type=submit]{cursor:pointer;appearance:none}
 .logout{margin:0;display:flex}
 
 /* Fallback: ensure collapse on small screens even if JS timing misses */
 @media (max-width: 720px){
   .header-actions .header-menu-toggle{display:inline-flex}
-  .header-actions .header-nav{display:none;position:absolute;top:calc(100% + 10px);right:0;flex-direction:column;gap:8px;padding:14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface-strong);box-shadow:var(--shadow-lg);min-width:190px;z-index:60;max-width:calc(100vw - 24px);inline-size:max-content;overflow-wrap:anywhere}
+  .header-actions .header-nav{display:none;position:absolute;top:calc(100% + 10px);right:0;flex-direction:column;gap:8px;padding:14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface-strong);min-width:190px;z-index:60;max-width:calc(100vw - 24px);inline-size:max-content;overflow-wrap:anywhere}
   .header-actions.is-open .header-nav{display:flex}
 }
