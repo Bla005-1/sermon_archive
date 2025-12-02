@@ -38,7 +38,7 @@ class LogoutView(APIView):
 
 
 class RefreshView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)

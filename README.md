@@ -27,7 +27,7 @@ See `project_tree.txt` for a concise map of the codebase. Django configuration n
    poetry run python manage.py runserver
    ```
 5. **Call the API**
-   Use any HTTP client (curl, HTTPie, Postman) against `http://127.0.0.1:8000/api/` with authenticated requests.
+   Use any HTTP client (curl, HTTPie, Postman) against `http://127.0.0.1:8000/api/` with authenticated requests. See `API_REFERENCE.md` for endpoint-level request and response details.
 
 ## Data model highlights
 - **Sermons**: date preached, title, speaker, series, location, notes (Markdown), timestamps.
