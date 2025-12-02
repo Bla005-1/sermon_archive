@@ -1,6 +1,0 @@
-.site-shell{min-height:100vh;display:flex;flex-direction:column}
-.skip-link{position:absolute;left:-9999px;top:16px;z-index:1000;background:var(--brand);color:var(--brand-fg);padding:12px 18px;border-radius:999px;transition:var(--transition)}
-.skip-link:focus{left:16px}
-.container{max-width:var(--content-width);margin:0 auto;padding:0 var(--page-gutter)}
-.page{flex:1;padding:48px 0 64px}
-.page-inner{display:flex;flex-direction:column;gap:var(--section-gap)}

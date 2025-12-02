@@ -1,37 +1,24 @@
 .
-├─ .env.example
 ├─ pyproject.toml
 ├─ README.md
 ├─ manage.py
 ├─ sermon_site/
 │  ├─ __init__.py
+│  ├─ asgi.py
 │  ├─ settings.py
 │  ├─ urls.py
-│  ├─ wsgi.py
-│  ├─ asgi.py
-│  ├─ static/
-│  │  ├─ css/
-│  │  │  └─ css files
-│  │  └─ js/
-│  │     └─ js files
-│  └─ templates/
-│     ├─ base.html
-│     ├─ locked_out.html
-│     ├─ auth/login.html
-│     └─ archive/
-│        ├─ sermon_list.html
-│        ├─ sermon_form.html
-│        ├─ sermon_detail.html
-│        └─ _partials/
-│           ├─ attachment_list.html
-│           ├─ passage_list.html
-│           └─ passage_preview.html
+│  └─ wsgi.py
 └─ archive/
    ├─ __init__.py
-   ├─ apps.py
    ├─ admin.py
+   ├─ api_urls.py
+   ├─ api_views.py
+   ├─ apps.py
+   ├─ migrations/
    ├─ models.py
-   ├─ urls.py
-   ├─ views.py
+   ├─ serializers.py
+   ├─ services/
    ├─ storage.py
+   ├─ tests/
+   ├─ utils/
    └─ verse_parser.py
