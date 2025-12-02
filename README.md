@@ -1,144 +1,53 @@
-# Sermon Archive (Django)
+# Sermon Archive API (Django + DRF)
 
-A private, local-first Django app for storing sermons, passages, and attachments with fast manual entry and future-proof data design.
+A JSON-only backend for storing sermons, linked passages, and file attachments. The project now exposes REST endpoints under `/api/` and no longer ships any HTML templates or front-end assets.
 
-## Key Features
-- **Sermon archive**: date, title, speaker, series, location, notes (Markdown).
-- **Passages**: link each sermon to contiguous Scripture ranges.
-- **Attachments**: upload slides, PDFs, images, audio; stored under a predictable media root.
-- **Clean data model**: normalized tables with foreign keys; portable and extensible.
-- **Simple UI**: list, create/edit, and detail views for sermons (templates under `sermon_site/templates/`).
+## API surface
+- `GET /api/sermons/` — list sermons (filter with `?q=` on title).
+- `POST /api/sermons/` — create a sermon.
+- `GET /api/sermons/<sermon_id>/` — retrieve a sermon with nested passages and attachments.
+- `PUT/PATCH /api/sermons/<sermon_id>/` — update sermon metadata.
+- `DELETE /api/sermons/<sermon_id>/` — remove a sermon.
+- `GET /api/sermons/<sermon_id>/passages/` — list passages for a sermon.
+- `POST /api/sermons/<sermon_id>/passages/` — add a passage (provide `start_verse_id`, optional `end_verse_id`, `ref_text`, `context_note`).
+- `GET/PATCH/DELETE /api/sermons/<sermon_id>/passages/<id>/` — manage a single passage.
+- `GET /api/sermons/<sermon_id>/attachments/` — list attachments.
+- `POST /api/sermons/<sermon_id>/attachments/` — upload a file using multipart form data with the `file` field.
+- `DELETE /api/sermons/<sermon_id>/attachments/<id>/` — delete an attachment.
+- `GET /api/sermons/<sermon_id>/attachments/<id>/download/` — download an attachment.
 
-## Tech Stack
-- Python 3.12+, Django 5.x
-- MySQL 8.0+ (InnoDB, utf8mb4)
-- HTMX (optional) / vanilla HTML templates
-- Nginx + Gunicorn (production suggestion)
+All endpoints require authentication (session or basic auth). Use the Django admin (`/admin/`) to create users or manage data directly.
 
----
+## Project layout
+See `project_tree.txt` for a concise map of the codebase. Front-end templates and static assets have been removed; only the API and supporting services remain.
 
-## Quick Start (Development)
+## Development setup
+1. **Install dependencies**
+   ```bash
+   poetry install
+   # If Poetry reports that the lock file is outdated after adding Django REST Framework,
+   # re-run `poetry lock` when you have internet access.
+   ```
+2. **Configure environment**
+   ```bash
+   cp .env.template .env
+   # Set DB credentials, secret key, and storage paths as needed.
+   ```
+3. **Migrate and create a user**
+   ```bash
+   poetry run python manage.py migrate
+   poetry run python manage.py createsuperuser
+   ```
+4. **Run the API server**
+   ```bash
+   poetry run python manage.py runserver
+   ```
+5. **Call the API**
+   Use any HTTP client (curl, HTTPie, Postman) against `http://127.0.0.1:8000/api/` with authenticated requests.
 
-### 1) Clone & enter the project
-```bash
-git clone <your-repo-url> sermon-archive
-cd sermon-archive
-```
+## Data model highlights
+- **Sermons**: date preached, title, speaker, series, location, notes (Markdown), timestamps.
+- **Passages**: ordered links to Bible verses with optional context notes.
+- **Attachments**: file metadata and server-side storage paths.
 
-### 2) Python environment
-```bash
-# Using Poetry (recommended)
-poetry install
-poetry run python manage.py --version
-# Or using venv
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt  # if using pip
-```
-
-### 3) Configure environment
-Create a `.env` from the example and fill in values:
-```bash
-cp .env.example .env
-```
-Common settings:
-```
-DEBUG=True
-SECRET_KEY=change-me
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# MySQL (preferred)
-DB_NAME=sermon_archive
-DB_USER=sermon_user
-DB_PASSWORD=yourpass
-DB_HOST=127.0.0.1
-DB_PORT=3306
-
-# Paths (override if needed)
-MEDIA_ROOT=./sermon_site/media
-STATIC_ROOT=./staticfiles
-```
-
-### 4) Database
-Create the MySQL database and user, then run migrations:
-```sql
-CREATE DATABASE sermon_archive CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE USER 'sermon_user'@'%' IDENTIFIED BY 'yourpass';
-GRANT ALL PRIVILEGES ON sermon_archive.* TO 'sermon_user'@'%';
-FLUSH PRIVILEGES;
-```
-```bash
-poetry run python manage.py migrate
-poetry run python manage.py createsuperuser
-```
-
-### 5) Run the dev server
-```bash
-poetry run python manage.py runserver
-```
-Visit http://127.0.0.1:8000/ and log in.
-
----
-
-
-**Primary Django app**: `archive`  
-**Project**: `sermon_site`
-
----
-
-## Data Model (Overview)
-
-Core tables (summarized):
-- `sermons`: sermon metadata + `notes_md` (Markdown).
-- `sermon_passages`: contiguous verse ranges used in a sermon (start/end verse_id + `ref_text`, `ord`).
-- `attachments`: files linked to a sermon.
-- Bible domain is normalized (`bible_books`, `bible_verses`, `verse_texts`, `verse_notes`).
-
-> Tip: Standardize book names with Arabic numerals (e.g., `1 Samuel`, `2 Corinthians`).
-
-### Migrations
-```bash
-poetry run python manage.py makemigrations
-poetry run python manage.py migrate
-```
-
----
-
-## Static & Media
-
-- **Static files** live in `sermon_site/static/` during development. In production, collect them to `STATIC_ROOT`:
-  ```bash
-  poetry run python manage.py collectstatic
-  ```
-- **Media files** (uploads) are stored under `MEDIA_ROOT` (default: `sermon_site/media/`). Make sure this directory exists and is writable.
-
-**Templates**: Remember to load the static tag at the top of templates that use static assets:
-```django
-{% load static %}
-<link rel="stylesheet" href="{% static 'css/app.css' %}">
-```
-
----
-
-## Useful Management Commands
-
-```bash
-# Create an initial staff superuser
-poetry run python manage.py createsuperuser
-
-# Dump/load data
-poetry run python manage.py dumpdata --natural-foreign --natural-primary -e contenttypes -e auth.Permission > backup.json
-poetry run python manage.py loaddata backup.json
-
-# Check for template or model issues
-poetry run python manage.py check
-```
-
----
-
-## Developer Tips
-
-- Keep translations separate in `verse_texts`. Don’t create duplicate rows in `bible_verses` for new translations; only add `verse_texts` rows.
-- Use `sermon_passages.ord` to control the display order of passages.
-- Prefer `utf8mb4` at the DB and connection level.
-- For import routines, build once-off scripts that join `(book_id, chapter, verse)` to map raw source data to your canonical IDs.
+Uploads are saved beneath `SERMON_STORAGE_ROOT` (configure in `.env`).

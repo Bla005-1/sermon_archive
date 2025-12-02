@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'archive'
 ]
 
@@ -67,10 +68,7 @@ ROOT_URLCONF = 'sermon_site.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [
-            BASE_DIR / 'templates',
-            BASE_DIR / 'sermon_site' / 'templates',
-        ],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -135,26 +133,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 
-STATIC_ROOT = '/home/bryce/personal_services/sermon_archive/staticfiles'
-STATICFILES_DIRS = [
-    BASE_DIR / 'sermon_site' / 'static',  # matches your project tree
-]
-if DEBUG:
-    # Local development: use relative path
-    STATIC_URL = '/static/'
-    STORAGES = {
-        'staticfiles': {
-            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
-        },
-    }
-else:
-    # Production: use your CDN/domain and manifest hashing
-    STATIC_URL = 'https://sermons.loosesocket.com/static/'
-    STORAGES = {
-        'staticfiles': {
-            'BACKEND': 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage',
-        },
-    }
+STATIC_URL = '/static/'
+STATIC_ROOT = os.getenv('STATIC_ROOT', BASE_DIR / 'staticfiles')
+STORAGES = {
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
@@ -162,6 +147,16 @@ LOGOUT_REDIRECT_URL = '/login/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 SERMON_STORAGE_ROOT = os.getenv('SERMON_STORAGE_ROOT', '.')
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
 
 LOG_LEVEL = os.getenv('DJANGO_LOG_LEVEL', 'INFO').upper()
 
