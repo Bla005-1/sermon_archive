@@ -10,11 +10,11 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory, SimpleTestCase
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sermon_site.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 if not apps.ready:
     django.setup()
 
-from archive import views  # noqa: E402  pylint: disable=wrong-import-position
+from apps.sermons import views  # noqa: E402  pylint: disable=wrong-import-position
 
 
 class _DummyUser(SimpleNamespace):

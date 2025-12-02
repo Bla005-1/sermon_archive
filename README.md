@@ -19,7 +19,7 @@ A JSON-only backend for storing sermons, linked passages, and file attachments. 
 All endpoints require authentication (session or basic auth). Use the Django admin (`/admin/`) to create users or manage data directly.
 
 ## Project layout
-See `project_tree.txt` for a concise map of the codebase. Front-end templates and static assets have been removed; only the API and supporting services remain.
+See `project_tree.txt` for a concise map of the codebase. Django configuration now lives in `config/`, the API router is centralized under `api/urls.py`, and the sermons app resides in `apps/sermons/`. Front-end templates and static assets have been removed; only the API and supporting services remain.
 
 ## Development setup
 1. **Install dependencies**

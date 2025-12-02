@@ -8,11 +8,11 @@ from django.apps import apps
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sermon_site.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 if not apps.ready:
     django.setup()
 
-from archive import storage  # noqa: E402  pylint: disable=wrong-import-position
+from apps.sermons import storage  # noqa: E402  pylint: disable=wrong-import-position
 
 
 class AttachmentStorageTests(SimpleTestCase):
