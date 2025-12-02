@@ -53,7 +53,6 @@ INSTALLED_APPS = [
     'apps.accounts',
     'apps.attachments',
     'apps.bible',
-    'apps.illustrations',
     'apps.search',
     'apps.widget',
     'apps.sermons',
