@@ -95,6 +95,14 @@ class SermonPassageDetailView(RetrieveUpdateDestroyAPIView):
         return instance
 
 
+class PassageDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = SermonPassageSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = SermonPassage.objects.select_related(
+        "sermon", "start_verse__book", "end_verse__book"
+    ).all()
+
+
 class AttachmentListCreateView(ListCreateAPIView):
     serializer_class = AttachmentSerializer
     permission_classes = [IsAuthenticated]

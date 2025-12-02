@@ -50,6 +50,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'apps.accounts',
+    'apps.attachments',
+    'apps.bible',
+    'apps.illustrations',
+    'apps.search',
+    'apps.widget',
     'apps.sermons',
 ]
 
