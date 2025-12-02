@@ -5,6 +5,7 @@ from .api_views import (
     AttachmentDetailView,
     AttachmentDownloadView,
     AttachmentListCreateView,
+    PassageDetailView,
     SermonPassageDetailView,
     SermonPassageListCreateView,
     SermonViewSet,
@@ -25,6 +26,7 @@ urlpatterns = [
         SermonPassageDetailView.as_view(),
         name="sermon-passage-detail",
     ),
+    path("passages/<int:pk>/", PassageDetailView.as_view(), name="passage-detail"),
     path(
         "sermons/<int:sermon_id>/attachments/",
         AttachmentListCreateView.as_view(),
