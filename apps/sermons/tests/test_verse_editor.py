@@ -6,10 +6,10 @@ from unittest import mock
 
 import django
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sermon_site.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from archive import views
+from apps.sermons import views
 
 
 class VerseEditorHelperTests(unittest.TestCase):

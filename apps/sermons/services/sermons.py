@@ -72,4 +72,4 @@ def update_sermon(sermon: Sermon, data: Mapping[str, object]) -> Sermon:
 
 
 def user_can_edit_sermons(user) -> bool:
-    return user.is_authenticated and user.has_perm('archive.change_sermon')
+    return user.is_authenticated and user.has_perm('sermons.change_sermon')
