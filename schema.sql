@@ -106,30 +106,6 @@ CREATE TABLE attachments (
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Reusable illustrations or stories
-CREATE TABLE illustrations (
-  illustration_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(256) NOT NULL,
-  body_md LONGTEXT NOT NULL,
-  keywords_csv TEXT,
-  source VARCHAR(256),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
--- Link table: which illustrations belong to which sermon
-CREATE TABLE sermon_illustrations (
-  sermon_id BIGINT UNSIGNED NOT NULL,
-  illustration_id BIGINT UNSIGNED NOT NULL,
-  ord SMALLINT UNSIGNED DEFAULT 1,
-  PRIMARY KEY (sermon_id, illustration_id),
-  FOREIGN KEY (sermon_id) REFERENCES sermons(sermon_id)
-    ON UPDATE CASCADE ON DELETE CASCADE,
-  FOREIGN KEY (illustration_id) REFERENCES illustrations(illustration_id)
-    ON UPDATE CASCADE ON DELETE RESTRICT
-) ENGINE=InnoDB;
-
 -- Link table: which passages are used in each sermon
 CREATE TABLE sermon_passages (
   sermon_id BIGINT UNSIGNED NOT NULL,
