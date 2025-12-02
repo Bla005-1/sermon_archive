@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 from django.core.exceptions import ObjectDoesNotExist
 
-from .models import BibleBook, BibleVerse
+from apps.bible.models import BibleBook, BibleVerse
 
 
 logger = logging.getLogger(__name__)

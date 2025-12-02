@@ -5,7 +5,8 @@ urlpatterns = [
     path("sermons/", include("apps.sermons.urls")),
     path("attachments/", include("apps.attachments.urls")),
     path("bible/", include("apps.bible.urls")),
-    path("verses/", include("apps.sermons.verse_urls")),
+    path("verses/sermons/", include("apps.sermons.verse_urls")),
+    path("verses/", include("apps.bible.verse_urls")),
     path("widget/", include("apps.widget.urls")),
     path("search/", include("apps.search.urls")),
 ]

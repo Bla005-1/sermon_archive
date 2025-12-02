@@ -1,26 +1,8 @@
 from rest_framework import serializers
 
-from .models import (
-    Attachment,
-    BibleBook,
-    BibleVerse,
-    Sermon,
-    SermonPassage,
-)
-
-
-class BibleBookSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BibleBook
-        fields = ["book_id", "name", "order_num", "testament"]
-
-
-class BibleVerseSerializer(serializers.ModelSerializer):
-    book = BibleBookSerializer(read_only=True)
-
-    class Meta:
-        model = BibleVerse
-        fields = ["verse_id", "book", "chapter", "verse"]
+from apps.bible.models import BibleVerse
+from apps.bible.serializers import BibleVerseSerializer
+from .models import Attachment, Sermon, SermonPassage
 
 
 class AttachmentSerializer(serializers.ModelSerializer):

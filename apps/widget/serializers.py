@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
-from apps.sermons.models import BibleVerse, BibleWidgetVerse
-from apps.sermons.serializers import BibleVerseSerializer
+from apps.bible.models import BibleVerse
+from apps.bible.serializers import BibleVerseSerializer
+from apps.sermons.models import BibleWidgetVerse
 
 
 class BibleWidgetSerializer(serializers.ModelSerializer):

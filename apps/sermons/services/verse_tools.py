@@ -11,18 +11,9 @@ from django.db import transaction
 
 from markdown2 import Markdown
 
-from ..models import (
-    BibleVerse,
-    BibleWidgetVerse,
-    SermonPassage,
-    VerseNote,
-    VerseText,
-)
-from ..utils.reference_parser import (
-    BOOK_ALIASES,
-    build_passage_context,
-    format_ref,
-)
+from apps.bible.models import BibleVerse, VerseNote, VerseText
+from apps.bible.utils.reference_parser import BOOK_ALIASES, build_passage_context, format_ref
+from ..models import BibleWidgetVerse, SermonPassage
 
 PREFERRED_TRANSLATIONS = ('ESV', 'NIV', 'KJV')
 _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])

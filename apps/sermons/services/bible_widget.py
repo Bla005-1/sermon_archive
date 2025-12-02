@@ -4,7 +4,8 @@ from typing import Tuple
 
 from django.db import DatabaseError
 
-from ..models import BibleVerse, BibleWidgetVerse
+from apps.bible.models import BibleVerse
+from ..models import BibleWidgetVerse
 
 
 class BibleWidgetError(Exception):

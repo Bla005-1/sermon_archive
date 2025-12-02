@@ -4,9 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.sermons.models import BibleVerse, VerseNote
-from apps.sermons.serializers import BibleVerseSerializer
-from apps.sermons.utils.reference_parser import format_ref, tolerant_parse_reference
+from apps.bible.models import BibleVerse, VerseNote
+from apps.bible.serializers import BibleVerseSerializer
+from apps.bible.utils.reference_parser import format_ref, tolerant_parse_reference
 
 from .serializers import VerseNoteSerializer
 

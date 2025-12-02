@@ -1,7 +1,20 @@
 from rest_framework import serializers
 
-from apps.sermons.models import BibleVerse, VerseNote
-from apps.sermons.serializers import BibleVerseSerializer
+from apps.bible.models import BibleBook, BibleVerse, VerseNote
+
+
+class BibleBookSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BibleBook
+        fields = ["book_id", "name", "order_num", "testament"]
+
+
+class BibleVerseSerializer(serializers.ModelSerializer):
+    book = BibleBookSerializer(read_only=True)
+
+    class Meta:
+        model = BibleVerse
+        fields = ["verse_id", "book", "chapter", "verse"]
 
 
 class VerseNoteSerializer(serializers.ModelSerializer):

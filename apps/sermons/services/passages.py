@@ -5,8 +5,8 @@ from typing import Tuple
 from django.db import DatabaseError
 from django.db.models import Max
 
+from apps.bible.utils.reference_parser import tolerant_parse_reference
 from ..models import Sermon, SermonPassage
-from ..utils.reference_parser import tolerant_parse_reference
 
 
 class PassageServiceError(Exception):

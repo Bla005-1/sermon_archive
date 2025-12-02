@@ -2,10 +2,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.bible.serializers import BibleVerseSerializer
+from apps.bible.utils.reference_parser import format_ref, tolerant_parse_reference
 from apps.sermons.models import Sermon
 from apps.sermons.serializers import SermonSerializer
-from apps.sermons.utils.reference_parser import tolerant_parse_reference, format_ref
-from apps.sermons.serializers import BibleVerseSerializer
 
 
 class SearchView(APIView):
