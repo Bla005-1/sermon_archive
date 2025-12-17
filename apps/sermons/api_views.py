@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 
+from apps.bible.utils.reference_parser import tolerant_parse_reference
 from .models import Attachment, Sermon, SermonPassage
 from .serializers import AttachmentSerializer, SermonPassageSerializer, SermonSerializer
 from .services.attachments import (
@@ -62,15 +63,31 @@ class SermonPassageListCreateView(ListCreateAPIView):
         )
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        ref_text = (request.data.get("ref_text") or "").strip()
+        if not ref_text:
+            raise ValidationError({"ref_text": ["Please include a reference like 'John 3:16'."]})
+        try:
+            start_verse, end_verse = tolerant_parse_reference(ref_text)
+        except ValueError as exc:
+            raise ValidationError({"ref_text": [str(exc)]}) from exc
+
+        data = request.data.copy()
+        data["ref_text"] = ref_text
+        data["start_verse_id"] = start_verse.pk
+        if end_verse and end_verse.pk != start_verse.pk:
+            data["end_verse_id"] = end_verse.pk
+        else:
+            data.pop("end_verse_id", None)
+
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         sermon = get_object_or_404(Sermon, pk=self.kwargs["sermon_id"])
         validated = serializer.validated_data
         passage = SermonPassage.objects.add_ordered(
             sermon=sermon,
-            start_verse=validated["start_verse"],
-            end_verse=validated.get("end_verse"),
-            ref_text=validated.get("ref_text"),
+            start_verse=start_verse,
+            end_verse=end_verse if end_verse.pk != start_verse.pk else None,
+            ref_text=ref_text,
             context_note=validated.get("context_note"),
         )
         output = SermonPassageSerializer(passage)

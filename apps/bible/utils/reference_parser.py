@@ -68,6 +68,7 @@ _REF_RE = re.compile(
 )
 
 def tolerant_parse_reference(ref_text: str) -> Tuple[BibleVerse, BibleVerse]:
+    # TODO: Parse "Book ch" in addition to existing formats. This would return all verses in a chapter.
     'Parse "Book ch:verse" or "Book ch:start-end" with unicode dashes and numeric-leading book names.'
     if not ref_text or not ref_text.strip():
         raise ValueError('Empty reference.')

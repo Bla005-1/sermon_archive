@@ -1,5 +1,5 @@
 # API reference
-
+# TODO: Update Documentation
 Base path: `/api/`. All endpoints use JSON request/response bodies unless otherwise noted. Session-based authentication is provided by the auth endpoints below; include the CSRF token for mutating requests.
 
 ## Authentication
