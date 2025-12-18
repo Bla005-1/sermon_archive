@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.db import transaction
 
-from markdown2 import Markdown
+from markdown2 import Markdown  # type: ignore[import-untyped]
 
 from apps.bible.models import BibleVerse, VerseNote, VerseText
 from apps.bible.utils.reference_parser import BOOK_ALIASES, build_passage_context, format_ref
@@ -234,7 +234,7 @@ def build_widget_display_text(result_payload: Mapping, translation: str) -> str:
         vt_rows = list(
             VerseText.objects.filter(verse__in=verses_in_range).order_by('translation', 'verse__verse')
         )
-    lookup = {}
+    lookup: Dict[int, str] = {}
     for row in vt_rows:
         lookup.setdefault(row.verse.verse_id, row.plain_text)
 

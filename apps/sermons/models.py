@@ -12,7 +12,7 @@ from apps.bible.models import (
     VerseText,
 )
 if TYPE_CHECKING:
-    from django.db.models.manager import RelatedManager
+    from django.db.models import Manager
 
 # ----------------------------
 # Auth / Django system tables
@@ -138,7 +138,7 @@ class DjangoSession(models.Model):
 
 class Sermon(models.Model):
     sermon_id = models.BigAutoField(primary_key=True)
-    preached_on = models.DateField()
+    preached_on = models.DateField(blank=True, null=True)
     title = models.CharField(max_length=256)
     speaker_name = models.CharField(max_length=128, blank=True, null=True)
     series_name = models.CharField(max_length=128, blank=True, null=True)
@@ -149,8 +149,8 @@ class Sermon(models.Model):
     updated_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
     preached_on_raw = ''
     if TYPE_CHECKING:
-        attachments: RelatedManager['Attachment']
-        passages: RelatedManager['SermonPassage']
+        attachments: Manager['Attachment']
+        passages: Manager['SermonPassage']
 
 
     class Meta:

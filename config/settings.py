@@ -38,7 +38,7 @@ DEBUG = _get_bool('DJANGO_DEBUG', False)
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER: tuple[str, str] | None = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # CORS: allow credentialed requests only from explicit origins (no wildcard when cookies are sent)
 _cors_origins = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 'http://localhost:3000')

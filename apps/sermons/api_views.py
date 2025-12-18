@@ -3,6 +3,7 @@ import os
 
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status, viewsets
 from rest_framework.generics import (
     ListCreateAPIView,
@@ -29,6 +30,19 @@ from .storage import AttachmentStorageError, resolve_attachment_path
 logger = logging.getLogger(__name__)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        description="List sermons, optionally filtered by a title search term.",
+        parameters=[
+            OpenApiParameter(
+                name="q",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Full or partial sermon title to filter the list.",
+            )
+        ],
+    )
+)
 class SermonViewSet(viewsets.ModelViewSet):
     serializer_class = SermonSerializer
     permission_classes = [IsAuthenticated]

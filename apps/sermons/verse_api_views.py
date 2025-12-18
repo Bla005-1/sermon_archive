@@ -1,6 +1,12 @@
 from django.db.models import F
 from django.db.models.functions import Coalesce
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -20,6 +26,45 @@ def _parse_reference(ref_text: str):
 class VerseSermonsView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        description="List sermons that include the requested verse or passage.",
+        parameters=[
+            OpenApiParameter(
+                name="ref",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description='Bible reference such as "Philippians 2:1-11" or "Psalm 23".',
+            )
+        ],
+        responses={
+            200: inline_serializer(
+                name="VerseSermonResponse",
+                fields={
+                    "reference": serializers.CharField(),
+                    "sermons": serializers.ListSerializer(
+                        child=inline_serializer(
+                            name="VerseSermonItem",
+                            fields={
+                                "sermon_id": serializers.IntegerField(),
+                                "title": serializers.CharField(),
+                                "preached_on": serializers.DateField(
+                                    allow_null=True, required=False
+                                ),
+                                "speaker_name": serializers.CharField(allow_blank=True),
+                                "series_name": serializers.CharField(allow_blank=True),
+                                "reference": serializers.CharField(),
+                                "context_note": serializers.CharField(allow_blank=True),
+                                "start_verse_id": serializers.IntegerField(),
+                                "end_verse_id": serializers.IntegerField(),
+                            },
+                        )()
+                    ),
+                },
+            ),
+            400: OpenApiResponse(description="Reference missing or could not be parsed."),
+        },
+    )
     def get(self, request):
         reference = (request.query_params.get("ref") or "").strip()
         if not reference:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Mapping, Optional
+from datetime import date
+from typing import Any, Mapping, Optional, cast
 
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError
@@ -15,7 +16,7 @@ class SermonServiceError(Exception):
 
 
 def build_sermon_from_post(
-    data: Mapping[str, object],
+    data: Mapping[str, Any],
     instance: Optional[Sermon] = None,
 ) -> Sermon:
     """Populate a ``Sermon`` instance for redisplay after a failed save."""
@@ -42,15 +43,17 @@ def build_sermon_from_post(
 
 
 def apply_sermon_data(sermon: Sermon, data: Mapping[str, object]) -> Sermon:
+    data = data or {}
     for field in SERMON_FIELDS:
         setattr(sermon, field, data.get(field, getattr(sermon, field)))
     return sermon
 
 
-def create_sermon(data: Mapping[str, object]) -> Sermon:
+def create_sermon(data: Mapping[str, Any]) -> Sermon:
+    preached_on_value = cast(str | date | None, data.get('preached_on'))
     try:
         sermon = Sermon.objects.create(
-            preached_on=data.get('preached_on') or None,
+            preached_on=preached_on_value or None,
             title=data.get('title', ''),
             speaker_name=data.get('speaker_name', ''),
             series_name=data.get('series_name', ''),
@@ -62,7 +65,7 @@ def create_sermon(data: Mapping[str, object]) -> Sermon:
     return sermon
 
 
-def update_sermon(sermon: Sermon, data: Mapping[str, object]) -> Sermon:
+def update_sermon(sermon: Sermon, data: Mapping[str, Any]) -> Sermon:
     apply_sermon_data(sermon, data)
     try:
         sermon.save()

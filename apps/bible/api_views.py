@@ -1,9 +1,17 @@
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.request import Request
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from typing import Dict, List, Sequence, Tuple
 from apps.bible.models import BibleVerse, VerseNote, VerseText
 from apps.bible.utils.reference_parser import (
     build_commentary_context,
@@ -38,10 +46,12 @@ def _load_passage_verses(start: BibleVerse, end: BibleVerse):
     )
 
 
-def _select_translation(verses, translation_hint: str):
+def _select_translation(
+    verses: Sequence[BibleVerse], translation_hint: str
+) -> Tuple[str, Dict[str, Dict[int, str]], Dict[str, Dict[int, str]], List[str]]:
     verse_ids = [v.verse_id for v in verses]
-    translation_map = {}
-    marked_translation_map = {}
+    translation_map: Dict[str, Dict[int, str]] = {}
+    marked_translation_map: Dict[str, Dict[int, str]] = {}
     for vt in VerseText.objects.filter(verse__in=verses):
         translation_map.setdefault(vt.translation, {})[vt.verse.verse_id] = vt.plain_text
         marked_translation_map.setdefault(vt.translation, {})[vt.verse.verse_id] = vt.marked_text
@@ -68,7 +78,7 @@ def _preview_text_for_range(to_start_id: int, to_end_id: int) -> str:
         rows = list(
             VerseText.objects.filter(verse__in=rng).order_by("translation", "verse__verse")
         )
-    lookup = {}
+    lookup: Dict[int, str] = {}
     for vt in rows:
         lookup.setdefault(vt.verse.verse_id, vt.plain_text)
     plain_text, _ = join_passage_text(rng, lookup)
@@ -78,6 +88,55 @@ def _preview_text_for_range(to_start_id: int, to_end_id: int) -> str:
 class VersePassageView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        description="Retrieve a passage with verse text, notes, and available translations.",
+        parameters=[
+            OpenApiParameter(
+                name="ref",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Bible reference such as "John 3:16-18" or "Psalm 23".',
+                required=True,
+            ),
+            OpenApiParameter(
+                name="translation",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Preferred translation code (e.g., ESV, NIV). Defaults to ESV.",
+                required=False,
+            ),
+        ],
+        responses={
+            200: inline_serializer(
+                name="VersePassageResponse",
+                fields={
+                    "reference": serializers.CharField(),
+                    "translation": serializers.CharField(),
+                    "text": serializers.CharField(),
+                    "combined_marked_text": serializers.CharField(),
+                    "verses": serializers.ListSerializer(
+                        child=inline_serializer(
+                            name="PassageVerse",
+                            fields={
+                                "verse_id": serializers.IntegerField(),
+                                "book": serializers.CharField(),
+                                "chapter": serializers.IntegerField(),
+                                "verse": serializers.IntegerField(),
+                                "text": serializers.CharField(),
+                                "marked_text": serializers.CharField(),
+                                "translation": serializers.CharField(),
+                                "notes": serializers.CharField(allow_null=True, required=False),
+                            },
+                        )()
+                    ),
+                    "available_translations": serializers.ListSerializer(
+                        child=serializers.CharField()
+                    ),
+                },
+            ),
+            400: OpenApiResponse(description="Missing or invalid reference."),
+        },
+    )
     def get(self, request):
         reference = (request.query_params.get("ref") or "").strip()
         translation_hint = (request.query_params.get("translation") or "ESV").strip()
@@ -139,6 +198,51 @@ class VersePassageView(APIView):
 class VerseCrossReferenceView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        description="Return cross references for the requested verse or passage.",
+        parameters=[
+            OpenApiParameter(
+                name="ref",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Bible reference such as "Romans 8:28".',
+                required=True,
+            )
+        ],
+        responses={
+            200: inline_serializer(
+                name="VerseCrossReferencesResponse",
+                fields={
+                    "reference": serializers.CharField(),
+                    "verses": serializers.ListSerializer(
+                        child=inline_serializer(
+                            name="CrossReferenceVerse",
+                            fields={
+                                "verse_id": serializers.IntegerField(),
+                                "book": serializers.CharField(),
+                                "chapter": serializers.IntegerField(),
+                                "verse": serializers.IntegerField(),
+                                "cross_references": serializers.ListSerializer(
+                                    child=inline_serializer(
+                                        name="CrossReferenceItem",
+                                        fields={
+                                            "reference": serializers.CharField(),
+                                            "votes": serializers.IntegerField(),
+                                            "note": serializers.CharField(),
+                                            "to_start_id": serializers.IntegerField(),
+                                            "to_end_id": serializers.IntegerField(),
+                                            "preview_text": serializers.CharField(),
+                                        },
+                                    )()
+                                ),
+                            },
+                        )()
+                    ),
+                },
+            ),
+            400: OpenApiResponse(description="Missing or invalid reference."),
+        },
+    )
     def get(self, request):
         reference = (request.query_params.get("ref") or "").strip()
         if not reference:
@@ -176,6 +280,65 @@ class VerseCrossReferenceView(APIView):
 class VerseCommentaryView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        description="Return patristic commentary excerpts for the requested verse or passage.",
+        parameters=[
+            OpenApiParameter(
+                name="ref",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description='Bible reference such as "Genesis 1".',
+                required=True,
+            )
+        ],
+        responses={
+            200: inline_serializer(
+                name="VerseCommentaryResponse",
+                fields={
+                    "reference": serializers.CharField(),
+                    "count": serializers.IntegerField(),
+                    "items": serializers.ListSerializer(
+                        child=inline_serializer(
+                            name="CommentaryItem",
+                            fields={
+                                "commentary_id": serializers.IntegerField(),
+                                "father_id": serializers.IntegerField(allow_null=True, required=False),
+                                "father_name": serializers.CharField(allow_blank=True),
+                                "display_name": serializers.CharField(),
+                                "append_to_author_name": serializers.CharField(allow_blank=True),
+                                "text": serializers.CharField(),
+                                "book_id": serializers.IntegerField(),
+                                "start_verse_id": serializers.IntegerField(),
+                                "end_verse_id": serializers.IntegerField(),
+                                "reference": serializers.CharField(),
+                                "source_url": serializers.CharField(allow_blank=True),
+                                "source_title": serializers.CharField(allow_blank=True),
+                                "default_year": serializers.IntegerField(allow_null=True, required=False),
+                                "wiki_url": serializers.CharField(allow_blank=True),
+                                "start": inline_serializer(
+                                    name="CommentaryStart",
+                                    fields={
+                                        "book": serializers.CharField(),
+                                        "chapter": serializers.IntegerField(),
+                                        "verse": serializers.IntegerField(),
+                                    },
+                                )(),
+                                "end": inline_serializer(
+                                    name="CommentaryEnd",
+                                    fields={
+                                        "book": serializers.CharField(),
+                                        "chapter": serializers.IntegerField(),
+                                        "verse": serializers.IntegerField(),
+                                    },
+                                )(),
+                            },
+                        )()
+                    ),
+                },
+            ),
+            400: OpenApiResponse(description="Missing or invalid reference."),
+        },
+    )
     def get(self, request):
         reference = (request.query_params.get("ref") or "").strip()
         if not reference:
@@ -200,6 +363,19 @@ class VerseCommentaryView(APIView):
         )
 
 
+@extend_schema_view(
+    list=extend_schema(
+        description="List verse notes, optionally filtered by verse id.",
+        parameters=[
+            OpenApiParameter(
+                name="verse_id",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Filter notes by the verse identifier.",
+            )
+        ],
+    )
+)
 class VerseNoteListCreateView(ListCreateAPIView):
     serializer_class = VerseNoteSerializer
     permission_classes = [IsAuthenticated]

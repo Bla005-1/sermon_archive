@@ -5,7 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import F
 from ..models import BibleBook, BibleVerse, VerseText, VerseCrossReference, VerseNote, Commentary
 from django.utils.html import escape
-from markdown2 import Markdown
+from markdown2 import Markdown  # type: ignore[import-untyped]
 
 
 logger = logging.getLogger(__name__)
@@ -67,9 +67,19 @@ _REF_RE = re.compile(
     re.IGNORECASE | re.VERBOSE
 )
 
+_CHAPTER_ONLY_RE = re.compile(
+    r'''
+    ^\s*
+    (?P<book>.+?)                          # book
+    \s+
+    (?P<ch>\d+)                            # chapter number
+    \s*$
+    ''',
+    re.IGNORECASE | re.VERBOSE
+)
+
 def tolerant_parse_reference(ref_text: str) -> Tuple[BibleVerse, BibleVerse]:
-    # TODO: Parse "Book ch" in addition to existing formats. This would return all verses in a chapter.
-    'Parse "Book ch:verse" or "Book ch:start-end" with unicode dashes and numeric-leading book names.'
+    'Parse "Book ch", "Book ch:verse", or "Book ch:start-end" with unicode dashes and numeric-leading book names.'
     if not ref_text or not ref_text.strip():
         raise ValueError('Empty reference.')
 
@@ -77,14 +87,27 @@ def tolerant_parse_reference(ref_text: str) -> Tuple[BibleVerse, BibleVerse]:
     cleaned = re.sub(DASHES, '-', ref_text.strip())
 
     m = _REF_RE.match(cleaned)
+    chapter_only_match = None
     if not m:
-        # Keep the error actionable (what we accept)
-        raise ValueError('References should be formatted like "Book Chapter:Verse" or "Book Chapter:Start-End".')
+        chapter_only_match = _CHAPTER_ONLY_RE.match(cleaned)
+        if not chapter_only_match:
+            # Keep the error actionable (what we accept)
+            raise ValueError(
+                'References should be formatted like "Book Chapter", '
+                '"Book Chapter:Verse", or "Book Chapter:Start-End".'
+            )
 
-    book_raw = m.group('book').strip()
-    ch = int(m.group('ch'))
-    v1 = int(m.group('v1'))
-    v2 = int(m.group('v2') or v1)
+    source = chapter_only_match or m
+    if source is None:
+        raise ValueError('We could not understand that reference.')
+    book_raw = source.group('book').strip()
+    ch = int(source.group('ch'))
+    if m:
+        v1 = int(m.group('v1'))
+        v2 = int(m.group('v2')) if m.group('v2') else v1
+    else:
+        v1 = None
+        v2 = None
 
     # Let your existing normalizer + tolerant finder do their thing
     book_name = normalize_book(book_raw)
@@ -93,13 +116,22 @@ def tolerant_parse_reference(ref_text: str) -> Tuple[BibleVerse, BibleVerse]:
         logger.warning('Unknown Bible book provided: %s', book_raw)
         raise ValueError(f'We could not find a Bible book named "{book_raw}".')
 
-    # Pull verses; fail clearly if either side doesn’t exist
-    try:
-        start_v = BibleVerse.objects.get(book=book, chapter=ch, verse=min(v1, v2))
-        end_v   = BibleVerse.objects.get(book=book, chapter=ch, verse=max(v1, v2))
-    except ObjectDoesNotExist:
-        logger.warning('Verse lookup failed for %s %s:%s-%s', book.name, ch, v1, v2)
-        raise ValueError('We could not locate that verse in the archive. Please verify the chapter and verse numbers.')
+    if chapter_only_match:
+        verses_in_chapter = BibleVerse.objects.filter(book=book, chapter=ch).order_by('verse')
+        start_v = verses_in_chapter.first()
+        end_v = verses_in_chapter.last()
+        if not start_v or not end_v:
+            logger.warning('Chapter lookup failed for %s %s', book.name, ch)
+            raise ValueError('We could not locate that chapter in the archive. Please verify the chapter number.')
+    else:
+        assert v1 is not None and v2 is not None  # for mypy
+        # Pull verses; fail clearly if either side doesn’t exist
+        try:
+            start_v = BibleVerse.objects.get(book=book, chapter=ch, verse=min(v1, v2))
+            end_v   = BibleVerse.objects.get(book=book, chapter=ch, verse=max(v1, v2))
+        except ObjectDoesNotExist:
+            logger.warning('Verse lookup failed for %s %s:%s-%s', book.name, ch, v1, v2)
+            raise ValueError('We could not locate that verse in the archive. Please verify the chapter and verse numbers.')
 
     # Safety: ensure order by primary key if ids aren’t strictly monotonic by (ch,verse)
     if start_v.verse_id > end_v.verse_id:
@@ -124,12 +156,12 @@ def get_texts(verses: Sequence[BibleVerse], translation: Optional[str] = None):
         return {} if translation else {}
     qs = VerseText.objects.filter(verse__in=verses)
     if translation:
-        rows = qs.filter(translation=translation).values('verse_id', 'text')
-        return {r['verse_id']: r['text'] for r in rows}
-    rows = qs.values('translation', 'verse_id', 'text')
+        rows = qs.filter(translation=translation).values('verse_id', 'plain_text')
+        return {r['verse_id']: r['plain_text'] for r in rows}
+    rows = qs.values('translation', 'verse_id', 'plain_text')
     out: Dict[str, Dict[int, str]] = {}
     for r in rows:
-        out.setdefault(r['translation'], {})[r['verse_id']] = r['text']
+        out.setdefault(r['translation'], {})[r['verse_id']] = r['plain_text']
     return out
 
 def get_notes(verses: Sequence[BibleVerse]) -> Dict[int, List[dict]]:
@@ -391,8 +423,10 @@ def build_cross_reference_context(verses: Sequence[BibleVerse]) -> dict:
                 ).order_by('verse__verse')
             )
             if not verse_text_qs:
-                verse_text_qs = VerseText.objects.filter(verse__in=verses_in_range).order_by(
-                    'translation', 'verse__verse'
+                verse_text_qs = list(
+                    VerseText.objects.filter(verse__in=verses_in_range).order_by(
+                        'translation', 'verse__verse'
+                    )
                 )
             for vt in verse_text_qs:
                 verse_text_lookup.setdefault(vt.verse.verse_id, vt.plain_text)
