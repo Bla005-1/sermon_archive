@@ -1,0 +1,1678 @@
+openapi: 3.0.3
+info:
+  title: ''
+  version: 0.0.0
+paths:
+  /api/attachments/{attachment_id}/:
+    get:
+      operationId: attachments_retrieve
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: integer
+        description: A unique integer value identifying this attachment.
+        required: true
+      tags:
+      - attachments
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+          description: ''
+    put:
+      operationId: attachments_update
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: integer
+        description: A unique integer value identifying this attachment.
+        required: true
+      tags:
+      - attachments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Attachment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Attachment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Attachment'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+          description: ''
+    patch:
+      operationId: attachments_partial_update
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: integer
+        description: A unique integer value identifying this attachment.
+        required: true
+      tags:
+      - attachments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAttachment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAttachment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAttachment'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+          description: ''
+    delete:
+      operationId: attachments_destroy
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: integer
+        description: A unique integer value identifying this attachment.
+        required: true
+      tags:
+      - attachments
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/attachments/{id}/download/:
+    get:
+      operationId: attachments_download_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - attachments
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/me/:
+    get:
+      operationId: auth_me_retrieve
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/refresh/:
+    get:
+      operationId: auth_refresh_retrieve
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/schema/:
+    get:
+      operationId: schema_retrieve
+      description: |-
+        OpenApi3 schema for this API. Format can be selected via content negotiation.
+
+        - YAML: application/vnd.oai.openapi
+        - JSON: application/vnd.oai.openapi+json
+      parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - json
+          - yaml
+      - in: query
+        name: lang
+        schema:
+          type: string
+          enum:
+          - af
+          - ar
+          - ar-dz
+          - ast
+          - az
+          - be
+          - bg
+          - bn
+          - br
+          - bs
+          - ca
+          - ckb
+          - cs
+          - cy
+          - da
+          - de
+          - dsb
+          - el
+          - en
+          - en-au
+          - en-gb
+          - eo
+          - es
+          - es-ar
+          - es-co
+          - es-mx
+          - es-ni
+          - es-ve
+          - et
+          - eu
+          - fa
+          - fi
+          - fr
+          - fy
+          - ga
+          - gd
+          - gl
+          - he
+          - hi
+          - hr
+          - hsb
+          - hu
+          - hy
+          - ia
+          - id
+          - ig
+          - io
+          - is
+          - it
+          - ja
+          - ka
+          - kab
+          - kk
+          - km
+          - kn
+          - ko
+          - ky
+          - lb
+          - lt
+          - lv
+          - mk
+          - ml
+          - mn
+          - mr
+          - ms
+          - my
+          - nb
+          - ne
+          - nl
+          - nn
+          - os
+          - pa
+          - pl
+          - pt
+          - pt-br
+          - ro
+          - ru
+          - sk
+          - sl
+          - sq
+          - sr
+          - sr-latn
+          - sv
+          - sw
+          - ta
+          - te
+          - tg
+          - th
+          - tk
+          - tr
+          - tt
+          - udm
+          - ug
+          - uk
+          - ur
+          - uz
+          - vi
+          - zh-hans
+          - zh-hant
+      tags:
+      - schema
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/vnd.oai.openapi:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/yaml:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/vnd.oai.openapi+json:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/search/:
+    get:
+      operationId: search_retrieve
+      tags:
+      - search
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/search/ref/:
+    get:
+      operationId: search_ref_retrieve
+      tags:
+      - search
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/sermons/:
+    get:
+      operationId: sermons_list
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sermon'
+          description: ''
+    post:
+      operationId: sermons_create
+      tags:
+      - sermons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sermon'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Sermon'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Sermon'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sermon'
+          description: ''
+  /api/sermons/{sermon_id}/:
+    get:
+      operationId: sermons_retrieve
+      parameters:
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        description: A unique integer value identifying this sermon.
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sermon'
+          description: ''
+    put:
+      operationId: sermons_update
+      parameters:
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        description: A unique integer value identifying this sermon.
+        required: true
+      tags:
+      - sermons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sermon'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Sermon'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Sermon'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sermon'
+          description: ''
+    patch:
+      operationId: sermons_partial_update
+      parameters:
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        description: A unique integer value identifying this sermon.
+        required: true
+      tags:
+      - sermons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSermon'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSermon'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSermon'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sermon'
+          description: ''
+    delete:
+      operationId: sermons_destroy
+      parameters:
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        description: A unique integer value identifying this sermon.
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sermons/{sermon_id}/attachments/:
+    get:
+      operationId: sermons_attachments_list
+      parameters:
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Attachment'
+          description: ''
+    post:
+      operationId: sermons_attachments_create
+      parameters:
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Attachment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Attachment'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+          description: ''
+  /api/sermons/{sermon_id}/attachments/{id}/:
+    get:
+      operationId: sermons_attachments_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+          description: ''
+    delete:
+      operationId: sermons_attachments_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sermons/{sermon_id}/attachments/{id}/download/:
+    get:
+      operationId: sermons_attachments_download_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/sermons/{sermon_id}/passages/:
+    get:
+      operationId: sermons_passages_list
+      parameters:
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SermonPassage'
+          description: ''
+    post:
+      operationId: sermons_passages_create
+      parameters:
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonPassage'
+          description: ''
+  /api/sermons/{sermon_id}/passages/{id}/:
+    get:
+      operationId: sermons_passages_retrieve_2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonPassage'
+          description: ''
+    put:
+      operationId: sermons_passages_update_2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonPassage'
+          description: ''
+    patch:
+      operationId: sermons_passages_partial_update_2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSermonPassage'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSermonPassage'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSermonPassage'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonPassage'
+          description: ''
+    delete:
+      operationId: sermons_passages_destroy_2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: sermon_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/sermons/passages/{id}/:
+    get:
+      operationId: sermons_passages_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonPassage'
+          description: ''
+    put:
+      operationId: sermons_passages_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SermonPassage'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonPassage'
+          description: ''
+    patch:
+      operationId: sermons_passages_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSermonPassage'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSermonPassage'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSermonPassage'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonPassage'
+          description: ''
+    delete:
+      operationId: sermons_passages_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/verses/:
+    get:
+      operationId: verses_retrieve
+      tags:
+      - verses
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/verses/commentaries/:
+    get:
+      operationId: verses_commentaries_retrieve
+      tags:
+      - verses
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/verses/crossrefs/:
+    get:
+      operationId: verses_crossrefs_retrieve
+      tags:
+      - verses
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/verses/notes/:
+    get:
+      operationId: verses_notes_list
+      tags:
+      - verses
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VerseNote'
+          description: ''
+    post:
+      operationId: verses_notes_create
+      tags:
+      - verses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerseNote'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerseNote'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerseNote'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerseNote'
+          description: ''
+  /api/verses/notes/{note_id}/:
+    get:
+      operationId: verses_notes_retrieve
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - verses
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerseNote'
+          description: ''
+    put:
+      operationId: verses_notes_update
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - verses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerseNote'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerseNote'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerseNote'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerseNote'
+          description: ''
+    patch:
+      operationId: verses_notes_partial_update
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - verses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVerseNote'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVerseNote'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVerseNote'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerseNote'
+          description: ''
+    delete:
+      operationId: verses_notes_destroy
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - verses
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/verses/sermons/:
+    get:
+      operationId: verses_sermons_retrieve
+      tags:
+      - verses
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/widget/:
+    get:
+      operationId: widget_list
+      tags:
+      - widget
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BibleWidget'
+          description: ''
+    post:
+      operationId: widget_create
+      tags:
+      - widget
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BibleWidget'
+          description: ''
+  /api/widget/{id}/:
+    get:
+      operationId: widget_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this bible widget verse.
+        required: true
+      tags:
+      - widget
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BibleWidget'
+          description: ''
+    put:
+      operationId: widget_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this bible widget verse.
+        required: true
+      tags:
+      - widget
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BibleWidget'
+          description: ''
+    patch:
+      operationId: widget_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this bible widget verse.
+        required: true
+      tags:
+      - widget
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBibleWidget'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBibleWidget'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBibleWidget'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BibleWidget'
+          description: ''
+    delete:
+      operationId: widget_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this bible widget verse.
+        required: true
+      tags:
+      - widget
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    Attachment:
+      type: object
+      properties:
+        attachment_id:
+          type: integer
+          readOnly: true
+        sermon:
+          type: integer
+          readOnly: true
+        rel_path:
+          type: string
+          readOnly: true
+        original_filename:
+          type: string
+          nullable: true
+          maxLength: 255
+        mime_type:
+          type: string
+          nullable: true
+          maxLength: 255
+        byte_size:
+          type: integer
+          maximum: 18446744073709551615
+          minimum: 0
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - attachment_id
+      - created_at
+      - rel_path
+      - sermon
+    BibleBook:
+      type: object
+      properties:
+        book_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 64
+        order_num:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+        testament:
+          $ref: '#/components/schemas/TestamentEnum'
+      required:
+      - book_id
+      - name
+      - order_num
+      - testament
+    BibleVerse:
+      type: object
+      properties:
+        verse_id:
+          type: integer
+          readOnly: true
+        book:
+          allOf:
+          - $ref: '#/components/schemas/BibleBook'
+          readOnly: true
+        chapter:
+          type: integer
+          maximum: 65535
+          minimum: 0
+        verse:
+          type: integer
+          maximum: 65535
+          minimum: 0
+      required:
+      - book
+      - chapter
+      - verse
+      - verse_id
+    BibleWidget:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        start_verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        end_verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        start_verse_id:
+          type: integer
+          writeOnly: true
+        end_verse_id:
+          type: integer
+          writeOnly: true
+        translation:
+          type: string
+          maxLength: 16
+        ref:
+          type: string
+          maxLength: 64
+        display_text:
+          type: string
+        weight:
+          type: integer
+          maximum: 65535
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - created_at
+      - display_text
+      - end_verse
+      - end_verse_id
+      - id
+      - ref
+      - start_verse
+      - start_verse_id
+      - translation
+      - updated_at
+    PatchedAttachment:
+      type: object
+      properties:
+        attachment_id:
+          type: integer
+          readOnly: true
+        sermon:
+          type: integer
+          readOnly: true
+        rel_path:
+          type: string
+          readOnly: true
+        original_filename:
+          type: string
+          nullable: true
+          maxLength: 255
+        mime_type:
+          type: string
+          nullable: true
+          maxLength: 255
+        byte_size:
+          type: integer
+          maximum: 18446744073709551615
+          minimum: 0
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+    PatchedBibleWidget:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        start_verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        end_verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        start_verse_id:
+          type: integer
+          writeOnly: true
+        end_verse_id:
+          type: integer
+          writeOnly: true
+        translation:
+          type: string
+          maxLength: 16
+        ref:
+          type: string
+          maxLength: 64
+        display_text:
+          type: string
+        weight:
+          type: integer
+          maximum: 65535
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+    PatchedSermon:
+      type: object
+      properties:
+        sermon_id:
+          type: integer
+          readOnly: true
+        preached_on:
+          type: string
+          format: date
+        title:
+          type: string
+          maxLength: 256
+        speaker_name:
+          type: string
+          nullable: true
+          maxLength: 128
+        series_name:
+          type: string
+          nullable: true
+          maxLength: 128
+        location_name:
+          type: string
+          nullable: true
+          maxLength: 128
+        notes_md:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        passages:
+          type: array
+          items:
+            $ref: '#/components/schemas/SermonPassage'
+          readOnly: true
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+          readOnly: true
+    PatchedSermonPassage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        sermon:
+          type: integer
+          readOnly: true
+        start_verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        end_verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        start_verse_id:
+          type: integer
+          writeOnly: true
+        end_verse_id:
+          type: integer
+          writeOnly: true
+          nullable: true
+        ref_text:
+          type: string
+          nullable: true
+          maxLength: 64
+        context_note:
+          type: string
+          nullable: true
+          maxLength: 512
+        ord:
+          type: integer
+          readOnly: true
+          default: 1
+    PatchedVerseNote:
+      type: object
+      properties:
+        note_id:
+          type: integer
+          readOnly: true
+        verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        verse_id:
+          type: integer
+          writeOnly: true
+        note_md:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+    Sermon:
+      type: object
+      properties:
+        sermon_id:
+          type: integer
+          readOnly: true
+        preached_on:
+          type: string
+          format: date
+        title:
+          type: string
+          maxLength: 256
+        speaker_name:
+          type: string
+          nullable: true
+          maxLength: 128
+        series_name:
+          type: string
+          nullable: true
+          maxLength: 128
+        location_name:
+          type: string
+          nullable: true
+          maxLength: 128
+        notes_md:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        passages:
+          type: array
+          items:
+            $ref: '#/components/schemas/SermonPassage'
+          readOnly: true
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+          readOnly: true
+      required:
+      - attachments
+      - created_at
+      - passages
+      - preached_on
+      - sermon_id
+      - title
+      - updated_at
+    SermonPassage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        sermon:
+          type: integer
+          readOnly: true
+        start_verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        end_verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        start_verse_id:
+          type: integer
+          writeOnly: true
+        end_verse_id:
+          type: integer
+          writeOnly: true
+          nullable: true
+        ref_text:
+          type: string
+          nullable: true
+          maxLength: 64
+        context_note:
+          type: string
+          nullable: true
+          maxLength: 512
+        ord:
+          type: integer
+          readOnly: true
+          default: 1
+      required:
+      - end_verse
+      - id
+      - ord
+      - sermon
+      - start_verse
+      - start_verse_id
+    TestamentEnum:
+      enum:
+      - OT
+      - NT
+      type: string
+      description: |-
+        * `OT` - OT
+        * `NT` - NT
+    VerseNote:
+      type: object
+      properties:
+        note_id:
+          type: integer
+          readOnly: true
+        verse:
+          allOf:
+          - $ref: '#/components/schemas/BibleVerse'
+          readOnly: true
+        verse_id:
+          type: integer
+          writeOnly: true
+        note_md:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - created_at
+      - note_id
+      - updated_at
+      - verse
+      - verse_id
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
