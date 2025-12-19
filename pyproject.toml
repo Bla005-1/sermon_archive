@@ -24,6 +24,7 @@ ipython = "^8.26"
 django-stubs = "^5.2.8"
 django-stubs-ext = "^5.2.8"
 mypy = "^1.19.1"
+pytest-django = "^4.11.1"
 
 [build-system]
 requires = ["poetry-core"]
