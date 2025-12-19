@@ -1,3 +1,6 @@
+from datetime import date
+from typing import List, Tuple, TypedDict
+
 from django.db.models import F
 from django.db.models.functions import Coalesce
 from drf_spectacular.utils import (
@@ -11,11 +14,28 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.bible.models import BibleVerse
 from apps.bible.utils.reference_parser import format_ref, tolerant_parse_reference
 from .models import SermonPassage
 
 
-def _parse_reference(ref_text: str):
+SortKey = Tuple[int, int, int, int, float | int, int]
+
+
+class SermonResult(TypedDict):
+    sermon_id: int
+    title: str
+    preached_on: date | None
+    speaker_name: str
+    series_name: str
+    reference: str
+    context_note: str
+    start_verse_id: int
+    end_verse_id: int
+    sort_key: SortKey
+
+
+def _parse_reference(ref_text: str) -> Tuple[BibleVerse | None, BibleVerse | None, str | None]:
     try:
         start, end = tolerant_parse_reference(ref_text)
         return start, end, None
@@ -58,7 +78,7 @@ class VerseSermonsView(APIView):
                                 "start_verse_id": serializers.IntegerField(),
                                 "end_verse_id": serializers.IntegerField(),
                             },
-                        )()
+                        )
                     ),
                 },
             ),
@@ -74,9 +94,10 @@ class VerseSermonsView(APIView):
             )
 
         start, end, error = _parse_reference(reference)
-        if error:
-            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
+        if error or start is None or end is None:
+            return Response({"detail": error or "Unable to parse reference."}, status=status.HTTP_400_BAD_REQUEST)
 
+        assert start is not None and end is not None
         query_start = min(start.verse_id, end.verse_id)
         query_end = max(start.verse_id, end.verse_id)
 
@@ -89,11 +110,16 @@ class VerseSermonsView(APIView):
             .filter(start_id__lte=query_end, end_id__gte=query_start)
         )
 
-        results = []
+        results: List[SermonResult] = []
         for passage in passages:
             sermon = passage.sermon
             start_id = getattr(passage, "start_id", passage.start_verse.verse_id)
-            end_id = getattr(passage, "end_id", passage.end_verse.verse_id if passage.end_verse_id else start_id)
+            end_id: int | None = getattr(passage, "end_id", None)
+            if end_id is None:
+                if passage.end_verse_id and passage.end_verse is not None:
+                    end_id = passage.end_verse.verse_id
+                else:
+                    end_id = start_id
             start_id, end_id = (min(start_id, end_id), max(start_id, end_id))
             length = (end_id - start_id) + 1
             display_ref = passage.ref_text or passage.ref_display()
@@ -101,9 +127,10 @@ class VerseSermonsView(APIView):
             if query_start == query_end:
                 is_exact = start_id == query_start and end_id == query_end
                 boundary_distance = abs(start_id - query_start) + abs(end_id - query_end)
-                sort_key = (
+                sort_key: SortKey = (
                     0 if is_exact else 1,
                     length,
+                    boundary_distance,
                     boundary_distance,
                     -sermon.preached_on.toordinal() if sermon.preached_on else float("inf"),
                     -sermon.pk,
@@ -139,8 +166,8 @@ class VerseSermonsView(APIView):
                     "sermon_id": sermon.pk,
                     "title": sermon.title,
                     "preached_on": sermon.preached_on,
-                    "speaker_name": sermon.speaker_name,
-                    "series_name": sermon.series_name,
+                    "speaker_name": sermon.speaker_name or "",
+                    "series_name": sermon.series_name or "",
                     "reference": display_ref,
                     "context_note": passage.context_note or "",
                     "start_verse_id": start_id,
@@ -150,7 +177,8 @@ class VerseSermonsView(APIView):
             )
 
         sorted_results = sorted(results, key=lambda r: r["sort_key"])
-        for entry in sorted_results:
-            entry.pop("sort_key", None)
+        response_results: List[dict[str, object]] = [
+            {k: v for k, v in entry.items() if k != "sort_key"} for entry in sorted_results
+        ]
 
-        return Response({"reference": format_ref(start, end), "sermons": sorted_results})
+        return Response({"reference": format_ref(start, end), "sermons": response_results})

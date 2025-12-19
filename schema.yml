@@ -318,6 +318,13 @@ paths:
   /api/search/:
     get:
       operationId: search_retrieve
+      description: Search sermons by title.
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Full or partial sermon title to search for.
       tags:
       - search
       security:
@@ -325,10 +332,22 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonSearchResponse'
+          description: ''
   /api/search/ref/:
     get:
       operationId: search_ref_retrieve
+      description: Resolve a Bible reference into canonical start/end verses.
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Reference string such as "1 John 4" or "John 3:16-18".
+        required: true
       tags:
       - search
       security:
@@ -336,10 +355,23 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferenceSearchResponse'
+          description: ''
+        '400':
+          description: The provided reference could not be parsed.
   /api/sermons/:
     get:
       operationId: sermons_list
+      description: List sermons, optionally filtered by a title search term.
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Full or partial sermon title to filter the list.
       tags:
       - sermons
       security:
@@ -882,6 +914,19 @@ paths:
   /api/verses/:
     get:
       operationId: verses_retrieve
+      description: Retrieve a passage with verse text, notes, and available translations.
+      parameters:
+      - in: query
+        name: ref
+        schema:
+          type: string
+        description: Bible reference such as "John 3:16-18" or "Psalm 23".
+        required: true
+      - in: query
+        name: translation
+        schema:
+          type: string
+        description: Preferred translation code (e.g., ESV, NIV). Defaults to ESV.
       tags:
       - verses
       security:
@@ -889,10 +934,25 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersePassageResponse'
+          description: ''
+        '400':
+          description: Missing or invalid reference.
   /api/verses/commentaries/:
     get:
       operationId: verses_commentaries_retrieve
+      description: Return patristic commentary excerpts for the requested verse or
+        passage.
+      parameters:
+      - in: query
+        name: ref
+        schema:
+          type: string
+        description: Bible reference such as "Genesis 1".
+        required: true
       tags:
       - verses
       security:
@@ -900,10 +960,24 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerseCommentaryResponse'
+          description: ''
+        '400':
+          description: Missing or invalid reference.
   /api/verses/crossrefs/:
     get:
       operationId: verses_crossrefs_retrieve
+      description: Return cross references for the requested verse or passage.
+      parameters:
+      - in: query
+        name: ref
+        schema:
+          type: string
+        description: Bible reference such as "Romans 8:28".
+        required: true
       tags:
       - verses
       security:
@@ -911,7 +985,13 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerseCrossReferencesResponse'
+          description: ''
+        '400':
+          description: Missing or invalid reference.
   /api/verses/notes/:
     get:
       operationId: verses_notes_list
@@ -1058,6 +1138,14 @@ paths:
   /api/verses/sermons/:
     get:
       operationId: verses_sermons_retrieve
+      description: List sermons that include the requested verse or passage.
+      parameters:
+      - in: query
+        name: ref
+        schema:
+          type: string
+        description: Bible reference such as "Philippians 2:1-11" or "Psalm 23".
+        required: true
       tags:
       - verses
       security:
@@ -1065,7 +1153,13 @@ paths:
       - basicAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerseSermonResponse'
+          description: ''
+        '400':
+          description: Reference missing or could not be parsed.
   /api/widget/:
     get:
       operationId: widget_list
@@ -1348,6 +1442,155 @@ components:
       - start_verse_id
       - translation
       - updated_at
+    CommentaryEnd:
+      type: object
+      properties:
+        book:
+          type: string
+        chapter:
+          type: integer
+        verse:
+          type: integer
+      required:
+      - book
+      - chapter
+      - verse
+    CommentaryItem:
+      type: object
+      properties:
+        commentary_id:
+          type: integer
+        father_id:
+          type: integer
+          nullable: true
+        father_name:
+          type: string
+        display_name:
+          type: string
+        append_to_author_name:
+          type: string
+        text:
+          type: string
+        book_id:
+          type: integer
+        start_verse_id:
+          type: integer
+        end_verse_id:
+          type: integer
+        reference:
+          type: string
+        source_url:
+          type: string
+        source_title:
+          type: string
+        default_year:
+          type: integer
+          nullable: true
+        wiki_url:
+          type: string
+        start:
+          $ref: '#/components/schemas/CommentaryStart'
+        end:
+          $ref: '#/components/schemas/CommentaryEnd'
+      required:
+      - append_to_author_name
+      - book_id
+      - commentary_id
+      - display_name
+      - end
+      - end_verse_id
+      - father_name
+      - reference
+      - source_title
+      - source_url
+      - start
+      - start_verse_id
+      - text
+      - wiki_url
+    CommentaryStart:
+      type: object
+      properties:
+        book:
+          type: string
+        chapter:
+          type: integer
+        verse:
+          type: integer
+      required:
+      - book
+      - chapter
+      - verse
+    CrossReferenceItem:
+      type: object
+      properties:
+        reference:
+          type: string
+        votes:
+          type: integer
+        note:
+          type: string
+        to_start_id:
+          type: integer
+        to_end_id:
+          type: integer
+        preview_text:
+          type: string
+      required:
+      - note
+      - preview_text
+      - reference
+      - to_end_id
+      - to_start_id
+      - votes
+    CrossReferenceVerse:
+      type: object
+      properties:
+        verse_id:
+          type: integer
+        book:
+          type: string
+        chapter:
+          type: integer
+        verse:
+          type: integer
+        cross_references:
+          type: array
+          items:
+            $ref: '#/components/schemas/CrossReferenceItem'
+      required:
+      - book
+      - chapter
+      - cross_references
+      - verse
+      - verse_id
+    PassageVerse:
+      type: object
+      properties:
+        verse_id:
+          type: integer
+        book:
+          type: string
+        chapter:
+          type: integer
+        verse:
+          type: integer
+        text:
+          type: string
+        marked_text:
+          type: string
+        translation:
+          type: string
+        notes:
+          type: string
+          nullable: true
+      required:
+      - book
+      - chapter
+      - marked_text
+      - text
+      - translation
+      - verse
+      - verse_id
     PatchedAttachment:
       type: object
       properties:
@@ -1430,6 +1673,7 @@ components:
         preached_on:
           type: string
           format: date
+          nullable: true
         title:
           type: string
           maxLength: 256
@@ -1530,6 +1774,19 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+    ReferenceSearchResponse:
+      type: object
+      properties:
+        reference:
+          type: string
+        start:
+          $ref: '#/components/schemas/BibleVerse'
+        end:
+          $ref: '#/components/schemas/BibleVerse'
+      required:
+      - end
+      - reference
+      - start
     Sermon:
       type: object
       properties:
@@ -1539,6 +1796,7 @@ components:
         preached_on:
           type: string
           format: date
+          nullable: true
         title:
           type: string
           maxLength: 256
@@ -1581,7 +1839,6 @@ components:
       - attachments
       - created_at
       - passages
-      - preached_on
       - sermon_id
       - title
       - updated_at
@@ -1628,6 +1885,15 @@ components:
       - sermon
       - start_verse
       - start_verse_id
+    SermonSearchResponse:
+      type: object
+      properties:
+        sermons:
+          type: array
+          items:
+            $ref: '#/components/schemas/Sermon'
+      required:
+      - sermons
     TestamentEnum:
       enum:
       - OT
@@ -1636,6 +1902,33 @@ components:
       description: |-
         * `OT` - OT
         * `NT` - NT
+    VerseCommentaryResponse:
+      type: object
+      properties:
+        reference:
+          type: string
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommentaryItem'
+      required:
+      - count
+      - items
+      - reference
+    VerseCrossReferencesResponse:
+      type: object
+      properties:
+        reference:
+          type: string
+        verses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CrossReferenceVerse'
+      required:
+      - reference
+      - verses
     VerseNote:
       type: object
       properties:
@@ -1668,6 +1961,76 @@ components:
       - updated_at
       - verse
       - verse_id
+    VersePassageResponse:
+      type: object
+      properties:
+        reference:
+          type: string
+        translation:
+          type: string
+        text:
+          type: string
+        combined_marked_text:
+          type: string
+        verses:
+          type: array
+          items:
+            $ref: '#/components/schemas/PassageVerse'
+        available_translations:
+          type: array
+          items:
+            type: string
+      required:
+      - available_translations
+      - combined_marked_text
+      - reference
+      - text
+      - translation
+      - verses
+    VerseSermonItem:
+      type: object
+      properties:
+        sermon_id:
+          type: integer
+        title:
+          type: string
+        preached_on:
+          type: string
+          format: date
+          nullable: true
+        speaker_name:
+          type: string
+        series_name:
+          type: string
+        reference:
+          type: string
+        context_note:
+          type: string
+        start_verse_id:
+          type: integer
+        end_verse_id:
+          type: integer
+      required:
+      - context_note
+      - end_verse_id
+      - reference
+      - series_name
+      - sermon_id
+      - speaker_name
+      - start_verse_id
+      - title
+    VerseSermonResponse:
+      type: object
+      properties:
+        reference:
+          type: string
+        sermons:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerseSermonItem'
+      required:
+      - reference
+      - sermons
   securitySchemes:
     basicAuth:
       type: http

@@ -127,7 +127,7 @@ class VersePassageView(APIView):
                                 "translation": serializers.CharField(),
                                 "notes": serializers.CharField(allow_null=True, required=False),
                             },
-                        )()
+                        )
                     ),
                     "available_translations": serializers.ListSerializer(
                         child=serializers.CharField()
@@ -164,7 +164,7 @@ class VersePassageView(APIView):
         combined_text, _ = join_passage_text(verses, verse_lookup)
         combined_marked_text, _ = join_passage_text(verses, verse_marked_lookup)
 
-        notes_by_vid = {}
+        notes_by_vid: dict[int, str] = {}
         for note in VerseNote.objects.filter(verse__in=verses).order_by("created_at"):
             if note.note_md:
                 notes_by_vid.setdefault(note.verse.verse_id, note.note_md)
@@ -233,10 +233,10 @@ class VerseCrossReferenceView(APIView):
                                             "to_end_id": serializers.IntegerField(),
                                             "preview_text": serializers.CharField(),
                                         },
-                                    )()
+                                    )
                                 ),
                             },
-                        )()
+                        )
                     ),
                 },
             ),
@@ -322,7 +322,7 @@ class VerseCommentaryView(APIView):
                                         "chapter": serializers.IntegerField(),
                                         "verse": serializers.IntegerField(),
                                     },
-                                )(),
+                                ),
                                 "end": inline_serializer(
                                     name="CommentaryEnd",
                                     fields={
@@ -330,9 +330,9 @@ class VerseCommentaryView(APIView):
                                         "chapter": serializers.IntegerField(),
                                         "verse": serializers.IntegerField(),
                                     },
-                                )(),
+                                ),
                             },
-                        )()
+                        )
                     ),
                 },
             ),

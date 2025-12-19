@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from django.db.models import F
 from django.db.models.functions import Coalesce
@@ -20,6 +20,7 @@ _markdown_renderer = Markdown(extras=['fenced-code-blocks', 'tables'])
 
 _SUPERSCRIPT_DIGIT_RE = re.compile(r'[\u2070\u00B9\u00B2\u00B3\u2074-\u2079]')
 _SUPERSCRIPT_SPAN_RE = re.compile(r'<span[^>]*class="sup"[^>]*>.*?</span>', re.IGNORECASE)
+SortKey = Tuple[int | float, ...]
 
 
 def render_markdown(text: Optional[str]) -> str:
@@ -117,7 +118,12 @@ def build_related_sermons(
     return _serialize_related_passages(back_params, query_start, query_end, passages)
 
 
-def _serialize_related_passages(back_params, query_start, query_end, passages):
+def _serialize_related_passages(
+    back_params: Mapping[str, str],
+    query_start: int,
+    query_end: int,
+    passages: Sequence[SermonPassage],
+) -> List[Mapping[str, object]]:
     if not query_start or not query_end or not passages:
         return []
 
@@ -125,19 +131,22 @@ def _serialize_related_passages(back_params, query_start, query_end, passages):
     query_length = (query_end - query_start) + 1
     is_single = query_start == query_end
 
-    serialized: List = []
+    serialized: List[Tuple[SortKey, Mapping[str, object]]] = []
 
     for passage in passages:
         sermon = passage.sermon
-        start_id = getattr(passage, 'start_id', None)
+        start_id: int | None = getattr(passage, 'start_id', None)
         if start_id is None:
-            start_id = getattr(passage, 'start_verse_id', None) or passage.start_verse.verse_id
-        end_id = getattr(passage, 'end_id', None)
+            start_id_attr: int | None = getattr(passage, 'start_verse_id', None)
+            start_id = start_id_attr if start_id_attr is not None else passage.start_verse.verse_id
+        end_id: int | None = getattr(passage, 'end_id', None)
         if end_id is None:
-            if passage.end_verse_id:
+            if passage.end_verse_id and passage.end_verse is not None:
                 end_id = passage.end_verse.verse_id
             else:
                 end_id = start_id
+
+        assert start_id is not None and end_id is not None
 
         length = (end_id - start_id) + 1
 
@@ -149,7 +158,7 @@ def _serialize_related_passages(back_params, query_start, query_end, passages):
 
         display_text = passage.ref_text or passage.ref_display()
 
-        payload = {
+        payload: Dict[str, object] = {
             'sermon': sermon,
             'ref_text': display_text,
             'context_note': passage.context_note or '',
@@ -160,10 +169,12 @@ def _serialize_related_passages(back_params, query_start, query_end, passages):
             is_exact = start_id == query_start and end_id == query_end
             boundary_distance = abs(start_id - query_start) + abs(end_id - query_end)
             date_key = -sermon.preached_on.toordinal() if sermon.preached_on else float('inf')
-            sort_key = (
+            sort_key: SortKey = (
                 0 if is_exact else 1,
                 length,
                 boundary_distance,
+                boundary_distance,
+                0,
                 date_key,
                 -sermon.pk,
             )

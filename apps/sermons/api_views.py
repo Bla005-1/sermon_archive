@@ -1,6 +1,7 @@
 import logging
 import os
 
+from django.db.models import QuerySet
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
@@ -47,17 +48,14 @@ class SermonViewSet(viewsets.ModelViewSet):
     serializer_class = SermonSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "sermon_id"
+    queryset = Sermon.objects.all()
 
-    def get_queryset(self):
-        sermons = (
-            Sermon.objects.all()
-            .prefetch_related(
-                "attachments",
-                "passages__start_verse__book",
-                "passages__end_verse__book",
-            )
-            .order_by("-preached_on", "-sermon_id")
-        )
+    def get_queryset(self) -> QuerySet[Sermon]:
+        sermons: QuerySet[Sermon] = self.queryset.prefetch_related(
+            "attachments",
+            "passages__start_verse__book",
+            "passages__end_verse__book",
+        ).order_by("-preached_on", "-sermon_id")
         query = self.request.query_params.get("q", "").strip()
         if query:
             sermons = sermons.filter(title__icontains=query)
@@ -69,7 +67,7 @@ class SermonPassageListCreateView(ListCreateAPIView):
     serializer_class = SermonPassageSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[SermonPassage]:
         return (
             SermonPassage.objects.filter(sermon_id=self.kwargs["sermon_id"])
             .select_related("sermon", "start_verse__book", "end_verse__book")
@@ -113,7 +111,7 @@ class SermonPassageDetailView(RetrieveUpdateDestroyAPIView):
     serializer_class = SermonPassageSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[SermonPassage]:
         return (
             SermonPassage.objects.filter(sermon_id=self.kwargs["sermon_id"])
             .select_related("sermon", "start_verse__book", "end_verse__book")
@@ -139,7 +137,7 @@ class AttachmentListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Attachment]:
         return Attachment.objects.filter(sermon_id=self.kwargs["sermon_id"]).order_by(
             "-created_at"
         )
@@ -172,7 +170,7 @@ class AttachmentDetailView(RetrieveDestroyAPIView):
     serializer_class = AttachmentSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Attachment]:
         return Attachment.objects.filter(sermon_id=self.kwargs["sermon_id"])
 
     def perform_destroy(self, instance):
