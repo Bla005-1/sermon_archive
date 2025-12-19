@@ -19,7 +19,7 @@ class AttachmentStorageTests(SimpleTestCase):
     def test_save_attachment_file_respects_configured_root(self):
         with TemporaryDirectory() as tmpdir, override_settings(SERMON_STORAGE_ROOT=tmpdir):
             uploaded = SimpleUploadedFile('notes.txt', b'hello world')
-            sermon = SimpleNamespace(preached_on=date(2024, 1, 7), id=42)
+            sermon = SimpleNamespace(preached_on=date(2024, 1, 7), sermon_id=42)
 
             rel_path, meta = storage.save_attachment_file(sermon, uploaded)
             abs_path = os.path.join(tmpdir, rel_path)
@@ -28,3 +28,11 @@ class AttachmentStorageTests(SimpleTestCase):
             self.assertFalse(os.path.isabs(rel_path))
             self.assertEqual(meta['byte_size'], len(b'hello world'))
             self.assertEqual(meta['mime_type'], 'text/plain')
+
+    def test_resolve_attachment_path_protects_against_escape(self):
+        with TemporaryDirectory() as tmpdir, override_settings(SERMON_STORAGE_ROOT=tmpdir):
+            allowed = storage.resolve_attachment_path('2024/1/file.txt')
+            self.assertTrue(allowed.startswith(os.path.abspath(tmpdir)))
+
+            with self.assertRaises(storage.AttachmentStorageError):
+                storage.resolve_attachment_path('../outside/file.txt')

@@ -14,7 +14,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 if not apps.ready:
     django.setup()
 
-from apps.sermons import views  # noqa: E402  pylint: disable=wrong-import-position
+from apps.sermons import api_views  # noqa: E402  pylint: disable=wrong-import-position
 
 
 class _DummyUser(SimpleNamespace):
