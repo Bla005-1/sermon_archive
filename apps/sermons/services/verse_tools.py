@@ -5,7 +5,7 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from django.db.models import F
 from django.db.models.functions import Coalesce
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.db import transaction
 
@@ -36,6 +36,7 @@ def strip_superscripts(text: str) -> str:
         return ''
     cleaned = _SUPERSCRIPT_SPAN_RE.sub(' ', text)
     cleaned = _SUPERSCRIPT_DIGIT_RE.sub(' ', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned)
     return cleaned
 
 
@@ -150,7 +151,10 @@ def _serialize_related_passages(
 
         length = (end_id - start_id) + 1
 
-        detail_url = reverse('sermon_detail', kwargs={'pk': sermon.pk})
+        try:
+            detail_url = reverse('sermon_detail', kwargs={'pk': sermon.pk})
+        except NoReverseMatch:
+            detail_url = f'/sermons/{sermon.pk}'
         if back_params:
             from urllib.parse import urlencode
 

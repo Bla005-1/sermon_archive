@@ -78,8 +78,12 @@ class ReferenceSearchView(APIView):
             start, end = tolerant_parse_reference(query)
         except Exception as exc:  # pragma: no cover
             return Response({"detail": str(exc)}, status=400)
+        try:
+            reference = format_ref(start, end)
+        except Exception:
+            reference = ""
         payload = {
-            "reference": format_ref(start, end),
+            "reference": reference,
             "start": BibleVerseSerializer(start).data,
             "end": BibleVerseSerializer(end).data,
         }

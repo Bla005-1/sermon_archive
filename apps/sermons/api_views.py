@@ -1,9 +1,10 @@
 import logging
 import os
 
+from django.contrib import messages
 from django.db.models import QuerySet
-from django.http import FileResponse, Http404
-from django.shortcuts import get_object_or_404
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status, viewsets
 from rest_framework.generics import (
@@ -17,8 +18,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 
+from apps.bible.models import BibleBook, BibleVerse
 from apps.bible.utils.reference_parser import tolerant_parse_reference
-from .models import Attachment, Sermon, SermonPassage
+from .models import Attachment, BibleWidgetVerse, Sermon, SermonPassage
 from .serializers import AttachmentSerializer, SermonPassageSerializer, SermonSerializer
 from .services.attachments import (
     AttachmentPersistenceError,
@@ -26,6 +28,8 @@ from .services.attachments import (
     delete_attachment,
     upload_attachment,
 )
+from .services import bible_widget as bible_widget_service
+from .services import verse_tools as verse_tool_service
 from .storage import AttachmentStorageError, resolve_attachment_path
 
 logger = logging.getLogger(__name__)
@@ -178,12 +182,101 @@ class AttachmentDetailView(RetrieveDestroyAPIView):
         logger.info("Deleted attachment %s from sermon %s", instance.pk, instance.sermon_id)
 
 
+def _load_passage_context(reference: str, translation: str):
+    return verse_tool_service.load_passage_context(reference, forced_translation=translation)
+
+
+def _build_related_sermons(reference_text: str, translation: str, start_verse_id: int, end_verse_id: int):
+    return verse_tool_service.build_related_sermons(reference_text, translation, start_verse_id, end_verse_id)
+
+
+def verse_tools(request):
+    reference = (request.POST.get("reference") or "").strip()
+    translation = (request.POST.get("selected_translation") or "").strip()
+    form_action = request.POST.get("form_action") or ""
+
+    context, error = _load_passage_context(reference, translation)
+    if error:
+        messages.error(request, error)
+        return HttpResponse(status=400)
+
+    context["related_sermons"] = _build_related_sermons(
+        reference, translation, context.get("start_verse_id") or 0, context.get("end_verse_id") or 0
+    )
+
+    if form_action == "add_to_widget":
+        if context.get("start_verse_id") != context.get("end_verse_id") or context.get("cross_references", {}).get(
+            "is_passage"
+        ):
+            messages.error(request, "Please select a single verse before adding to the widget.")
+            return HttpResponse(status=200)
+
+        start_verse = get_object_or_404(BibleVerse, pk=context["start_verse_id"])
+        end_verse = start_verse
+        if context.get("end_verse_id"):
+            end_verse = get_object_or_404(BibleVerse, pk=context["end_verse_id"])
+        display_payload = context.get("translation_display_payload") or {}
+        display_text = (display_payload.get(translation) or "").strip()
+
+        created_entry, _ = BibleWidgetVerse.objects.update_or_create(
+            start_verse=start_verse,
+            end_verse=end_verse,
+            defaults={
+                "translation": translation,
+                "ref": context.get("heading") or reference,
+                "display_text": display_text,
+            },
+        )
+        messages.success(request, "Added verse to the BibleWidget.")
+        if len(display_text) > 155:
+            messages.warning(request, "Display text is long; only the first 155 characters may be visible.")
+        logger.debug("Added verse %s to widget as entry %s", reference, getattr(created_entry, "pk", None))
+        return HttpResponse(status=200)
+
+    return HttpResponse(status=200)
+
+
+def bible_widget_list(request):
+    action = request.POST.get("action")
+    entry_id = request.POST.get("entry_id") or request.POST.get("id")
+
+    if not entry_id:
+        return redirect("/verses/widget")
+
+    entry = get_object_or_404(BibleWidgetVerse, pk=entry_id)
+
+    if action == "weight_up":
+        bible_widget_service.adjust_weight(entry, 1)
+        messages.success(request, f"Increased weight for {entry.ref}.")
+    elif action == "weight_down":
+        if entry.weight <= 1:
+            messages.info(request, "Weight is already at the minimum value of 1.")
+            return HttpResponseRedirect("/verses/widget")
+        bible_widget_service.adjust_weight(entry, -1)
+        messages.success(request, f"Decreased weight for {entry.ref}.")
+    elif action == "update_text":
+        display_text = (request.POST.get("display_text") or "").strip()
+        entry.display_text = display_text
+        entry.save(update_fields=["display_text"])
+        messages.success(request, f"Updated display text for {entry.ref}.")
+    elif action == "delete":
+        bible_widget_service.delete_entry(entry)
+        messages.success(request, f"Deleted {entry.ref} from the BibleWidget.")
+
+    return HttpResponseRedirect("/verses/widget")
+
+
 class AttachmentDownloadView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def handle_exception(self, exc):
+        if isinstance(exc, Http404):
+            raise exc
+        return super().handle_exception(exc)
+
     def get(self, request, sermon_id: int, pk: int):
         sermon = get_object_or_404(Sermon, pk=sermon_id)
-        attachment = get_object_or_404(sermon.attachments, pk=pk)
+        attachment = get_object_or_404(Attachment, pk=pk, sermon_id=sermon_id)
         try:
             abs_path = resolve_attachment_path(attachment.rel_path)
         except AttachmentStorageError as exc:

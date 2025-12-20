@@ -249,7 +249,6 @@ class SermonPassage(models.Model):
 # Bible widget tables
 # ----------------------------
 
-
 class BibleWidgetVerse(models.Model):
     id = models.BigAutoField(primary_key=True)
 
@@ -284,11 +283,11 @@ class BibleWidgetVerse(models.Model):
                 name='uq_widget_passage_tr'
             ),
             models.CheckConstraint(
-                check=models.Q(start_verse__lte=models.F('end_verse')),
+                condition=models.Q(start_verse__lte=models.F('end_verse')),
                 name='chk_start_le_end'
             ),
         ]
 
     def __str__(self):
         return f'{self.ref} ({self.translation})'
-    
+

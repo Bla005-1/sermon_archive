@@ -5,8 +5,8 @@ from typing import Tuple
 from django.core.files.uploadedfile import UploadedFile
 from django.db import DatabaseError
 
+from .. import storage
 from ..models import Attachment, Sermon
-from ..storage import AttachmentStorageError, save_attachment_file
 
 
 class AttachmentServiceError(Exception):
@@ -19,8 +19,8 @@ class AttachmentPersistenceError(AttachmentServiceError):
 
 def upload_attachment(sermon: Sermon, file: UploadedFile) -> Tuple[Attachment, dict]:
     try:
-        rel_path, meta = save_attachment_file(sermon, file)
-    except AttachmentStorageError as exc:
+        rel_path, meta = storage.save_attachment_file(sermon, file)
+    except storage.AttachmentStorageError as exc:
         raise AttachmentServiceError(str(exc)) from exc
 
     try:

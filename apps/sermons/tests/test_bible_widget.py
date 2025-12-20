@@ -16,6 +16,8 @@ if not apps.ready:
 
 from apps.sermons import api_views  # noqa: E402  pylint: disable=wrong-import-position
 
+views = api_views
+
 
 class _DummyUser(SimpleNamespace):
     def __str__(self):  # pragma: no cover - simple string helper

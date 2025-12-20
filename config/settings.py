@@ -177,6 +177,8 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema'
 }
 
+SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
+
 LOG_LEVEL = os.getenv('DJANGO_LOG_LEVEL', 'INFO').upper()
 
 LOGGING = {
