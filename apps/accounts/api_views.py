@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils.decorators import method_decorator
@@ -42,12 +43,16 @@ class LogoutView(APIView):
 
 
 class RefreshView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [SessionAuthentication]
 
     def get(self, request):
         base_request = getattr(request, "_request", request)
         user = getattr(base_request, "user", None) or request.user
+
+        if not user or not getattr(user, "is_authenticated", False):
+            return Response({"detail": _("Authentication credentials were not provided.")}, status=status.HTTP_401_UNAUTHORIZED)
+
         return Response(UserSerializer(user).data)
 
 
