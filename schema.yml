@@ -123,6 +123,18 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/auth/csrf/:
+    get:
+      operationId: auth_csrf_retrieve
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
   /api/auth/login/:
     post:
       operationId: auth_login_create
@@ -154,6 +166,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           description: No response body
@@ -163,8 +176,6 @@ paths:
       tags:
       - auth
       security:
-      - cookieAuth: []
-      - basicAuth: []
       - {}
       responses:
         '200':
@@ -318,13 +329,44 @@ paths:
   /api/search/:
     get:
       operationId: search_retrieve
-      description: Search sermons by title.
+      description: Full-text Bible verse search with pagination and optional filters.
       parameters:
+      - in: query
+        name: book
+        schema:
+          type: string
+        description: Restrict results to a specific Bible book.
+      - in: query
+        name: chapter
+        schema:
+          type: integer
+        description: Restrict results to a specific chapter within the selected book.
+      - in: query
+        name: exact
+        schema:
+          type: boolean
+        description: If true, only return verses containing the exact query string.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Result page to return (1-indexed).
       - in: query
         name: q
         schema:
           type: string
-        description: Full or partial sermon title to search for.
+        description: Free-text query to search for within verse text.
+        required: true
+      - in: query
+        name: testament
+        schema:
+          type: string
+        description: Restrict results to OT or NT.
+      - in: query
+        name: translation
+        schema:
+          type: string
+        description: Translation code to search within (defaults to ESV).
       tags:
       - search
       security:
@@ -335,8 +377,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SermonSearchResponse'
+                $ref: '#/components/schemas/VerseSearchResponse'
           description: ''
+        '400':
+          description: Missing or invalid query.
   /api/search/ref/:
     get:
       operationId: search_ref_retrieve
@@ -362,6 +406,28 @@ paths:
           description: ''
         '400':
           description: The provided reference could not be parsed.
+  /api/search/sermons/:
+    get:
+      operationId: search_sermons_retrieve
+      description: Search sermons by title.
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Full or partial sermon title to search for.
+      tags:
+      - search
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SermonSearchResponse'
+          description: ''
   /api/sermons/:
     get:
       operationId: sermons_list
@@ -915,12 +981,15 @@ paths:
     get:
       operationId: verses_retrieve
       description: Retrieve a passage with verse text, notes, and available translations.
+        If the provided query is not a Bible reference, a lightweight intent payload
+        is returned instead of performing any lookup.
       parameters:
       - in: query
-        name: ref
+        name: query
         schema:
           type: string
-        description: Bible reference such as "John 3:16-18" or "Psalm 23".
+        description: Bible reference such as "John 3:16-18" or "Psalm 23". Also accepts
+          "ref" for backwards compatibility.
         required: true
       - in: query
         name: translation
@@ -937,10 +1006,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VersePassageResponse'
+                $ref: '#/components/schemas/VerseIntentResponse'
           description: ''
         '400':
-          description: Missing or invalid reference.
+          description: Missing reference.
   /api/verses/commentaries/:
     get:
       operationId: verses_commentaries_retrieve
@@ -1563,34 +1632,6 @@ components:
       - cross_references
       - verse
       - verse_id
-    PassageVerse:
-      type: object
-      properties:
-        verse_id:
-          type: integer
-        book:
-          type: string
-        chapter:
-          type: integer
-        verse:
-          type: integer
-        text:
-          type: string
-        marked_text:
-          type: string
-        translation:
-          type: string
-        notes:
-          type: string
-          nullable: true
-      required:
-      - book
-      - chapter
-      - marked_text
-      - text
-      - translation
-      - verse
-      - verse_id
     PatchedAttachment:
       type: object
       properties:
@@ -1929,6 +1970,21 @@ components:
       required:
       - reference
       - verses
+    VerseIntentResponse:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/VerseIntentResponseTypeEnum'
+        query:
+          type: string
+      required:
+      - query
+      - type
+    VerseIntentResponseTypeEnum:
+      enum:
+      - text
+      type: string
+      description: '* `text` - text'
     VerseNote:
       type: object
       properties:
@@ -1961,32 +2017,60 @@ components:
       - updated_at
       - verse
       - verse_id
-    VersePassageResponse:
+    VerseSearchResponse:
       type: object
       properties:
+        type:
+          $ref: '#/components/schemas/VerseSearchResponseTypeEnum'
+        query:
+          type: string
+        page:
+          type: integer
+        total:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerseSearchResult'
+      required:
+      - page
+      - query
+      - results
+      - total
+      - type
+    VerseSearchResponseTypeEnum:
+      enum:
+      - text_results
+      type: string
+      description: '* `text_results` - text_results'
+    VerseSearchResult:
+      type: object
+      properties:
+        order_num:
+          type: integer
+        verse_id:
+          type: integer
         reference:
           type: string
+        book:
+          type: string
+        chapter:
+          type: integer
+        verse:
+          type: integer
         translation:
           type: string
         text:
           type: string
-        combined_marked_text:
-          type: string
-        verses:
-          type: array
-          items:
-            $ref: '#/components/schemas/PassageVerse'
-        available_translations:
-          type: array
-          items:
-            type: string
       required:
-      - available_translations
-      - combined_marked_text
+      - book
+      - chapter
+      - order_num
       - reference
       - text
       - translation
-      - verses
+      - verse
+      - verse_id
     VerseSermonItem:
       type: object
       properties:

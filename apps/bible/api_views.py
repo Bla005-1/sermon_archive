@@ -89,13 +89,14 @@ class VersePassageView(APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        description="Retrieve a passage with verse text, notes, and available translations.",
+        description="Retrieve a passage with verse text, notes, and available translations. "
+        "If the provided query is not a Bible reference, a lightweight intent payload is returned instead of performing any lookup.",
         parameters=[
             OpenApiParameter(
-                name="ref",
+                name="query",
                 type=str,
                 location=OpenApiParameter.QUERY,
-                description='Bible reference such as "John 3:16-18" or "Psalm 23".',
+                description='Bible reference such as "John 3:16-18" or "Psalm 23". Also accepts "ref" for backwards compatibility.',
                 required=True,
             ),
             OpenApiParameter(
@@ -110,6 +111,7 @@ class VersePassageView(APIView):
             200: inline_serializer(
                 name="VersePassageResponse",
                 fields={
+                    "type": serializers.ChoiceField(choices=["reference"]),
                     "reference": serializers.CharField(),
                     "translation": serializers.CharField(),
                     "text": serializers.CharField(),
@@ -134,20 +136,33 @@ class VersePassageView(APIView):
                     ),
                 },
             ),
-            400: OpenApiResponse(description="Missing or invalid reference."),
+            200: inline_serializer(
+                name="VerseIntentResponse",
+                fields={
+                    "type": serializers.ChoiceField(choices=["text"]),
+                    "query": serializers.CharField(),
+                },
+            ),
+            400: OpenApiResponse(description="Missing reference."),
         },
     )
     def get(self, request):
-        reference = (request.query_params.get("ref") or "").strip()
+        reference = (
+            request.query_params.get("query")
+            or request.query_params.get("ref")
+            or ""
+        ).strip()
         translation_hint = (request.query_params.get("translation") or "ESV").strip()
         if not reference:
             return Response(
-                {"detail": "Provide a reference in the 'ref' query param."},
+                {"detail": "Provide a reference in the 'query' query param."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             start, end = _parse_reference(reference)
+        except ValueError:
+            return Response({"type": "text", "query": reference})
         except Exception as e:
             return Response({"detail": e}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -185,6 +200,7 @@ class VersePassageView(APIView):
         available_translations = [name.upper() for name in available_translations]
         return Response(
             {
+                "type": "reference",
                 "reference": format_ref(start, end),
                 "translation": selected_translation,
                 "text": combined_text,
