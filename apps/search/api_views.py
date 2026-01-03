@@ -4,7 +4,10 @@ from drf_spectacular.utils import (
     extend_schema,
     inline_serializer,
 )
-from django.db.models import Case, IntegerField, Value, When
+from django.db.models import Case, IntegerField, Value, When, F
+from django.db.models.functions import RowNumber
+from django.db.models.expressions import Window
+
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -133,7 +136,7 @@ class VerseSearchView(APIView):
         if not query:
             return Response({"detail": "Provide a search query in the 'q' query param."}, status=400)
 
-        translation = (request.query_params.get("translation") or "ESV").strip()
+        translation = (request.query_params.get("translation") or "").strip()
         page_raw = request.query_params.get("page") or "1"
         try:
             page = max(int(page_raw), 1)
@@ -180,6 +183,11 @@ class VerseSearchView(APIView):
                 default=Value(0),
                 output_field=IntegerField(),
             ),
+            esv_preference=Case(
+                When(translation__iexact="ESV", then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            ),
             match_count=sum(match_components, match_baseline) if match_components else match_baseline,
         ).order_by(
             "-starts_with",
@@ -188,7 +196,19 @@ class VerseSearchView(APIView):
             "verse__chapter",
             "verse__verse",
         )
-
+        if not translation:
+            qs = qs.annotate(
+                row_number=Window(
+                    expression=RowNumber(),
+                    partition_by=[F("verse_id")],
+                    order_by=[
+                        F("starts_with").desc(),
+                        F("match_count").desc(),
+                        F("esv_preference").desc(),  # ← ESV wins ties
+                    ],
+                )
+            ).filter(row_number=1)
+            
         total = qs.count()
         offset = (page - 1) * page_size
         results = list(qs[offset : offset + page_size])
