@@ -1,3 +1,6 @@
+import re
+from typing import Iterable, List, Optional, Tuple
+
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -5,6 +8,7 @@ from drf_spectacular.utils import (
     inline_serializer,
 )
 from django.db.models import Case, IntegerField, Value, When, F
+from django.db.models import Q
 from django.db.models.functions import RowNumber
 from django.db.models.expressions import Window
 
@@ -162,56 +166,83 @@ class VerseSearchView(APIView):
         if chapter is not None:
             qs = qs.filter(verse__chapter=chapter)
 
-        search_terms = [query] if exact else [term for term in query.split() if term]
-        if not search_terms:
-            return Response({"detail": "Provide a non-empty search query."}, status=400)
-        for term in search_terms:
-            qs = qs.filter(plain_text__icontains=term)
-
-        match_components = [
-            Case(
-                When(plain_text__icontains=term, then=Value(1)),
-                default=Value(0),
-                output_field=IntegerField(),
-            )
-            for term in search_terms
-        ]
-        match_baseline = Value(0, output_field=IntegerField())
-        qs = qs.annotate(
-            starts_with=Case(
-                When(plain_text__istartswith=query, then=Value(1)),
-                default=Value(0),
-                output_field=IntegerField(),
-            ),
-            esv_preference=Case(
-                When(translation__iexact="ESV", then=Value(1)),
-                default=Value(0),
-                output_field=IntegerField(),
-            ),
-            match_count=sum(match_components, match_baseline) if match_components else match_baseline,
-        ).order_by(
-            "-starts_with",
-            "-match_count",
-            "verse__book__order_num",
-            "verse__chapter",
-            "verse__verse",
-        )
-        if not translation:
-            qs = qs.annotate(
-                row_number=Window(
-                    expression=RowNumber(),
-                    partition_by=[F("verse_id")],
-                    order_by=[
-                        F("starts_with").desc(),
-                        F("match_count").desc(),
-                        F("esv_preference").desc(),  # ← ESV wins ties
-                    ],
-                )
-            ).filter(row_number=1)
-            
-        total = qs.count()
+        results: List[VerseText]
         offset = (page - 1) * page_size
-        results = list(qs[offset : offset + page_size])
+        if exact:
+            qs = qs.filter(plain_text__icontains=query)
+            match_components = [
+                Case(
+                    When(plain_text__icontains=query, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            ]
+            match_baseline = Value(0, output_field=IntegerField())
+            qs = qs.annotate(
+                starts_with=Case(
+                    When(plain_text__istartswith=query, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                ),
+                esv_preference=Case(
+                    When(translation__iexact="ESV", then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                ),
+                match_count=sum(match_components, match_baseline),
+            ).order_by(
+                "-starts_with",
+                "-match_count",
+                "verse__book__order_num",
+                "verse__chapter",
+                "verse__verse",
+            )
+            if not translation:
+                qs = qs.annotate(
+                    row_number=Window(
+                        expression=RowNumber(),
+                        partition_by=[F("verse_id")],
+                        order_by=[
+                            F("starts_with").desc(),
+                            F("match_count").desc(),
+                            F("esv_preference").desc(),  # ← ESV wins ties
+                        ],
+                    )
+                ).filter(row_number=1)
+            total = qs.count()
+            results = list(qs[offset : offset + page_size])
+        else:
+            search_terms = self._tokenize_search_terms(query)
+            print(search_terms)
+            if not search_terms:
+                return Response({"detail": "Provide a non-empty search query."}, status=400)
+            word_boundary_filters = Q()
+            for term in search_terms:
+                pattern = rf"(^|\W){re.escape(term)}(\W|$)"
+                word_boundary_filters |= Q(plain_text__iregex=pattern)
+            qs = qs.filter(word_boundary_filters)
+            scored_rows: List[Tuple[Tuple[int, int, int], VerseText]] = []
+            for row in qs:
+                score = self._score_flexible_match(row.plain_text, search_terms)
+                if score is None:
+                    continue
+                scored_rows.append((score, row))
+            scored_rows.sort(
+                key=lambda item: self._flexible_sort_key(
+                    item[0], item[1], bool(translation)
+                ),
+                reverse=True,
+            )
+            ordered_rows: List[VerseText] = []
+            seen_verses = set()
+            for _, row in scored_rows:
+                if not translation:
+                    if row.verse.verse_id in seen_verses:
+                        continue
+                    seen_verses.add(row.verse.verse_id)
+                ordered_rows.append(row)
+            total = len(ordered_rows)
+            results = ordered_rows[offset : offset + page_size]
 
         payload = {
             "type": "text_results",
@@ -237,6 +268,59 @@ class VerseSearchView(APIView):
             )
 
         return Response(payload)
+
+    @staticmethod
+    def _tokenize_search_terms(query: str) -> List[str]:
+        return re.findall(r"[\w']+", query.lower())
+
+    @staticmethod
+    def _score_flexible_match(text: str, terms: Iterable[str]) -> Optional[Tuple[int, int, int]]:
+        term_list = list(terms)
+        if not term_list:
+            return None
+        term_set = set(term_list)
+        tokens = re.findall(r"[\w']+", text.lower())
+        term_positions = {term: [] for term in term_set}
+        for idx, token in enumerate(tokens):
+            if token in term_set:
+                term_positions[token].append(idx)
+        matched_terms = sum(1 for positions in term_positions.values() if positions)
+        if matched_terms == 0:
+            return None
+        ordered_positions: List[int] = []
+        last_index = -1
+        for term in term_list:
+            next_positions = [pos for pos in term_positions.get(term, []) if pos > last_index]
+            if not next_positions:
+                ordered_positions = []
+                break
+            chosen = next_positions[0]
+            ordered_positions.append(chosen)
+            last_index = chosen
+        order_match = 1 if ordered_positions and len(ordered_positions) == len(term_list) else 0
+        if order_match:
+            span = ordered_positions[-1] - ordered_positions[0]
+        else:
+            present_positions = [pos for positions in term_positions.values() for pos in positions]
+            span = max(present_positions) - min(present_positions) if len(present_positions) > 1 else 0
+        proximity = -span
+        return matched_terms, order_match, proximity
+
+    @staticmethod
+    def _flexible_sort_key(score: Tuple[int, int, int], row: VerseText, has_translation_filter: bool):
+        matched_terms, order_match, proximity = score
+        verse = row.verse
+        translation = (row.translation or "").upper()
+        esv_preference = 1 if not has_translation_filter and translation == "ESV" else 0
+        return (
+            matched_terms,
+            order_match,
+            proximity,
+            esv_preference,
+            -verse.book.order_num,
+            -verse.chapter,
+            -verse.verse,
+        )
 
 
 class ReferenceSearchView(APIView):

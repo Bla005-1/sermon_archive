@@ -90,8 +90,11 @@ class DummyQuerySet(list):
         self.annotations = {}
         self.ordering = ()
 
-    def filter(self, **kwargs):
-        self.filters.append(kwargs)
+    def filter(self, *args, **kwargs):
+        if args:
+            self.filters.extend(args)
+        if kwargs:
+            self.filters.append(kwargs)
         return self
 
     def annotate(self, **kwargs):
@@ -151,3 +154,45 @@ def test_verse_search_returns_ranked_results():
         "translation": "ESV",
         "text": "For God so loved the world",
     }
+
+
+def test_flexible_search_skips_substring_only_matches():
+    book = SimpleNamespace(name="Psalms", order_num=19, testament="OT")
+    verse = SimpleNamespace(book=book, chapter=24, verse=4, verse_id=24004)
+    verse_text = SimpleNamespace(verse=verse, translation="ESV", plain_text="He who has clean hands and a pure heart")
+    verse_text_substring = SimpleNamespace(
+        verse=verse, translation="NIV", plain_text="Do not count me among the unclean or wicked"
+    )
+    manager = DummyManager([verse_text_substring, verse_text])
+
+    request = _auth_get("/api/search?q=clean&page=1")
+    with mock.patch.object(api_views.VerseText, "objects", manager):
+        response = api_views.VerseSearchView.as_view()(request)
+
+    assert response.status_code == 200
+    assert response.data["total"] == 1
+    assert response.data["results"][0]["text"] == "He who has clean hands and a pure heart"
+
+
+def test_flexible_search_ranks_by_term_coverage_and_proximity():
+    book = SimpleNamespace(name="John", order_num=43, testament="NT")
+    verse_a = SimpleNamespace(book=book, chapter=13, verse=34, verse_id=1334)
+    verse_b = SimpleNamespace(book=book, chapter=14, verse=15, verse_id=1415)
+    tight_match = SimpleNamespace(
+        verse=verse_a,
+        translation="ESV",
+        plain_text="love one another just as I have loved you",
+    )
+    sparse_match = SimpleNamespace(
+        verse=verse_b,
+        translation="ESV",
+        plain_text="If you love me, keep my commandments and love is shown by obedience",
+    )
+    manager = DummyManager([sparse_match, tight_match])
+
+    request = _auth_get("/api/search?q=love+one+another")
+    with mock.patch.object(api_views.VerseText, "objects", manager):
+        response = api_views.VerseSearchView.as_view()(request)
+
+    assert response.status_code == 200
+    assert response.data["results"][0]["text"] == "love one another just as I have loved you"
