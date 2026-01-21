@@ -176,7 +176,7 @@ paths:
       tags:
       - auth
       security:
-      - {}
+      - cookieAuth: []
       responses:
         '200':
           description: No response body
@@ -976,6 +976,18 @@ paths:
       - basicAuth: []
       responses:
         '204':
+          description: No response body
+  /api/sermons/suggestions/:
+    get:
+      operationId: sermons_suggestions_retrieve
+      description: Return distinct speaker, series, and location names for sermons.
+      tags:
+      - sermons
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
           description: No response body
   /api/verses/:
     get:

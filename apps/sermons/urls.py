@@ -8,6 +8,7 @@ from .api_views import (
     PassageDetailView,
     SermonPassageDetailView,
     SermonPassageListCreateView,
+    SermonSuggestionView,
     SermonViewSet,
 )
 
@@ -15,6 +16,7 @@ router = DefaultRouter()
 router.register("", SermonViewSet, basename="sermon")
 
 urlpatterns = [
+    path("suggestions/", SermonSuggestionView.as_view(), name="sermon-suggestions"),
     path("", include(router.urls)),
     path(
         "<int:sermon_id>/passages/",
@@ -42,4 +44,5 @@ urlpatterns = [
         AttachmentDownloadView.as_view(),
         name="attachment-download",
     ),
+    path("suggestions/", SermonSuggestionView.as_view(), name="sermon-suggestions"),
 ]

@@ -67,6 +67,43 @@ class SermonViewSet(viewsets.ModelViewSet):
         return sermons
 
 
+class SermonSuggestionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        description="Return distinct speaker, series, and location names for sermons.",
+    )
+    def get(self, request, *args, **kwargs):
+        speakers = (
+            Sermon.objects.exclude(speaker_name__isnull=True)
+            .exclude(speaker_name__exact="")
+            .order_by("speaker_name")
+            .values_list("speaker_name", flat=True)
+            .distinct()
+        )
+        series = (
+            Sermon.objects.exclude(series_name__isnull=True)
+            .exclude(series_name__exact="")
+            .order_by("series_name")
+            .values_list("series_name", flat=True)
+            .distinct()
+        )
+        locations = (
+            Sermon.objects.exclude(location_name__isnull=True)
+            .exclude(location_name__exact="")
+            .order_by("location_name")
+            .values_list("location_name", flat=True)
+            .distinct()
+        )
+        return Response(
+            {
+                "speakers": list(speakers),
+                "series": list(series),
+                "locations": list(locations),
+            }
+        )
+
+
 class SermonPassageListCreateView(ListCreateAPIView):
     serializer_class = SermonPassageSerializer
     permission_classes = [IsAuthenticated]

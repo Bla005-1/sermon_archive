@@ -170,3 +170,49 @@ CREATE TABLE IF NOT EXISTS commentaries (
   FOREIGN KEY (end_verse_id) REFERENCES bible_verses(verse_id)
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB;
+
+CREATE TABLE footnotes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  verse_id BIGINT UNSIGNED NOT NULL,
+  translation VARCHAR(16) NOT NULL,
+  order_in_translation INT NOT NULL,     -- corresponds to `o` from VERSION.json
+  word_index SMALLINT UNSIGNED NOT NULL, -- corresponds to `w`
+  footnote_label VARCHAR(8) NOT NULL,    -- a, b, c, etc.
+  footnote_text LONGTEXT NULL,            -- corresponds to `t`
+
+  -- Prevent accidental duplicates
+  UNIQUE KEY uq_footnote_location (
+    verse_id,
+    translation,
+    word_index,
+    footnote_label
+  ),
+
+  KEY idx_footnotes_translation (translation),
+  KEY idx_footnotes_verse (verse_id),
+
+  FOREIGN KEY (verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE footnote_cross_refs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  footnote_id BIGINT UNSIGNED NOT NULL,
+  to_start_verse_id BIGINT UNSIGNED NOT NULL,
+  to_end_verse_id BIGINT UNSIGNED DEFAULT NULL,
+
+  source_order_number INT DEFAULT NULL, -- number after `*` in JSON
+  reference_note VARCHAR(255),          -- optional parsed text if needed
+
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  KEY idx_crossref_footnote (footnote_id),
+  KEY idx_crossref_target_start (to_start_verse_id),
+  KEY idx_crossref_target_end (to_end_verse_id),
+
+  UNIQUE KEY uq_cross (footnote_id, to_start_verse_id, to_end_verse_id, source_order_number),
+  FOREIGN KEY (to_start_verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  FOREIGN KEY (to_end_verse_id) REFERENCES bible_verses(verse_id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB;
