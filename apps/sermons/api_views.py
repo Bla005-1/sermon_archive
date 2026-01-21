@@ -2,7 +2,7 @@ import logging
 import os
 
 from django.contrib import messages
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Max
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
@@ -75,26 +75,35 @@ class SermonSuggestionView(APIView):
     )
     def get(self, request, *args, **kwargs):
         speakers = (
-            Sermon.objects.exclude(speaker_name__isnull=True)
+            Sermon.objects
+            .exclude(speaker_name__isnull=True)
             .exclude(speaker_name__exact="")
-            .order_by("speaker_name")
+            .values("speaker_name")
+            .annotate(latest=Max("preached_on"))
+            .order_by("-latest")
             .values_list("speaker_name", flat=True)
-            .distinct()
         )
+
         series = (
-            Sermon.objects.exclude(series_name__isnull=True)
+            Sermon.objects
+            .exclude(series_name__isnull=True)
             .exclude(series_name__exact="")
-            .order_by("series_name")
+            .values("series_name")
+            .annotate(latest=Max("preached_on"))
+            .order_by("-latest")
             .values_list("series_name", flat=True)
-            .distinct()
         )
+
         locations = (
-            Sermon.objects.exclude(location_name__isnull=True)
+            Sermon.objects
+            .exclude(location_name__isnull=True)
             .exclude(location_name__exact="")
-            .order_by("location_name")
+            .values("location_name")
+            .annotate(latest=Max("preached_on"))
+            .order_by("-latest")
             .values_list("location_name", flat=True)
-            .distinct()
         )
+
         return Response(
             {
                 "speakers": list(speakers),
