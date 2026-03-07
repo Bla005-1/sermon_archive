@@ -5,6 +5,16 @@ from apps.bible.serializers import BibleVerseSerializer
 from apps.sermons.models import BibleWidgetVerse
 
 
+class BibleWidgetCreateSerializer(serializers.Serializer):
+    reference = serializers.CharField(max_length=64)
+    translation = serializers.CharField(max_length=16)
+    display_text = serializers.CharField(allow_blank=False)
+    verse_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+    )
+
+
 class BibleWidgetSerializer(serializers.ModelSerializer):
     start_verse = BibleVerseSerializer(read_only=True)
     end_verse = BibleVerseSerializer(read_only=True)
