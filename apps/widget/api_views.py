@@ -1,6 +1,6 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.sermons.models import BibleWidgetVerse
@@ -13,6 +13,11 @@ class BibleWidgetViewSet(viewsets.ModelViewSet):
     queryset = BibleWidgetVerse.objects.select_related(
         "start_verse__book", "end_verse__book"
     ).all()
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     @action(detail=False, methods=["post"], url_path="create")
     def create_widget(self, request):

@@ -1249,6 +1249,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -1299,6 +1300,7 @@ paths:
       security:
       - cookieAuth: []
       - basicAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -1388,6 +1390,33 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/widget/create/:
+    post:
+      operationId: widget_create_create
+      tags:
+      - widget
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BibleWidget'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BibleWidget'
+          description: ''
 components:
   schemas:
     Attachment:
