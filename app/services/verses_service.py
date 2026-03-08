@@ -36,7 +36,9 @@ from app.services._mappers import verse_note_schema
 from app.services._reference import format_ref, parse_reference
 
 
-def _load_verse_range(db: Session, start: BibleVerses, end: BibleVerses) -> Sequence[BibleVerses]:
+def _load_verse_range(
+    db: Session, start: BibleVerses, end: BibleVerses
+) -> Sequence[BibleVerses]:
     """Load all verses between start and end verse ids."""
     lo = min(start.verse_id, end.verse_id)
     hi = max(start.verse_id, end.verse_id)
@@ -67,7 +69,9 @@ def _preview_text_for_range(db: Session, start_id: int, end_id: int) -> str:
         if current.translation.upper() != "ESV" and row.translation.upper() == "ESV":
             chosen_by_verse[row.verse_id] = row
 
-    return " ".join(chosen_by_verse[key].plain_text for key in sorted(chosen_by_verse.keys())).strip()
+    return " ".join(
+        chosen_by_verse[key].plain_text for key in sorted(chosen_by_verse.keys())
+    ).strip()
 
 
 def get_passage_or_intent(
@@ -78,12 +82,16 @@ def get_passage_or_intent(
     """Return lightweight intent payload, normalizing references when parseable."""
     raw = (query or "").strip()
     if not raw:
-        raise HTTPException(status_code=400, detail="Provide a reference in the 'query' query param.")
+        raise HTTPException(
+            status_code=400, detail="Provide a reference in the 'query' query param."
+        )
 
     try:
         start, end = parse_reference(db, raw)
         normalized = format_ref(start, end)
-        return VerseIntentResponse(type=VerseIntentResponseTypeEnum.TEXT, query=normalized)
+        return VerseIntentResponse(
+            type=VerseIntentResponseTypeEnum.TEXT, query=normalized
+        )
     except ValueError:
         return VerseIntentResponse(type=VerseIntentResponseTypeEnum.TEXT, query=raw)
 
@@ -92,7 +100,9 @@ def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
     """Return commentary excerpts for verses resolved from a Bible reference."""
     reference = (ref or "").strip()
     if not reference:
-        raise HTTPException(status_code=400, detail="Provide a reference in the 'ref' query param.")
+        raise HTTPException(
+            status_code=400, detail="Provide a reference in the 'ref' query param."
+        )
 
     try:
         start, end = parse_reference(db, reference)
@@ -101,7 +111,9 @@ def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
 
     verses = _load_verse_range(db, start, end)
     if not verses:
-        return VerseCommentaryResponse(reference=format_ref(start, end), count=0, items=[])
+        return VerseCommentaryResponse(
+            reference=format_ref(start, end), count=0, items=[]
+        )
 
     lo = min(v.verse_id for v in verses)
     hi = max(v.verse_id for v in verses)
@@ -120,7 +132,11 @@ def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
             joinedload(Commentaries.end_verse).joinedload(BibleVerses.book),
             joinedload(Commentaries.book),
         )
-        .order_by(Commentaries.start_verse_id, Commentaries.end_verse_id, Commentaries.commentary_id)
+        .order_by(
+            Commentaries.start_verse_id,
+            Commentaries.end_verse_id,
+            Commentaries.commentary_id,
+        )
     ).all()
 
     items: list[CommentaryItem] = []
@@ -151,19 +167,27 @@ def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
                 source_title=row.source_title or "",
                 default_year=father.default_year if father else None,
                 wiki_url=father.wiki_url or "" if father else "",
-                start=CommentaryStart(book=start_v.book.name, chapter=start_v.chapter, verse=start_v.verse),
-                end=CommentaryEnd(book=end_v.book.name, chapter=end_v.chapter, verse=end_v.verse),
+                start=CommentaryStart(
+                    book=start_v.book.name, chapter=start_v.chapter, verse=start_v.verse
+                ),
+                end=CommentaryEnd(
+                    book=end_v.book.name, chapter=end_v.chapter, verse=end_v.verse
+                ),
             )
         )
 
-    return VerseCommentaryResponse(reference=format_ref(start, end), count=len(items), items=items)
+    return VerseCommentaryResponse(
+        reference=format_ref(start, end), count=len(items), items=items
+    )
 
 
 def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
     """Return verse-level outbound cross references for a resolved reference range."""
     reference = (ref or "").strip()
     if not reference:
-        raise HTTPException(status_code=400, detail="Provide a reference in the 'ref' query param.")
+        raise HTTPException(
+            status_code=400, detail="Provide a reference in the 'ref' query param."
+        )
 
     try:
         start, end = parse_reference(db, reference)
@@ -180,7 +204,9 @@ def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
             joinedload(VerseCrossrefs.to_start_verse).joinedload(BibleVerses.book),
             joinedload(VerseCrossrefs.to_end_verse).joinedload(BibleVerses.book),
         )
-        .order_by(VerseCrossrefs.from_verse_id, desc(VerseCrossrefs.votes), VerseCrossrefs.id)
+        .order_by(
+            VerseCrossrefs.from_verse_id, desc(VerseCrossrefs.votes), VerseCrossrefs.id
+        )
     ).all()
 
     by_from: dict[int, list[VerseCrossrefs]] = {vid: [] for vid in verse_ids}
@@ -200,7 +226,9 @@ def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
                     note=row.note or "",
                     to_start_id=to_start.verse_id,
                     to_end_id=to_end.verse_id,
-                    preview_text=_preview_text_for_range(db, to_start.verse_id, to_end.verse_id),
+                    preview_text=_preview_text_for_range(
+                        db, to_start.verse_id, to_end.verse_id
+                    ),
                 )
             )
 
@@ -214,7 +242,9 @@ def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
             )
         )
 
-    return VerseCrossReferencesResponse(reference=format_ref(start, end), verses=payload)
+    return VerseCrossReferencesResponse(
+        reference=format_ref(start, end), verses=payload
+    )
 
 
 def list_notes(db: Session, verse_id: int | None = None) -> list[VerseNote]:
@@ -235,7 +265,9 @@ def create_note(db: Session, payload: VerseNote) -> VerseNote:
     if payload.verse_id is None:
         raise HTTPException(status_code=400, detail="verse_id is required.")
 
-    verse_exists = db.scalar(select(BibleVerses.verse_id).where(BibleVerses.verse_id == payload.verse_id))
+    verse_exists = db.scalar(
+        select(BibleVerses.verse_id).where(BibleVerses.verse_id == payload.verse_id)
+    )
     if verse_exists is None:
         raise HTTPException(status_code=400, detail="verse_id is invalid.")
 
@@ -272,7 +304,9 @@ def update_note(db: Session, note_id: int, payload: VerseNote) -> VerseNote:
     if payload.verse_id is None:
         raise HTTPException(status_code=400, detail="verse_id is required.")
 
-    verse_exists = db.scalar(select(BibleVerses.verse_id).where(BibleVerses.verse_id == payload.verse_id))
+    verse_exists = db.scalar(
+        select(BibleVerses.verse_id).where(BibleVerses.verse_id == payload.verse_id)
+    )
     if verse_exists is None:
         raise HTTPException(status_code=400, detail="verse_id is invalid.")
 
@@ -290,7 +324,9 @@ def patch_note(db: Session, note_id: int, payload: PatchedVerseNote) -> VerseNot
 
     values = payload.model_dump(exclude_unset=True)
     if "verse_id" in values and payload.verse_id is not None:
-        verse_exists = db.scalar(select(BibleVerses.verse_id).where(BibleVerses.verse_id == payload.verse_id))
+        verse_exists = db.scalar(
+            select(BibleVerses.verse_id).where(BibleVerses.verse_id == payload.verse_id)
+        )
         if verse_exists is None:
             raise HTTPException(status_code=400, detail="verse_id is invalid.")
         note.verse_id = payload.verse_id
@@ -314,7 +350,9 @@ def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
     """Return sermons whose passages overlap a parsed verse reference range."""
     reference = (ref or "").strip()
     if not reference:
-        raise HTTPException(status_code=400, detail="Provide a reference in the 'ref' query param.")
+        raise HTTPException(
+            status_code=400, detail="Provide a reference in the 'ref' query param."
+        )
 
     try:
         start, end = parse_reference(db, reference)
@@ -328,7 +366,8 @@ def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
         select(SermonPassages)
         .where(
             SermonPassages.start_verse_id <= query_end,
-            func.coalesce(SermonPassages.end_verse_id, SermonPassages.start_verse_id) >= query_start,
+            func.coalesce(SermonPassages.end_verse_id, SermonPassages.start_verse_id)
+            >= query_start,
         )
         .options(
             joinedload(SermonPassages.sermon),
@@ -361,7 +400,9 @@ def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
         else:
             overlap_start = max(start_id, query_start)
             overlap_end = min(end_id, query_end)
-            overlap_len = overlap_end - overlap_start + 1 if overlap_end >= overlap_start else 0
+            overlap_len = (
+                overlap_end - overlap_start + 1 if overlap_end >= overlap_start else 0
+            )
             if overlap_len <= 0:
                 continue
 

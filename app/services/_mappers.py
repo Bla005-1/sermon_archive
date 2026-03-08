@@ -70,8 +70,13 @@ def sermon_schema(sermon: Sermons, *, include_nested: bool = True) -> Sermon:
     passages = []
     attachments = []
     if include_nested:
-        attachments = [attachment_schema(item) for item in getattr(sermon, "attachments", [])]
-        passages = [sermon_passage_schema(item) for item in getattr(sermon, "sermon_passages", [])]
+        attachments = [
+            attachment_schema(item) for item in getattr(sermon, "attachments", [])
+        ]
+        passages = [
+            sermon_passage_schema(item)
+            for item in getattr(sermon, "sermon_passages", [])
+        ]
         passages.sort(key=lambda item: ((item.ord or 0), item.id or 0))
 
     return Sermon(

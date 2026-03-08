@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth_placeholder
-from app.schemas.search import ReferenceSearchResponse, SermonSearchResponse, VerseSearchResponse
+from app.schemas.search import (
+    ReferenceSearchResponse,
+    SermonSearchResponse,
+    VerseSearchResponse,
+)
 from app.services import search_service
 
 router = APIRouter(tags=["search"], dependencies=[Depends(require_auth_placeholder)])
@@ -31,7 +35,9 @@ def search_retrieve(
     )
 
 
-@router.get("/ref/", response_model=ReferenceSearchResponse, operation_id="search_ref_retrieve")
+@router.get(
+    "/ref/", response_model=ReferenceSearchResponse, operation_id="search_ref_retrieve"
+)
 def search_ref_retrieve(
     q: str = Query(..., description='Reference string such as "John 3:16-18".'),
     db: Session = Depends(get_db),
@@ -39,7 +45,11 @@ def search_ref_retrieve(
     return search_service.resolve_reference(db=db, q=q)
 
 
-@router.get("/sermons/", response_model=SermonSearchResponse, operation_id="search_sermons_retrieve")
+@router.get(
+    "/sermons/",
+    response_model=SermonSearchResponse,
+    operation_id="search_sermons_retrieve",
+)
 def search_sermons_retrieve(
     q: str | None = Query(default=None),
     db: Session = Depends(get_db),

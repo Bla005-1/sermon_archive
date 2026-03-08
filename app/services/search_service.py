@@ -40,7 +40,9 @@ def search_verses(
     """Search verse text rows with optional filters and paginated results."""
     query = (q or "").strip()
     if not query:
-        raise HTTPException(status_code=400, detail="Provide a search query in the 'q' query param.")
+        raise HTTPException(
+            status_code=400, detail="Provide a search query in the 'q' query param."
+        )
 
     page = max(page, 1)
     page_size = 20
@@ -54,7 +56,9 @@ def search_verses(
 
     filters = []
     if translation:
-        filters.append(func.upper(VerseTextsMarked.translation) == translation.strip().upper())
+        filters.append(
+            func.upper(VerseTextsMarked.translation) == translation.strip().upper()
+        )
     if book:
         filters.append(func.lower(BibleBooks.name) == book.strip().lower())
     if chapter is not None:
@@ -67,8 +71,12 @@ def search_verses(
     else:
         terms = _tokenize_search_terms(query)
         if not terms:
-            raise HTTPException(status_code=400, detail="Provide a non-empty search query.")
-        filters.append(and_(*[VerseTextsMarked.plain_text.ilike(f"%{term}%") for term in terms]))
+            raise HTTPException(
+                status_code=400, detail="Provide a non-empty search query."
+            )
+        filters.append(
+            and_(*[VerseTextsMarked.plain_text.ilike(f"%{term}%") for term in terms])
+        )
 
     if filters:
         stmt = stmt.where(and_(*filters))
@@ -94,13 +102,16 @@ def search_verses(
             if current is None:
                 by_verse[verse_id] = row
                 continue
-            if current.translation.upper() != "ESV" and row.translation.upper() == "ESV":
+            if (
+                current.translation.upper() != "ESV"
+                and row.translation.upper() == "ESV"
+            ):
                 by_verse[verse_id] = row
         selected_rows = list(by_verse.values())
 
     total = len(selected_rows)
     offset = (page - 1) * page_size
-    paged = selected_rows[offset: offset + page_size]
+    paged = selected_rows[offset : offset + page_size]
 
     results = []
     for idx, row in enumerate(paged, start=1):
@@ -131,7 +142,9 @@ def resolve_reference(db: Session, q: str) -> ReferenceSearchResponse:
     """Parse a Bible reference into canonical start/end verse payloads."""
     query = (q or "").strip()
     if not query:
-        raise HTTPException(status_code=400, detail="Provide a reference in the 'q' query param.")
+        raise HTTPException(
+            status_code=400, detail="Provide a reference in the 'q' query param."
+        )
 
     try:
         start, end = parse_reference(db, query)
@@ -158,4 +171,6 @@ def search_sermons(db: Session, q: str | None = None) -> SermonSearchResponse:
         .limit(10)
     )
     sermons = db.scalars(stmt).all()
-    return SermonSearchResponse(sermons=[sermon_schema(row, include_nested=False) for row in sermons])
+    return SermonSearchResponse(
+        sermons=[sermon_schema(row, include_nested=False) for row in sermons]
+    )

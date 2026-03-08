@@ -29,13 +29,17 @@ def _safe_rel_to_abs(rel_path: str) -> str:
     root = _storage_root()
     abs_path = os.path.abspath(os.path.join(root, rel_path))
     if os.path.commonpath([root, abs_path]) != root:
-        raise HTTPException(status_code=400, detail="Attachment path is outside storage root.")
+        raise HTTPException(
+            status_code=400, detail="Attachment path is outside storage root."
+        )
     return abs_path
 
 
 def _get_attachment_or_404(db: Session, attachment_id: int) -> Attachments:
     """Load one attachment row or raise a 404 error."""
-    attachment = db.scalar(select(Attachments).where(Attachments.attachment_id == attachment_id))
+    attachment = db.scalar(
+        select(Attachments).where(Attachments.attachment_id == attachment_id)
+    )
     if attachment is None:
         raise HTTPException(status_code=404, detail="Attachment not found.")
     return attachment
@@ -54,7 +58,9 @@ def get_attachment(db: Session, attachment_id: int) -> Attachment:
     return attachment_schema(_get_attachment_or_404(db, attachment_id))
 
 
-def update_attachment(db: Session, attachment_id: int, payload: Attachment) -> Attachment:
+def update_attachment(
+    db: Session, attachment_id: int, payload: Attachment
+) -> Attachment:
     """Fully update writable attachment metadata fields."""
     attachment = _get_attachment_or_404(db, attachment_id)
     attachment.original_filename = payload.original_filename
@@ -65,7 +71,9 @@ def update_attachment(db: Session, attachment_id: int, payload: Attachment) -> A
     return attachment_schema(attachment)
 
 
-def patch_attachment(db: Session, attachment_id: int, payload: PatchedAttachment) -> Attachment:
+def patch_attachment(
+    db: Session, attachment_id: int, payload: PatchedAttachment
+) -> Attachment:
     """Partially update writable attachment metadata fields."""
     attachment = _get_attachment_or_404(db, attachment_id)
     values = payload.model_dump(exclude_unset=True)
@@ -120,7 +128,11 @@ def create_sermon_attachment(
         shutil.copyfileobj(file.file, handle)
 
     rel_path = os.path.relpath(abs_path, root)
-    mime_type = file.content_type or mimetypes.guess_type(file.filename)[0] or "application/octet-stream"
+    mime_type = (
+        file.content_type
+        or mimetypes.guess_type(file.filename)[0]
+        or "application/octet-stream"
+    )
     byte_size = os.path.getsize(abs_path)
 
     attachment = Attachments(

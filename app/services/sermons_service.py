@@ -34,10 +34,18 @@ def _sermon_with_relations_stmt() -> Select:
     )
 
 
-def _get_sermon_or_404(db: Session, sermon_id: int, *, with_relations: bool = False) -> Sermons:
+def _get_sermon_or_404(
+    db: Session, sermon_id: int, *, with_relations: bool = False
+) -> Sermons:
     """Load a sermon row by id or raise a 404 error."""
     if with_relations:
-        sermon = db.scalars(_sermon_with_relations_stmt().where(Sermons.sermon_id == sermon_id)).unique().first()
+        sermon = (
+            db.scalars(
+                _sermon_with_relations_stmt().where(Sermons.sermon_id == sermon_id)
+            )
+            .unique()
+            .first()
+        )
     else:
         sermon = db.scalar(select(Sermons).where(Sermons.sermon_id == sermon_id))
     if sermon is None:
@@ -60,10 +68,19 @@ def _get_passage_or_404(db: Session, sermon_id: int, passage_id: int) -> SermonP
     return passage
 
 
-def _coerce_sermon_fields(payload: Sermon | PatchedSermon, existing: Sermons | None = None) -> dict:
+def _coerce_sermon_fields(
+    payload: Sermon | PatchedSermon, existing: Sermons | None = None
+) -> dict:
     """Extract writable sermon fields from schema payloads."""
     data = payload.model_dump(exclude_unset=True)
-    writable_keys = {"preached_on", "title", "speaker_name", "series_name", "location_name", "notes_md"}
+    writable_keys = {
+        "preached_on",
+        "title",
+        "speaker_name",
+        "series_name",
+        "location_name",
+        "notes_md",
+    }
     cleaned = {k: v for k, v in data.items() if k in writable_keys}
     if existing is None:
         if not cleaned.get("title"):
@@ -77,7 +94,9 @@ def _coerce_sermon_fields(payload: Sermon | PatchedSermon, existing: Sermons | N
     return cleaned
 
 
-def _resolve_passage_verse_ids(db: Session, payload: SermonPassage | PatchedSermonPassage) -> tuple[int | None, int | None, str | None]:
+def _resolve_passage_verse_ids(
+    db: Session, payload: SermonPassage | PatchedSermonPassage
+) -> tuple[int | None, int | None, str | None]:
     """Resolve passage verse ids from payload fields and optional `ref_text`."""
     ref_text = payload.ref_text.strip() if payload.ref_text else None
     if ref_text:
@@ -94,13 +113,21 @@ def _resolve_passage_verse_ids(db: Session, payload: SermonPassage | PatchedSerm
     if start_id is None:
         return None, None, ref_text
 
-    start_v = db.scalar(select(BibleVerses).where(BibleVerses.verse_id == start_id).options(joinedload(BibleVerses.book)))
+    start_v = db.scalar(
+        select(BibleVerses)
+        .where(BibleVerses.verse_id == start_id)
+        .options(joinedload(BibleVerses.book))
+    )
     if start_v is None:
         raise HTTPException(status_code=400, detail="start_verse_id is invalid.")
 
     end_v = None
     if end_id is not None:
-        end_v = db.scalar(select(BibleVerses).where(BibleVerses.verse_id == end_id).options(joinedload(BibleVerses.book)))
+        end_v = db.scalar(
+            select(BibleVerses)
+            .where(BibleVerses.verse_id == end_id)
+            .options(joinedload(BibleVerses.book))
+        )
         if end_v is None:
             raise HTTPException(status_code=400, detail="end_verse_id is invalid.")
     normalized = format_ref(start_v, end_v or start_v)
@@ -109,7 +136,9 @@ def _resolve_passage_verse_ids(db: Session, payload: SermonPassage | PatchedSerm
 
 def list_sermons(db: Session, q: str | None = None) -> list[Sermon]:
     """Return sermons ordered by newest preached date, optionally filtered by title."""
-    stmt = _sermon_with_relations_stmt().order_by(Sermons.preached_on.desc(), Sermons.sermon_id.desc())
+    stmt = _sermon_with_relations_stmt().order_by(
+        Sermons.preached_on.desc(), Sermons.sermon_id.desc()
+    )
     query = (q or "").strip()
     if query:
         stmt = stmt.where(Sermons.title.ilike(f"%{query}%"))
@@ -138,7 +167,14 @@ def update_sermon(db: Session, sermon_id: int, payload: Sermon) -> Sermon:
     values = _coerce_sermon_fields(payload, sermon)
     if "title" not in values:
         raise HTTPException(status_code=400, detail="title is required.")
-    for key in ("preached_on", "title", "speaker_name", "series_name", "location_name", "notes_md"):
+    for key in (
+        "preached_on",
+        "title",
+        "speaker_name",
+        "series_name",
+        "location_name",
+        "notes_md",
+    ):
         setattr(sermon, key, values.get(key))
     db.commit()
     return get_sermon(db, sermon_id)
@@ -176,14 +212,25 @@ def list_sermon_passages(db: Session, sermon_id: int) -> list[SermonPassage]:
     return [sermon_passage_schema(row) for row in passages]
 
 
-def create_sermon_passage(db: Session, sermon_id: int, payload: SermonPassage) -> SermonPassage:
+def create_sermon_passage(
+    db: Session, sermon_id: int, payload: SermonPassage
+) -> SermonPassage:
     """Create a sermon passage, deriving verse ids from `ref_text` when provided."""
     _get_sermon_or_404(db, sermon_id)
     start_id, end_id, normalized_ref = _resolve_passage_verse_ids(db, payload)
     if start_id is None:
-        raise HTTPException(status_code=400, detail="start_verse_id or ref_text is required.")
+        raise HTTPException(
+            status_code=400, detail="start_verse_id or ref_text is required."
+        )
 
-    max_ord = db.scalar(select(func.max(SermonPassages.ord)).where(SermonPassages.sermon_id == sermon_id)) or 0
+    max_ord = (
+        db.scalar(
+            select(func.max(SermonPassages.ord)).where(
+                SermonPassages.sermon_id == sermon_id
+            )
+        )
+        or 0
+    )
     passage = SermonPassages(
         sermon_id=sermon_id,
         start_verse_id=start_id,
@@ -213,7 +260,9 @@ def update_sermon_passage(
     passage = _get_passage_or_404(db, sermon_id, passage_id)
     start_id, end_id, normalized_ref = _resolve_passage_verse_ids(db, payload)
     if start_id is None:
-        raise HTTPException(status_code=400, detail="start_verse_id or ref_text is required.")
+        raise HTTPException(
+            status_code=400, detail="start_verse_id or ref_text is required."
+        )
 
     passage.start_verse_id = start_id
     passage.end_verse_id = end_id

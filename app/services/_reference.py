@@ -100,7 +100,9 @@ def parse_reference(db: Session, ref_text: str) -> tuple[BibleVerses, BibleVerse
 
     book = _find_book_tolerant(db, book_name)
     if book is None:
-        raise ValueError(f'We could not find a Bible book named "{source.group("book")}".')
+        raise ValueError(
+            f'We could not find a Bible book named "{source.group("book")}".'
+        )
 
     if chapter_match is not None:
         verses = db.scalars(
@@ -148,5 +150,7 @@ def format_ref(start: BibleVerses, end: BibleVerses) -> str:
     if start.book_id == end.book_id:
         if start.chapter == end.chapter:
             return f"{start.book.name} {start.chapter}:{start.verse}-{end.verse}"
-        return f"{start.book.name} {start.chapter}:{start.verse}-{end.chapter}:{end.verse}"
+        return (
+            f"{start.book.name} {start.chapter}:{start.verse}-{end.chapter}:{end.verse}"
+        )
     return f"{start.book.name} {start.chapter}:{start.verse} - {end.book.name} {end.chapter}:{end.verse}"

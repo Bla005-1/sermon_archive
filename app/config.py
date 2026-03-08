@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from dotenv import load_dotenv
+
 load_dotenv()
 
 
@@ -60,23 +61,41 @@ class Settings:
         db_password = os.getenv("DB_PASSWORD", "")
         db_host = os.getenv("DB_HOST", "127.0.0.1")
         db_port = os.getenv("DB_PORT", "3306")
-        default_db_url = f"mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        default_db_url = (
+            f"mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        )
 
         cookie_secure_default = app_env == "production"
 
         return Settings(
             app_env=app_env,
             debug=debug,
-            secret_key=os.getenv("APP_SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "dev-secret-key")),
-            log_level=os.getenv("APP_LOG_LEVEL", os.getenv("DJANGO_LOG_LEVEL", "INFO")).upper(),
+            secret_key=os.getenv(
+                "APP_SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "dev-secret-key")
+            ),
+            log_level=os.getenv(
+                "APP_LOG_LEVEL", os.getenv("DJANGO_LOG_LEVEL", "INFO")
+            ).upper(),
             database_url=os.getenv("DATABASE_URL", default_db_url),
             sermon_storage_root=os.getenv("SERMON_STORAGE_ROOT", "."),
-            allowed_hosts=_to_list(os.getenv("APP_ALLOWED_HOSTS", os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1"))),
-            cors_allowed_origins=_to_list(
-                os.getenv("APP_CORS_ALLOWED_ORIGINS", os.getenv("DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"))
+            allowed_hosts=_to_list(
+                os.getenv(
+                    "APP_ALLOWED_HOSTS",
+                    os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1"),
+                )
             ),
-            cors_allow_credentials=_to_bool(os.getenv("APP_CORS_ALLOW_CREDENTIALS"), default=True),
-            cookie_secure=_to_bool(os.getenv("APP_COOKIE_SECURE"), default=cookie_secure_default),
+            cors_allowed_origins=_to_list(
+                os.getenv(
+                    "APP_CORS_ALLOWED_ORIGINS",
+                    os.getenv("DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"),
+                )
+            ),
+            cors_allow_credentials=_to_bool(
+                os.getenv("APP_CORS_ALLOW_CREDENTIALS"), default=True
+            ),
+            cookie_secure=_to_bool(
+                os.getenv("APP_COOKIE_SECURE"), default=cookie_secure_default
+            ),
             cookie_samesite=os.getenv("APP_COOKIE_SAMESITE", "lax").lower(),
             session_cookie_name=os.getenv("APP_SESSION_COOKIE_NAME", "sessionid"),
             csrf_cookie_name=os.getenv("APP_CSRF_COOKIE_NAME", "csrftoken"),

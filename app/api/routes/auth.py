@@ -27,7 +27,9 @@ def auth_login_create(
     response: Response,
     db: Session = Depends(get_db),
 ) -> UserResponse:
-    return auth_service.login_user(db=db, request=request, response=response, credentials=payload)
+    return auth_service.login_user(
+        db=db, request=request, response=response, credentials=payload
+    )
 
 
 @router.post("/token/", response_model=TokenResponse, operation_id="auth_token_create")
@@ -39,12 +41,20 @@ def auth_token_create(
     return auth_service.issue_token(db=db, request=request, payload=payload)
 
 
-@router.post("/token/revoke/", response_model=TokenRevokeResponse, operation_id="auth_token_revoke_create")
-def auth_token_revoke_create(request: Request, db: Session = Depends(get_db)) -> TokenRevokeResponse:
+@router.post(
+    "/token/revoke/",
+    response_model=TokenRevokeResponse,
+    operation_id="auth_token_revoke_create",
+)
+def auth_token_revoke_create(
+    request: Request, db: Session = Depends(get_db)
+) -> TokenRevokeResponse:
     return auth_service.revoke_token(db=db, request=request)
 
 
-@router.post("/logout/", status_code=status.HTTP_200_OK, operation_id="auth_logout_create")
+@router.post(
+    "/logout/", status_code=status.HTTP_200_OK, operation_id="auth_logout_create"
+)
 def auth_logout_create(
     request: Request,
     response: Response,
@@ -60,7 +70,9 @@ def auth_me_retrieve(request: Request, db: Session = Depends(get_db)) -> UserRes
     return auth_service.get_me(db=db, request=request)
 
 
-@router.get("/refresh/", response_model=UserResponse, operation_id="auth_refresh_retrieve")
+@router.get(
+    "/refresh/", response_model=UserResponse, operation_id="auth_refresh_retrieve"
+)
 def auth_refresh_retrieve(
     request: Request,
     response: Response,

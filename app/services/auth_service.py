@@ -53,7 +53,9 @@ def _verify_password(password: str, stored_hash: str) -> bool:
             _, salt_hex, digest_hex = stored_hash.split("$", 2)
             salt = bytes.fromhex(salt_hex)
             expected = bytes.fromhex(digest_hex)
-            actual = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1)
+            actual = hashlib.scrypt(
+                password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1
+            )
             return hmac.compare_digest(actual, expected)
         except Exception:
             return False
@@ -155,7 +157,9 @@ def _authenticate_session(db: Session, session_id: str) -> AuthContext | None:
         return None
 
     user = db.scalar(
-        select(ApiUsers).where(ApiUsers.user_id == session.user_id, ApiUsers.is_active == 1)
+        select(ApiUsers).where(
+            ApiUsers.user_id == session.user_id, ApiUsers.is_active == 1
+        )
     )
     if user is None:
         return None
@@ -179,7 +183,9 @@ def _authenticate_token(db: Session, raw_token: str) -> AuthContext | None:
         return None
 
     user = db.scalar(
-        select(ApiUsers).where(ApiUsers.user_id == token.user_id, ApiUsers.is_active == 1)
+        select(ApiUsers).where(
+            ApiUsers.user_id == token.user_id, ApiUsers.is_active == 1
+        )
     )
     if user is None:
         return None
@@ -210,7 +216,9 @@ def require_authenticated_context(db: Session, request: Request) -> AuthContext:
     """Require a valid auth context or raise 401."""
     context = authenticate_request(db, request)
     if context is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required."
+        )
     return context
 
 
@@ -221,15 +229,21 @@ def get_csrf_payload(response: Response) -> CsrfResponse:
     return CsrfResponse(detail="CSRF cookie set.")
 
 
-def login_user(db: Session, request: Request, response: Response, credentials: LoginRequest) -> UserResponse:
+def login_user(
+    db: Session, request: Request, response: Response, credentials: LoginRequest
+) -> UserResponse:
     """Authenticate username/password and establish a new session-cookie login."""
     username = (credentials.username or "").strip()
     password = credentials.password or ""
     if not username or not password:
-        raise HTTPException(status_code=400, detail="Username and password are required.")
+        raise HTTPException(
+            status_code=400, detail="Username and password are required."
+        )
 
     user = db.scalar(
-        select(ApiUsers).where(func.lower(ApiUsers.username) == username.lower(), ApiUsers.is_active == 1)
+        select(ApiUsers).where(
+            func.lower(ApiUsers.username) == username.lower(), ApiUsers.is_active == 1
+        )
     )
     if user is None or not _verify_password(password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials.")
@@ -240,15 +254,21 @@ def login_user(db: Session, request: Request, response: Response, credentials: L
     return _to_user_response(user)
 
 
-def issue_token(db: Session, request: Request, payload: TokenLoginRequest) -> TokenResponse:
+def issue_token(
+    db: Session, request: Request, payload: TokenLoginRequest
+) -> TokenResponse:
     """Authenticate credentials and issue a new bearer token record."""
     username = (payload.username or "").strip()
     password = payload.password or ""
     if not username or not password:
-        raise HTTPException(status_code=400, detail="Username and password are required.")
+        raise HTTPException(
+            status_code=400, detail="Username and password are required."
+        )
 
     user = db.scalar(
-        select(ApiUsers).where(func.lower(ApiUsers.username) == username.lower(), ApiUsers.is_active == 1)
+        select(ApiUsers).where(
+            func.lower(ApiUsers.username) == username.lower(), ApiUsers.is_active == 1
+        )
     )
     if user is None or not _verify_password(password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials.")
@@ -297,7 +317,11 @@ def logout_user(db: Session, request: Request, response: Response) -> None:
     """Revoke current session and clear auth cookies."""
     session_id = request.cookies.get(settings.session_cookie_name)
     if session_id:
-        session = db.scalar(select(ApiSessions).where(ApiSessions.session_id == session_id, ApiSessions.is_revoked == 0))
+        session = db.scalar(
+            select(ApiSessions).where(
+                ApiSessions.session_id == session_id, ApiSessions.is_revoked == 0
+            )
+        )
         if session is not None:
             session.is_revoked = 1
             db.commit()
@@ -314,7 +338,9 @@ def refresh_user(db: Session, request: Request, response: Response) -> UserRespo
     """Refresh active session expiry and return the current authenticated user."""
     context = require_authenticated_context(db, request)
     if context.session is not None:
-        context.session.expires_at = _utcnow() + datetime.timedelta(minutes=settings.session_ttl_minutes)
+        context.session.expires_at = _utcnow() + datetime.timedelta(
+            minutes=settings.session_ttl_minutes
+        )
         db.commit()
         _set_session_cookie(response, context.session.session_id)
         _set_csrf_cookie(response, context.session.csrf_token)
@@ -328,7 +354,9 @@ def ensure_bootstrap_admin(db: Session) -> None:
     if not username or not password:
         return
 
-    existing = db.scalar(select(ApiUsers).where(func.lower(ApiUsers.username) == username.lower()))
+    existing = db.scalar(
+        select(ApiUsers).where(func.lower(ApiUsers.username) == username.lower())
+    )
     if existing is not None:
         return
 
