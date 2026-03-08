@@ -85,7 +85,7 @@ def _tokenize_search_terms(query: str) -> list[str]:
 
 
 def _verse_result_from_text_row(
-    row: VerseTextsMarked, order_num: int
+    row: VerseTextsMarked, order_num: int, available_translations: Sequence[str] | None = None
 ) -> VerseSearchResult:
     verse = row.verse
     return VerseSearchResult(
@@ -95,9 +95,21 @@ def _verse_result_from_text_row(
         book=verse.book.name,
         chapter=verse.chapter,
         verse=verse.verse,
+        available_translations=list(available_translations or []),
         translation=row.translation,
         text=row.plain_text,
     )
+
+
+def _available_translations_by_verse(
+    rows: Sequence[VerseTextsMarked],
+) -> dict[int, list[str]]:
+    translations_by_verse: dict[int, list[str]] = {}
+    for row in rows:
+        values = translations_by_verse.setdefault(row.verse_id, [])
+        if row.translation not in values:
+            values.append(row.translation)
+    return translations_by_verse
 
 
 def _select_preferred_rows(rows: Sequence[VerseTextsMarked]) -> list[VerseTextsMarked]:
@@ -148,6 +160,7 @@ def resolve_query_intent(
         .where(VerseTextsMarked.verse_id.in_(verse_ids))
         .order_by(BibleVerses.verse_id, func.lower(VerseTextsMarked.translation))
     ).all()
+    available_translations = _available_translations_by_verse(text_rows)
 
     if translation:
         wanted = translation.strip().upper()
@@ -171,7 +184,13 @@ def resolve_query_intent(
         query=format_ref(start, end),
         reference=format_ref(start, end),
         verses=[
-            _verse_result_from_text_row(row=row, order_num=idx)
+            _verse_result_from_text_row(
+                row=row,
+                order_num=idx,
+                available_translations=available_translations.get(
+                    row.verse_id, [row.translation]
+                ),
+            )
             for idx, row in enumerate(selected, start=1)
         ],
     )
@@ -248,13 +267,30 @@ def search_verse_text(
     total = len(selected_rows)
     offset = (page - 1) * page_size
     paged = selected_rows[offset : offset + page_size]
+    paged_verse_ids = [row.verse_id for row in paged]
+    available_translations_by_verse: dict[int, list[str]] = {}
+    if paged_verse_ids:
+        translation_rows = db.scalars(
+            select(VerseTextsMarked)
+            .where(VerseTextsMarked.verse_id.in_(paged_verse_ids))
+            .order_by(VerseTextsMarked.verse_id, func.lower(VerseTextsMarked.translation))
+        ).all()
+        available_translations_by_verse = _available_translations_by_verse(
+            translation_rows
+        )
 
     return VerseTextSearchResponse(
         query=query,
         page=page,
         total=total,
         results=[
-            _verse_result_from_text_row(row=row, order_num=offset + idx)
+            _verse_result_from_text_row(
+                row=row,
+                order_num=offset + idx,
+                available_translations=available_translations_by_verse.get(
+                    row.verse_id, [row.translation]
+                ),
+            )
             for idx, row in enumerate(paged, start=1)
         ],
     )

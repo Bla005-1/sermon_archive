@@ -96,6 +96,7 @@ class VerseSearchResult(APIModel):
     book: str
     chapter: int
     verse: int
+    available_translations: list[str] = Field(default_factory=list)
     translation: str
     text: str
 
