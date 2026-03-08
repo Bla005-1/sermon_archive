@@ -46,18 +46,20 @@ Notes:
 
 Base values live in `.env.template`. Most important settings:
 
-- `DATABASE_URL`: full SQLAlchemy DSN override
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`: used if `DATABASE_URL` is not set
+- `DATABASE_URL`: full SQLAlchemy DSN (required)
 - `SERMON_STORAGE_ROOT`: root folder for attachment uploads
-- `APP_DEBUG`, `APP_LOG_LEVEL`: runtime debugging/log level
-- `APP_SESSION_TTL_MINUTES`: session lifetime
-- `APP_TOKEN_TTL_MINUTES`: bearer token lifetime
-- `APP_CORS_ALLOWED_ORIGINS`: comma-separated CORS allowlist
-- `APP_COOKIE_SECURE`, `APP_COOKIE_SAMESITE`: cookie behavior
+- `DEBUG`, `LOG_LEVEL`: runtime debugging/log level
+- `SESSION_TTL_MINUTES`: session lifetime
+- `TOKEN_TTL_MINUTES`: bearer token lifetime
+- `CORS_ALLOWED_ORIGINS`: comma-separated CORS allowlist
+- `CORS_ALLOW_CREDENTIALS`: allow credentials for CORS
+- `ALLOWED_HOSTS`: comma-separated trusted hosts
+- `COOKIE_SECURE`, `COOKIE_SAMESITE`: cookie behavior
+- `SESSION_COOKIE_NAME`, `CSRF_COOKIE_NAME`: cookie names
 
 For a browser client on a different domain, set:
-- `APP_COOKIE_SAMESITE=none`
-- `APP_COOKIE_SECURE=true`
+- `COOKIE_SAMESITE=none`
+- `COOKIE_SECURE=true`
 
 Attachment files are written under:
 
