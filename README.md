@@ -1,144 +1,161 @@
-# Sermon Archive (Django)
+# Sermon Archive API
 
-A private, local-first Django app for storing sermons, passages, and attachments with fast manual entry and future-proof data design.
+FastAPI backend for sermon records, Bible reference lookup/search, commentary and cross-reference retrieval, verse notes, and widget passage management.
 
-## Key Features
-- **Sermon archive**: date, title, speaker, series, location, notes (Markdown).
-- **Passages**: link each sermon to contiguous Scripture ranges.
-- **Attachments**: upload slides, PDFs, images, audio; stored under a predictable media root.
-- **Clean data model**: normalized tables with foreign keys; portable and extensible.
-- **Simple UI**: list, create/edit, and detail views for sermons (templates under `sermon_site/templates/`).
+## Stack
 
-## Tech Stack
-- Python 3.12+, Django 5.x
-- MySQL 8.0+ (InnoDB, utf8mb4)
-- HTMX (optional) / vanilla HTML templates
-- Nginx + Gunicorn (production suggestion)
+- Python 3.11
+- FastAPI
+- SQLAlchemy 2.x
+- MySQL (`mysql+pymysql`)
+- Poetry
 
----
+## What This API Provides
 
-## Quick Start (Development)
+- Auth with either:
+  - Session cookie (`/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`)
+  - Bearer token (`/api/auth/token`, `/api/auth/token/revoke`)
+- Sermons CRUD with nested passages and attachments
+- Bible reference parsing + verse text lookup
+- Free-text verse search with paging/filters
+- Commentary and cross-reference lookup for references
+- Verse notes CRUD
+- Widget verse entries CRUD
 
-### 1) Clone & enter the project
-```bash
-git clone <your-repo-url> sermon-archive
-cd sermon-archive
-```
+## Project Layout
 
-### 2) Python environment
-```bash
-# Using Poetry (recommended)
-poetry install
-poetry run python manage.py --version
-# Or using venv
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt  # if using pip
-```
+- `main.py`: FastAPI app entrypoint
+- `app/config.py`: environment-backed settings
+- `app/api/routes/`: API routes
+- `app/services/`: domain/service logic
+- `app/db/models.py`: SQLAlchemy models (database-first)
+- `tests/rest_client/`: manual API requests for VS Code REST Client
 
-### 3) Configure environment
-Create a `.env` from the example and fill in values:
-```bash
-cp .env.example .env
-```
-Common settings:
-```
-DEBUG=True
-SECRET_KEY=change-me
-ALLOWED_HOSTS=localhost,127.0.0.1
+## Prerequisites
 
-# MySQL (preferred)
-DB_NAME=sermon_archive
-DB_USER=sermon_user
-DB_PASSWORD=yourpass
-DB_HOST=127.0.0.1
-DB_PORT=3306
+1. Python 3.11+
+2. Poetry
+3. MySQL database with the expected schema/tables already present
 
-# Paths (override if needed)
-MEDIA_ROOT=./sermon_site/media
-STATIC_ROOT=./staticfiles
-```
-
-### 4) Database
-Create the MySQL database and user, then run migrations:
-```sql
-CREATE DATABASE sermon_archive CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE USER 'sermon_user'@'%' IDENTIFIED BY 'yourpass';
-GRANT ALL PRIVILEGES ON sermon_archive.* TO 'sermon_user'@'%';
-FLUSH PRIVILEGES;
-```
-```bash
-poetry run python manage.py migrate
-poetry run python manage.py createsuperuser
-```
-
-### 5) Run the dev server
-```bash
-poetry run python manage.py runserver
-```
-Visit http://127.0.0.1:8000/ and log in.
-
----
+Notes:
+- This codebase is database-first and uses existing tables from `app/db/models.py`.
+- There are no migrations in this repository.
 
 
-**Primary Django app**: `archive`  
-**Project**: `sermon_site`
+## Environment Variables
 
----
+Base values live in `.env.template`. Most important settings:
 
-## Data Model (Overview)
+- `DATABASE_URL`: full SQLAlchemy DSN (required)
+- `SERMON_STORAGE_ROOT`: root folder for attachment uploads
+- `DEBUG`, `LOG_LEVEL`: runtime debugging/log level
+- `SESSION_TTL_MINUTES`: session lifetime
+- `TOKEN_TTL_MINUTES`: bearer token lifetime
+- `CORS_ALLOWED_ORIGINS`: comma-separated CORS allowlist
+- `CORS_ALLOW_CREDENTIALS`: allow credentials for CORS
+- `ALLOWED_HOSTS`: comma-separated trusted hosts
+- `COOKIE_SECURE`, `COOKIE_SAMESITE`: cookie behavior
+- `SESSION_COOKIE_NAME`, `CSRF_COOKIE_NAME`: cookie names
 
-Core tables (summarized):
-- `sermons`: sermon metadata + `notes_md` (Markdown).
-- `sermon_passages`: contiguous verse ranges used in a sermon (start/end verse_id + `ref_text`, `ord`).
-- `attachments`: files linked to a sermon.
-- Bible domain is normalized (`bible_books`, `bible_verses`, `verse_texts`, `verse_notes`).
+For a browser client on a different domain, set:
+- `COOKIE_SAMESITE=none`
+- `COOKIE_SECURE=true`
 
-> Tip: Standardize book names with Arabic numerals (e.g., `1 Samuel`, `2 Corinthians`).
+Attachment files are written under:
 
-### Migrations
-```bash
-poetry run python manage.py makemigrations
-poetry run python manage.py migrate
-```
+- `<SERMON_STORAGE_ROOT>/<year>/<sermon_id>/<generated_filename>`
 
----
+## Authentication
 
-## Static & Media
+Protected endpoints use:
+1. `Authorization: Bearer <token>` first
+2. Session cookie fallback (`sessionid` by default)
 
-- **Static files** live in `sermon_site/static/` during development. In production, collect them to `STATIC_ROOT`:
-  ```bash
-  poetry run python manage.py collectstatic
-  ```
-- **Media files** (uploads) are stored under `MEDIA_ROOT` (default: `sermon_site/media/`). Make sure this directory exists and is writable.
+Common auth flow:
 
-**Templates**: Remember to load the static tag at the top of templates that use static assets:
-```django
-{% load static %}
-<link rel="stylesheet" href="{% static 'css/app.css' %}">
-```
+1. `POST /api/auth/token` with username/password
+2. Use returned token as bearer auth
+3. Call protected routes
+4. `POST /api/auth/token/revoke` when done
 
----
+Session-cookie flow is also available through `/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`.
 
-## Useful Management Commands
+Password verification supports only scrypt-formatted hashes (`scrypt$<salt>$<digest>`). Legacy plaintext fallbacks are not accepted.
 
-```bash
-# Create an initial staff superuser
-poetry run python manage.py createsuperuser
+For session-cookie auth, CSRF validation is required on state-changing methods (`POST`, `PUT`, `PATCH`, `DELETE`) via `X-CSRF-Token`.
 
-# Dump/load data
-poetry run python manage.py dumpdata --natural-foreign --natural-primary -e contenttypes -e auth.Permission > backup.json
-poetry run python manage.py loaddata backup.json
+## API Route Summary
 
-# Check for template or model issues
-poetry run python manage.py check
-```
+### Auth
 
----
+- `GET /api/auth/csrf`
+- `POST /api/auth/login`
+- `POST /api/auth/token`
+- `POST /api/auth/token/revoke`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `POST /api/auth/refresh`
 
-## Developer Tips
+### Sermons (protected)
 
-- Keep translations separate in `verse_texts`. Don’t create duplicate rows in `bible_verses` for new translations; only add `verse_texts` rows.
-- Use `sermon_passages.ord` to control the display order of passages.
-- Prefer `utf8mb4` at the DB and connection level.
-- For import routines, build once-off scripts that join `(book_id, chapter, verse)` to map raw source data to your canonical IDs.
+- `GET /api/sermons`
+- `POST /api/sermons`
+- `GET /api/sermons/{sermon_id}`
+- `PUT /api/sermons/{sermon_id}`
+- `PATCH /api/sermons/{sermon_id}`
+- `DELETE /api/sermons/{sermon_id}`
+- `GET /api/sermons/{sermon_id}/attachments`
+- `POST /api/sermons/{sermon_id}/attachments` (multipart file upload)
+- `GET /api/sermons/{sermon_id}/attachments/{attachment_id}/download` (file download)
+- `GET /api/sermons/{sermon_id}/passages`
+- `POST /api/sermons/{sermon_id}/passages`
+- `GET /api/sermons/{sermon_id}/passages/{id}`
+- `PUT /api/sermons/{sermon_id}/passages/{id}`
+- `PATCH /api/sermons/{sermon_id}/passages/{id}`
+- `DELETE /api/sermons/{sermon_id}/passages/{id}`
+- `GET /api/sermons/suggestions`
+
+### Attachments (protected)
+
+- `GET /api/attachments/{id}`
+- `PUT /api/attachments/{id}`
+- `PATCH /api/attachments/{id}`
+- `DELETE /api/attachments/{id}`
+
+### Verses
+
+Public:
+- `GET /api/verses`
+- `GET /api/verses/search`
+
+Protected:
+- `GET /api/verses/commentaries`
+- `GET /api/verses/crossrefs`
+- `GET /api/verses/notes`
+- `POST /api/verses/notes`
+- `GET /api/verses/notes/{note_id}`
+- `PUT /api/verses/notes/{note_id}`
+- `PATCH /api/verses/notes/{note_id}`
+- `DELETE /api/verses/notes/{note_id}`
+- `GET /api/verses/sermons`
+
+### Widget
+
+Public:
+- `GET /api/widget`
+- `GET /api/widget/{id}`
+
+Protected:
+- `POST /api/widget`
+- `PUT /api/widget/{id}`
+- `PATCH /api/widget/{id}`
+- `DELETE /api/widget/{id}`
+
+## Manual Testing
+
+Use the VS Code REST Client files in `tests/rest_client/`:
+
+- `tests/rest_client/auth.rest`
+- `tests/rest_client/protected_endpoints.rest`
+
+Set credentials in your environment (`API_USERNAME`, `API_PASSWORD`) before running requests.
