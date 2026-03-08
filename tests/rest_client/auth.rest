@@ -1,0 +1,45 @@
+@baseUrl = http://127.0.0.1:8000
+@username = {{$dotenv API_USERNAME}}
+@password ={{$dotenv API_PASSWORD}}
+
+### Optional: set CSRF cookie for browser-style clients
+# @name csrf
+GET {{baseUrl}}/api/auth/csrf/
+
+### Login with session cookie auth (REST Client cookie jar stores Set-Cookie)
+# @name sessionLogin
+POST {{baseUrl}}/api/auth/login/
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+### Auth check using session cookie from previous request
+GET {{baseUrl}}/api/auth/me/
+
+### Refresh session cookie expiry
+GET {{baseUrl}}/api/auth/refresh/
+
+### Logout and clear cookies
+POST {{baseUrl}}/api/auth/logout/
+
+### Login with token auth (bearer)
+# @name tokenLogin
+POST {{baseUrl}}/api/auth/token/
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}",
+  "token_name": "vscode-rest-client"
+}
+
+### Auth check using bearer token from tokenLogin response
+GET {{baseUrl}}/api/auth/me/
+Authorization: Bearer {{tokenLogin.response.body.$.access_token}}
+
+### Revoke the same bearer token
+POST {{baseUrl}}/api/auth/token/revoke/
+Authorization: Bearer {{tokenLogin.response.body.$.access_token}}

@@ -1,4 +1,8 @@
+from fastapi import Depends, Request
+from sqlalchemy.orm import Session
+
 from app.db.session import SessionLocal
+from app.services import auth_service
 
 
 def get_db():
@@ -10,6 +14,11 @@ def get_db():
         db.close()
 
 
-def require_auth_placeholder() -> None:
-    """Temporary auth dependency placeholder until real authentication is implemented."""
-    return None
+def require_auth_placeholder(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> None:
+    """Temporary dependency name that now enforces real auth for protected routes."""
+    context = auth_service.require_authenticated_context(db=db, request=request)
+    request.state.current_user = context.user
+    request.state.auth_method = context.method

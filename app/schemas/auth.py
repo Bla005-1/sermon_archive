@@ -1,9 +1,17 @@
+from datetime import datetime
+
 from app.schemas.base import APIModel
 
 
 class LoginRequest(APIModel):
     username: str
     password: str
+
+
+class TokenLoginRequest(APIModel):
+    username: str
+    password: str
+    token_name: str | None = None
 
 
 class UserResponse(APIModel):
@@ -21,4 +29,14 @@ class AuthDetailResponse(APIModel):
 
 
 class CsrfResponse(APIModel):
+    detail: str
+
+
+class TokenResponse(APIModel):
+    access_token: str
+    token_type: str
+    expires_at: datetime
+
+
+class TokenRevokeResponse(APIModel):
     detail: str

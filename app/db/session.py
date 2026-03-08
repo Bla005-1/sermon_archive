@@ -1,12 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import os
 
-DATABASE_URL = os.getenv('DATABASE_URL', '')
+from app.config import settings
 
 engine = create_engine(
-    DATABASE_URL,
+    settings.database_url,
     pool_pre_ping=True,
+    echo=settings.debug,
 )
 
 SessionLocal = sessionmaker(

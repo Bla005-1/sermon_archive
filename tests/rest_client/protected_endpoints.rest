@@ -1,0 +1,22 @@
+@baseUrl = http://127.0.0.1:8000
+@username = {{$dotenv API_USERNAME}}
+@password ={{$dotenv API_PASSWORD}}
+
+### Get bearer token for protected requests in this file
+# @name tokenLogin
+POST {{baseUrl}}/api/auth/token/
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}",
+  "token_name": "vscode-rest-client-protected"
+}
+
+### Search verses (protected endpoint)
+GET {{baseUrl}}/api/search/?q=love&page=1
+Authorization: Bearer {{tokenLogin.response.body.$.access_token}}
+
+### List sermons (protected endpoint)
+GET {{baseUrl}}/api/sermons/
+Authorization: Bearer {{tokenLogin.response.body.$.access_token}}
