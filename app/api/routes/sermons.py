@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, Path, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
@@ -106,6 +107,25 @@ def sermons_attachments_create(
 ) -> Attachment:
     return attachment_service.create_sermon_attachment(
         db=db, sermon_id=sermon_id, file=file
+    )
+
+
+@router.get(
+    "/{sermon_id}/attachments/{attachment_id}/download",
+    operation_id="sermons_attachments_download",
+)
+def sermons_attachments_download(
+    sermon_id: int = Path(...),
+    attachment_id: int = Path(...),
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    abs_path, filename, mime_type = attachment_service.get_sermon_attachment_download(
+        db=db, sermon_id=sermon_id, attachment_id=attachment_id
+    )
+    return FileResponse(
+        path=abs_path,
+        media_type=mime_type,
+        filename=filename,
     )
 
 

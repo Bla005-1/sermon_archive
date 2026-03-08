@@ -104,6 +104,7 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `DELETE /api/sermons/{sermon_id}`
 - `GET /api/sermons/{sermon_id}/attachments`
 - `POST /api/sermons/{sermon_id}/attachments` (multipart file upload)
+- `GET /api/sermons/{sermon_id}/attachments/{attachment_id}/download` (file download)
 - `GET /api/sermons/{sermon_id}/passages`
 - `POST /api/sermons/{sermon_id}/passages`
 - `GET /api/sermons/{sermon_id}/passages/{id}`

@@ -7,6 +7,7 @@ import os
 import shutil
 import uuid
 from datetime import date
+from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import select
@@ -51,6 +52,22 @@ def _get_sermon_or_404(db: Session, sermon_id: int) -> Sermons:
     if sermon is None:
         raise HTTPException(status_code=404, detail="Sermon not found.")
     return sermon
+
+
+def _get_sermon_attachment_or_404(
+    db: Session, sermon_id: int, attachment_id: int
+) -> Attachments:
+    """Load one attachment scoped to a sermon or raise a 404 error."""
+    _get_sermon_or_404(db, sermon_id)
+    attachment = db.scalar(
+        select(Attachments).where(
+            Attachments.attachment_id == attachment_id,
+            Attachments.sermon_id == sermon_id,
+        )
+    )
+    if attachment is None:
+        raise HTTPException(status_code=404, detail="Attachment not found.")
+    return attachment
 
 
 def get_attachment(db: Session, attachment_id: int) -> Attachment:
@@ -146,3 +163,22 @@ def create_sermon_attachment(
     db.commit()
     db.refresh(attachment)
     return attachment_schema(attachment)
+
+
+def get_sermon_attachment_download(
+    db: Session, sermon_id: int, attachment_id: int
+) -> tuple[str, str, str]:
+    """Resolve a sermon attachment to an existing file and return download metadata."""
+    attachment = _get_sermon_attachment_or_404(
+        db=db, sermon_id=sermon_id, attachment_id=attachment_id
+    )
+    if not attachment.rel_path:
+        raise HTTPException(status_code=404, detail="Attachment file not found.")
+
+    abs_path = _safe_rel_to_abs(attachment.rel_path)
+    if not os.path.isfile(abs_path):
+        raise HTTPException(status_code=404, detail="Attachment file not found.")
+
+    filename = attachment.original_filename or Path(abs_path).name
+    mime_type = attachment.mime_type or "application/octet-stream"
+    return abs_path, filename, mime_type
