@@ -20,7 +20,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/auth/me/
 
 ### Refresh session cookie expiry
-GET {{baseUrl}}/api/auth/refresh/
+POST {{baseUrl}}/api/auth/refresh/
 
 ### Logout and clear cookies
 POST {{baseUrl}}/api/auth/logout/

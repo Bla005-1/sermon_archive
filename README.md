@@ -13,7 +13,7 @@ FastAPI backend for sermon records, Bible reference lookup/search, commentary an
 ## What This API Provides
 
 - Auth with either:
-  - Session cookie (`/api/auth/login`, `/api/auth/me`, `/api/auth/logout`)
+  - Session cookie (`/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`)
   - Bearer token (`/api/auth/token`, `/api/auth/token/revoke`)
 - Sermons CRUD with nested passages and attachments
 - Bible reference parsing + verse text lookup
@@ -78,6 +78,10 @@ Common auth flow:
 
 Session-cookie flow is also available through `/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`.
 
+Password verification supports only scrypt-formatted hashes (`scrypt$<salt>$<digest>`). Legacy plaintext fallbacks are not accepted.
+
+For session-cookie auth, CSRF validation is required on state-changing methods (`POST`, `PUT`, `PATCH`, `DELETE`) via `X-CSRF-Token`.
+
 ## API Route Summary
 
 ### Auth
@@ -88,7 +92,7 @@ Session-cookie flow is also available through `/api/auth/login`, `/api/auth/me`,
 - `POST /api/auth/token/revoke`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
-- `GET /api/auth/refresh`
+- `POST /api/auth/refresh`
 
 ### Sermons (protected)
 

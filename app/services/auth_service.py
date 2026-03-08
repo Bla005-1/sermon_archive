@@ -24,6 +24,10 @@ from app.schemas.auth import (
 )
 
 
+_CSRF_HEADER_NAME = "X-CSRF-Token"
+_CSRF_PROTECTED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
 @dataclass(slots=True)
 class AuthContext:
     """Authenticated request context derived from either session or bearer token."""
@@ -47,7 +51,7 @@ def _password_hash(password: str) -> str:
 
 
 def _verify_password(password: str, stored_hash: str) -> bool:
-    """Verify plain password against stored hash (scrypt or legacy plain fallback)."""
+    """Verify plain password against the supported password hash format."""
     if stored_hash.startswith("scrypt$"):
         try:
             _, salt_hex, digest_hex = stored_hash.split("$", 2)
@@ -59,9 +63,7 @@ def _verify_password(password: str, stored_hash: str) -> bool:
             return hmac.compare_digest(actual, expected)
         except Exception:
             return False
-    if stored_hash.startswith("plain$"):
-        return hmac.compare_digest(password, stored_hash.split("$", 1)[1])
-    return hmac.compare_digest(password, stored_hash)
+    return False
 
 
 def _token_hash(token: str) -> str:
@@ -219,7 +221,25 @@ def require_authenticated_context(db: Session, request: Request) -> AuthContext:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required."
         )
+
+    if (
+        context.method == "session"
+        and context.session is not None
+        and request.method.upper() in _CSRF_PROTECTED_METHODS
+    ):
+        validate_csrf(request=request, session=context.session)
+
     return context
+
+
+def validate_csrf(request: Request, session: ApiSessions) -> None:
+    """Validate CSRF header value for state-changing cookie-authenticated requests."""
+    csrf_header = request.headers.get(_CSRF_HEADER_NAME)
+    if not csrf_header or not hmac.compare_digest(csrf_header, session.csrf_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"CSRF validation failed. Send {_CSRF_HEADER_NAME} header.",
+        )
 
 
 def get_csrf_payload(response: Response) -> CsrfResponse:
