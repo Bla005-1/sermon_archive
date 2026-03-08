@@ -345,27 +345,3 @@ def refresh_user(db: Session, request: Request, response: Response) -> UserRespo
         _set_session_cookie(response, context.session.session_id)
         _set_csrf_cookie(response, context.session.csrf_token)
     return _to_user_response(context.user)
-
-
-def ensure_bootstrap_admin(db: Session) -> None:
-    """Create a bootstrap admin user from environment variables when configured."""
-    username = settings.bootstrap_admin_username
-    password = settings.bootstrap_admin_password
-    if not username or not password:
-        return
-
-    existing = db.scalar(
-        select(ApiUsers).where(func.lower(ApiUsers.username) == username.lower())
-    )
-    if existing is not None:
-        return
-
-    user = ApiUsers(
-        username=username,
-        email=None,
-        password_hash=_password_hash(password),
-        is_active=1,
-        is_staff=1,
-    )
-    db.add(user)
-    db.commit()

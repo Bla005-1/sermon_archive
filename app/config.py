@@ -2,108 +2,87 @@
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
-from dotenv import load_dotenv
+from typing import Literal
 
-load_dotenv()
-
-
-def _to_bool(value: str | None, default: bool = False) -> bool:
-    """Parse environment truthy/falsey values."""
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def _to_list(value: str | None, default: list[str] | None = None) -> list[str]:
-    """Split comma-separated environment values into a normalized list."""
-    if not value:
-        return list(default or [])
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
-@dataclass(slots=True)
-class Settings:
+class Settings(BaseSettings):
     """Runtime settings loaded from environment variables."""
 
-    app_env: str
-    debug: bool
-    secret_key: str
-    log_level: str
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
-    database_url: str
-    sermon_storage_root: str
+    debug: bool = Field(default=True, validation_alias="APP_DEBUG")
+    log_level: str = Field(default="INFO", validation_alias="APP_LOG_LEVEL")
+    database_url: str | None = Field(default=None, validation_alias="DATABASE_URL")
+    sermon_storage_root: str = Field(
+        default=".", validation_alias="SERMON_STORAGE_ROOT"
+    )
 
-    allowed_hosts: list[str]
-    cors_allowed_origins: list[str]
-    cors_allow_credentials: bool
+    cors_allowed_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:3000"],
+        validation_alias="APP_CORS_ALLOWED_ORIGINS",
+    )
+    cors_allow_credentials: bool = Field(
+        default=True, validation_alias="APP_CORS_ALLOW_CREDENTIALS"
+    )
 
-    cookie_secure: bool
-    cookie_samesite: str
-    session_cookie_name: str
-    csrf_cookie_name: str
+    cookie_secure: bool = Field(default=False, validation_alias="APP_COOKIE_SECURE")
+    cookie_samesite: Literal["lax", "strict", "none"] = Field(
+        default="lax", validation_alias="APP_COOKIE_SAMESITE"
+    )
+    session_cookie_name: str = Field(
+        default="sessionid", validation_alias="APP_SESSION_COOKIE_NAME"
+    )
+    csrf_cookie_name: str = Field(
+        default="csrftoken", validation_alias="APP_CSRF_COOKIE_NAME"
+    )
 
-    session_ttl_minutes: int
-    token_ttl_minutes: int
+    session_ttl_minutes: int = Field(
+        default=10080, validation_alias="APP_SESSION_TTL_MINUTES"
+    )
+    token_ttl_minutes: int = Field(
+        default=1440, validation_alias="APP_TOKEN_TTL_MINUTES"
+    )
 
-    bootstrap_admin_username: str | None
-    bootstrap_admin_password: str | None
+    db_name: str = Field(default="sermon_archive", validation_alias="DB_NAME")
+    db_user: str = Field(default="sermon_user", validation_alias="DB_USER")
+    db_password: str = Field(default="", validation_alias="DB_PASSWORD")
+    db_host: str = Field(default="127.0.0.1", validation_alias="DB_HOST")
+    db_port: int = Field(default=3306, validation_alias="DB_PORT")
 
-    @staticmethod
-    def from_env() -> "Settings":
-        """Construct settings from current process environment variables."""
-        app_env = os.getenv("APP_ENV", "development").strip().lower()
-        debug = _to_bool(os.getenv("APP_DEBUG"), default=(app_env != "production"))
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def _normalize_log_level(cls, value: str) -> str:
+        return value.upper()
 
-        db_name = os.getenv("DB_NAME", "sermon_archive")
-        db_user = os.getenv("DB_USER", "sermon_user")
-        db_password = os.getenv("DB_PASSWORD", "")
-        db_host = os.getenv("DB_HOST", "127.0.0.1")
-        db_port = os.getenv("DB_PORT", "3306")
-        default_db_url = (
-            f"mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    @field_validator("cookie_samesite", mode="before")
+    @classmethod
+    def _normalize_samesite(cls, value: str) -> str:
+        return value.lower()
+
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def _parse_cors_allowed_origins(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, list):
+            return [item.strip() for item in value if item.strip()]
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    @model_validator(mode="after")
+    def _build_database_url(self) -> "Settings":
+        if self.database_url:
+            return self
+        self.database_url = (
+            f"mysql+pymysql://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
-
-        cookie_secure_default = app_env == "production"
-
-        return Settings(
-            app_env=app_env,
-            debug=debug,
-            secret_key=os.getenv(
-                "APP_SECRET_KEY", os.getenv("DJANGO_SECRET_KEY", "dev-secret-key")
-            ),
-            log_level=os.getenv(
-                "APP_LOG_LEVEL", os.getenv("DJANGO_LOG_LEVEL", "INFO")
-            ).upper(),
-            database_url=os.getenv("DATABASE_URL", default_db_url),
-            sermon_storage_root=os.getenv("SERMON_STORAGE_ROOT", "."),
-            allowed_hosts=_to_list(
-                os.getenv(
-                    "APP_ALLOWED_HOSTS",
-                    os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1"),
-                )
-            ),
-            cors_allowed_origins=_to_list(
-                os.getenv(
-                    "APP_CORS_ALLOWED_ORIGINS",
-                    os.getenv("DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:3000"),
-                )
-            ),
-            cors_allow_credentials=_to_bool(
-                os.getenv("APP_CORS_ALLOW_CREDENTIALS"), default=True
-            ),
-            cookie_secure=_to_bool(
-                os.getenv("APP_COOKIE_SECURE"), default=cookie_secure_default
-            ),
-            cookie_samesite=os.getenv("APP_COOKIE_SAMESITE", "lax").lower(),
-            session_cookie_name=os.getenv("APP_SESSION_COOKIE_NAME", "sessionid"),
-            csrf_cookie_name=os.getenv("APP_CSRF_COOKIE_NAME", "csrftoken"),
-            session_ttl_minutes=int(os.getenv("APP_SESSION_TTL_MINUTES", "10080")),
-            token_ttl_minutes=int(os.getenv("APP_TOKEN_TTL_MINUTES", "1440")),
-            bootstrap_admin_username=os.getenv("APP_BOOTSTRAP_ADMIN_USERNAME"),
-            bootstrap_admin_password=os.getenv("APP_BOOTSTRAP_ADMIN_PASSWORD"),
-        )
+        return self
 
 
-settings = Settings.from_env()
+settings = Settings()

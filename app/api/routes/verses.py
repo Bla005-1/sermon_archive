@@ -20,10 +20,7 @@ router = APIRouter(tags=["verses"])
 def verses_lookup(
     q: str = Query(
         ...,
-        description=(
-            "Single entry point. If `intent=reference`, passage verse data is returned. "
-            "If `intent=text`, call `GET /api/verses/search?q=...`."
-        ),
+        description=("Search by reference"),
     ),
     translation: str | None = Query(default=None),
     db: Session = Depends(get_db),
