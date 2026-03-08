@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import BibleVerses, BibleWidgetVerses
-from app.schemas.widget import BibleWidget, PatchedBibleWidget
+from app.schemas.widget import BibleWidget, PartialBibleWidget
 from app.services._mappers import widget_schema
 
 
@@ -123,7 +123,7 @@ def update_widget(db: Session, widget_id: int, payload: BibleWidget) -> BibleWid
 
 
 def patch_widget(
-    db: Session, widget_id: int, payload: PatchedBibleWidget
+    db: Session, widget_id: int, payload: PartialBibleWidget
 ) -> BibleWidget:
     """Partially update a widget entry's writable fields."""
     row = _get_widget_or_404(db, widget_id)

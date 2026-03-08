@@ -14,11 +14,11 @@ def get_db():
         db.close()
 
 
-def require_auth_placeholder(
+def require_auth(
     request: Request,
     db: Session = Depends(get_db),
 ) -> None:
-    """Temporary dependency name that now enforces real auth for protected routes."""
+    """Enforce auth for protected routes."""
     context = auth_service.require_authenticated_context(db=db, request=request)
     request.state.current_user = context.user
     request.state.auth_method = context.method

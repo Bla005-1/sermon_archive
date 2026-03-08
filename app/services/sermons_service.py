@@ -12,7 +12,7 @@ from sqlalchemy.sql import Select
 from app.db.models import BibleVerses, SermonPassages, Sermons
 from app.schemas.sermons import (
     PatchedSermon,
-    PatchedSermonPassage,
+    PartialSermonPassage,
     Sermon,
     SermonPassage,
     SermonSuggestionsResponse,
@@ -95,7 +95,7 @@ def _coerce_sermon_fields(
 
 
 def _resolve_passage_verse_ids(
-    db: Session, payload: SermonPassage | PatchedSermonPassage
+    db: Session, payload: SermonPassage | PartialSermonPassage
 ) -> tuple[int | None, int | None, str | None]:
     """Resolve passage verse ids from payload fields and optional `ref_text`."""
     ref_text = payload.ref_text.strip() if payload.ref_text else None
@@ -276,7 +276,7 @@ def patch_sermon_passage(
     db: Session,
     sermon_id: int,
     passage_id: int,
-    payload: PatchedSermonPassage,
+    payload: PartialSermonPassage,
 ) -> SermonPassage:
     """Partially update a sermon passage and return the updated passage."""
     passage = _get_passage_or_404(db, sermon_id, passage_id)

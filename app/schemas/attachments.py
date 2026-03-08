@@ -13,7 +13,7 @@ class Attachment(APIModel):
     created_at: datetime | None = None
 
 
-class PatchedAttachment(APIModel):
+class PartialAttachment(APIModel):
     original_filename: str | None = None
     mime_type: str | None = None
     byte_size: int | None = None

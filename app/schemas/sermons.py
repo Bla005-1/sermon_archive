@@ -21,7 +21,7 @@ class SermonPassage(APIModel):
     ord: int | None = None
 
 
-class PatchedSermonPassage(APIModel):
+class PartialSermonPassage(APIModel):
     start_verse_id: int | None = None
     end_verse_id: int | None = None
     ref_text: str | None = None
@@ -49,10 +49,6 @@ class PatchedSermon(APIModel):
     series_name: str | None = None
     location_name: str | None = None
     notes_md: str | None = None
-
-
-class SermonSearchResponse(APIModel):
-    sermons: list[Sermon]
 
 
 class SermonSuggestionsResponse(APIModel):

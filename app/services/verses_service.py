@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
+from collections import OrderedDict
 from collections.abc import Sequence
 
 from fastapi import HTTPException
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import (
+    BibleBooks,
     BibleVerses,
     Commentaries,
     SermonPassages,
@@ -23,12 +26,14 @@ from app.schemas.verses import (
     CommentaryStart,
     CrossReferenceItem,
     CrossReferenceVerse,
-    PatchedVerseNote,
+    PartialVerseNote,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
-    VerseIntentResponse,
-    VerseIntentResponseTypeEnum,
+    SearchIntentEnum,
+    VerseQueryResponse,
     VerseNote,
+    VerseTextSearchResponse,
+    VerseSearchResult,
     VerseSermonItem,
     VerseSermonResponse,
 )
@@ -74,26 +79,185 @@ def _preview_text_for_range(db: Session, start_id: int, end_id: int) -> str:
     ).strip()
 
 
-def get_passage_or_intent(
+def _tokenize_search_terms(query: str) -> list[str]:
+    """Split a free-text query into lower-cased word tokens."""
+    return re.findall(r"[\w']+", query.lower())
+
+
+def _verse_result_from_text_row(
+    row: VerseTextsMarked, order_num: int
+) -> VerseSearchResult:
+    verse = row.verse
+    return VerseSearchResult(
+        order_num=order_num,
+        verse_id=verse.verse_id,
+        reference=format_ref(verse, verse),
+        book=verse.book.name,
+        chapter=verse.chapter,
+        verse=verse.verse,
+        translation=row.translation,
+        text=row.plain_text,
+    )
+
+
+def _select_preferred_rows(rows: Sequence[VerseTextsMarked]) -> list[VerseTextsMarked]:
+    """Keep one row per verse, preferring ESV when multiple translations exist."""
+    by_verse: OrderedDict[int, VerseTextsMarked] = OrderedDict()
+    for row in rows:
+        verse_id = row.verse_id
+        current = by_verse.get(verse_id)
+        if current is None:
+            by_verse[verse_id] = row
+            continue
+        if current.translation.upper() != "ESV" and row.translation.upper() == "ESV":
+            by_verse[verse_id] = row
+    return list(by_verse.values())
+
+
+def resolve_query_intent(
     db: Session,
-    query: str,
+    q: str,
     translation: str | None = None,
-) -> VerseIntentResponse:
-    """Return lightweight intent payload, normalizing references when parseable."""
-    raw = (query or "").strip()
-    if not raw:
+) -> VerseQueryResponse:
+    """Resolve input as reference or text intent and return a single envelope."""
+    query = (q or "").strip()
+    if not query:
         raise HTTPException(
-            status_code=400, detail="Provide a reference in the 'query' query param."
+            status_code=400, detail="Provide a query in the 'q' query param."
         )
 
     try:
-        start, end = parse_reference(db, raw)
-        normalized = format_ref(start, end)
-        return VerseIntentResponse(
-            type=VerseIntentResponseTypeEnum.TEXT, query=normalized
-        )
+        start, end = parse_reference(db, query)
     except ValueError:
-        return VerseIntentResponse(type=VerseIntentResponseTypeEnum.TEXT, query=raw)
+        return VerseQueryResponse(intent=SearchIntentEnum.TEXT, query=query)
+
+    verses = _load_verse_range(db, start, end)
+    verse_ids = [verse.verse_id for verse in verses]
+    if not verse_ids:
+        return VerseQueryResponse(
+            intent=SearchIntentEnum.REFERENCE,
+            query=format_ref(start, end),
+            reference=format_ref(start, end),
+            verses=[],
+        )
+
+    text_rows = db.scalars(
+        select(VerseTextsMarked)
+        .join(BibleVerses, VerseTextsMarked.verse_id == BibleVerses.verse_id)
+        .options(joinedload(VerseTextsMarked.verse).joinedload(BibleVerses.book))
+        .where(VerseTextsMarked.verse_id.in_(verse_ids))
+        .order_by(BibleVerses.verse_id, func.lower(VerseTextsMarked.translation))
+    ).all()
+
+    if translation:
+        wanted = translation.strip().upper()
+        picked_by_verse: OrderedDict[int, VerseTextsMarked] = OrderedDict()
+        fallback_by_verse: OrderedDict[int, VerseTextsMarked] = OrderedDict()
+        for row in text_rows:
+            if row.verse_id not in fallback_by_verse:
+                fallback_by_verse[row.verse_id] = row
+            if row.translation.upper() == wanted:
+                picked_by_verse[row.verse_id] = row
+        selected = [
+            picked_by_verse.get(vid, fallback_by_verse[vid])
+            for vid in verse_ids
+            if vid in fallback_by_verse
+        ]
+    else:
+        selected = _select_preferred_rows(text_rows)
+
+    return VerseQueryResponse(
+        intent=SearchIntentEnum.REFERENCE,
+        query=format_ref(start, end),
+        reference=format_ref(start, end),
+        verses=[
+            _verse_result_from_text_row(row=row, order_num=idx)
+            for idx, row in enumerate(selected, start=1)
+        ],
+    )
+
+
+def search_verse_text(
+    db: Session,
+    q: str,
+    page: int = 1,
+    book: str | None = None,
+    chapter: int | None = None,
+    testament: str | None = None,
+    exact: bool = False,
+    translation: str | None = None,
+) -> VerseTextSearchResponse:
+    """Search verse text rows with optional filters and paginated results."""
+    query = (q or "").strip()
+    if not query:
+        raise HTTPException(
+            status_code=400, detail="Provide a search query in the 'q' query param."
+        )
+
+    page = max(page, 1)
+    page_size = 20
+
+    stmt = (
+        select(VerseTextsMarked)
+        .join(BibleVerses, VerseTextsMarked.verse_id == BibleVerses.verse_id)
+        .join(BibleBooks, BibleBooks.book_id == BibleVerses.book_id)
+        .options(joinedload(VerseTextsMarked.verse).joinedload(BibleVerses.book))
+    )
+
+    filters = []
+    if translation:
+        filters.append(
+            func.upper(VerseTextsMarked.translation) == translation.strip().upper()
+        )
+    if book:
+        filters.append(func.lower(BibleBooks.name) == book.strip().lower())
+    if chapter is not None:
+        filters.append(BibleVerses.chapter == chapter)
+    if testament and testament.strip().upper() in {"OT", "NT"}:
+        filters.append(BibleBooks.testament == testament.strip().upper())
+
+    if exact:
+        filters.append(VerseTextsMarked.plain_text.ilike(f"%{query}%"))
+    else:
+        terms = _tokenize_search_terms(query)
+        if not terms:
+            raise HTTPException(
+                status_code=400, detail="Provide a non-empty search query."
+            )
+        filters.append(
+            and_(*[VerseTextsMarked.plain_text.ilike(f"%{term}%") for term in terms])
+        )
+
+    if filters:
+        stmt = stmt.where(and_(*filters))
+
+    stmt = stmt.order_by(
+        BibleBooks.order_num,
+        BibleVerses.chapter,
+        BibleVerses.verse,
+        func.lower(VerseTextsMarked.translation),
+    )
+
+    rows = db.scalars(stmt).all()
+    selected_rows: Sequence[VerseTextsMarked]
+    if translation:
+        selected_rows = rows
+    else:
+        selected_rows = _select_preferred_rows(rows)
+
+    total = len(selected_rows)
+    offset = (page - 1) * page_size
+    paged = selected_rows[offset : offset + page_size]
+
+    return VerseTextSearchResponse(
+        query=query,
+        page=page,
+        total=total,
+        results=[
+            _verse_result_from_text_row(row=row, order_num=offset + idx)
+            for idx, row in enumerate(paged, start=1)
+        ],
+    )
 
 
 def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
@@ -316,7 +480,7 @@ def update_note(db: Session, note_id: int, payload: VerseNote) -> VerseNote:
     return get_note(db, note_id)
 
 
-def patch_note(db: Session, note_id: int, payload: PatchedVerseNote) -> VerseNote:
+def patch_note(db: Session, note_id: int, payload: PartialVerseNote) -> VerseNote:
     """Partially update a note's verse target and/or markdown body."""
     note = db.scalar(select(VerseNotes).where(VerseNotes.note_id == note_id))
     if note is None:

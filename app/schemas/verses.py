@@ -1,6 +1,8 @@
 from datetime import datetime, date
 from enum import Enum
 
+from pydantic import Field
+
 from app.schemas.base import APIModel
 
 
@@ -82,13 +84,34 @@ class VerseCrossReferencesResponse(APIModel):
     verses: list[CrossReferenceVerse]
 
 
-class VerseIntentResponseTypeEnum(str, Enum):
+class SearchIntentEnum(str, Enum):
+    REFERENCE = "reference"
     TEXT = "text"
 
 
-class VerseIntentResponse(APIModel):
-    type: VerseIntentResponseTypeEnum
+class VerseSearchResult(APIModel):
+    order_num: int
+    verse_id: int
+    reference: str
+    book: str
+    chapter: int
+    verse: int
+    translation: str
+    text: str
+
+
+class VerseQueryResponse(APIModel):
+    intent: SearchIntentEnum
     query: str
+    reference: str | None = None
+    verses: list[VerseSearchResult] = Field(default_factory=list)
+
+
+class VerseTextSearchResponse(APIModel):
+    query: str
+    page: int
+    total: int
+    results: list[VerseSearchResult]
 
 
 class VerseNote(APIModel):
@@ -100,7 +123,7 @@ class VerseNote(APIModel):
     updated_at: datetime | None = None
 
 
-class PatchedVerseNote(APIModel):
+class PartialVerseNote(APIModel):
     verse_id: int | None = None
     note_md: str | None = None
 

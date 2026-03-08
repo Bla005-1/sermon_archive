@@ -18,7 +18,7 @@ class BibleWidget(APIModel):
     updated_at: datetime | None = None
 
 
-class PatchedBibleWidget(APIModel):
+class PartialBibleWidget(APIModel):
     start_verse_id: int | None = None
     end_verse_id: int | None = None
     translation: str | None = None

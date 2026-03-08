@@ -15,12 +15,12 @@ from app.services import auth_service
 router = APIRouter(tags=["auth"])
 
 
-@router.get("/csrf/", response_model=CsrfResponse, operation_id="auth_csrf_retrieve")
+@router.get("/csrf", response_model=CsrfResponse, operation_id="auth_csrf_retrieve")
 def auth_csrf_retrieve(response: Response) -> CsrfResponse:
     return auth_service.get_csrf_payload(response=response)
 
 
-@router.post("/login/", response_model=UserResponse, operation_id="auth_login_create")
+@router.post("/login", response_model=UserResponse, operation_id="auth_login_create")
 def auth_login_create(
     payload: LoginRequest,
     request: Request,
@@ -32,7 +32,7 @@ def auth_login_create(
     )
 
 
-@router.post("/token/", response_model=TokenResponse, operation_id="auth_token_create")
+@router.post("/token", response_model=TokenResponse, operation_id="auth_token_create")
 def auth_token_create(
     payload: TokenLoginRequest,
     request: Request,
@@ -42,7 +42,7 @@ def auth_token_create(
 
 
 @router.post(
-    "/token/revoke/",
+    "/token/revoke",
     response_model=TokenRevokeResponse,
     operation_id="auth_token_revoke_create",
 )
@@ -53,7 +53,7 @@ def auth_token_revoke_create(
 
 
 @router.post(
-    "/logout/", status_code=status.HTTP_200_OK, operation_id="auth_logout_create"
+    "/logout", status_code=status.HTTP_200_OK, operation_id="auth_logout_create"
 )
 def auth_logout_create(
     request: Request,
@@ -65,13 +65,13 @@ def auth_logout_create(
     return response
 
 
-@router.get("/me/", response_model=UserResponse, operation_id="auth_me_retrieve")
+@router.get("/me", response_model=UserResponse, operation_id="auth_me_retrieve")
 def auth_me_retrieve(request: Request, db: Session = Depends(get_db)) -> UserResponse:
     return auth_service.get_me(db=db, request=request)
 
 
 @router.get(
-    "/refresh/", response_model=UserResponse, operation_id="auth_refresh_retrieve"
+    "/refresh", response_model=UserResponse, operation_id="auth_refresh_retrieve"
 )
 def auth_refresh_retrieve(
     request: Request,

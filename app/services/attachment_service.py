@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Attachments, Sermons
-from app.schemas.attachments import Attachment, PatchedAttachment
+from app.schemas.attachments import Attachment, PartialAttachment
 from app.services._mappers import attachment_schema
 
 
@@ -72,7 +72,7 @@ def update_attachment(
 
 
 def patch_attachment(
-    db: Session, attachment_id: int, payload: PatchedAttachment
+    db: Session, attachment_id: int, payload: PartialAttachment
 ) -> Attachment:
     """Partially update writable attachment metadata fields."""
     attachment = _get_attachment_or_404(db, attachment_id)
