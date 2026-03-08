@@ -68,29 +68,6 @@ class ChurchFathers(Base):
     )
 
 
-class Illustrations(Base):
-    __tablename__ = "illustrations"
-    __table_args__ = (Index("ix_illustrations_title", "title"),)
-
-    illustration_id: Mapped[int] = mapped_column(
-        BIGINT(unsigned=True), primary_key=True
-    )
-    title: Mapped[str] = mapped_column(String(256), nullable=False)
-    body_md: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
-    keywords_csv: Mapped[Optional[str]] = mapped_column(Text)
-    source: Mapped[Optional[str]] = mapped_column(String(256))
-    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(
-        TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")
-    )
-    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(
-        TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-    )
-
-    sermon_illustrations: Mapped[list["SermonIllustrations"]] = relationship(
-        "SermonIllustrations", back_populates="illustration"
-    )
-
-
 class Sermons(Base):
     __tablename__ = "sermons"
     __table_args__ = (
@@ -116,9 +93,6 @@ class Sermons(Base):
 
     attachments: Mapped[list["Attachments"]] = relationship(
         "Attachments", back_populates="sermon"
-    )
-    sermon_illustrations: Mapped[list["SermonIllustrations"]] = relationship(
-        "SermonIllustrations", back_populates="sermon"
     )
     sermon_passages: Mapped[list["SermonPassages"]] = relationship(
         "SermonPassages", back_populates="sermon"
@@ -246,44 +220,6 @@ class BibleVerses(Base):
     )
     verse_texts_marked: Mapped[list["VerseTextsMarked"]] = relationship(
         "VerseTextsMarked", back_populates="verse"
-    )
-
-
-class SermonIllustrations(Base):
-    __tablename__ = "sermon_illustrations"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["illustration_id"],
-            ["illustrations.illustration_id"],
-            ondelete="RESTRICT",
-            onupdate="CASCADE",
-            name="fk_si_illustration",
-        ),
-        ForeignKeyConstraint(
-            ["sermon_id"],
-            ["sermons.sermon_id"],
-            ondelete="CASCADE",
-            onupdate="CASCADE",
-            name="fk_si_sermon",
-        ),
-        Index("fk_si_illustration", "illustration_id"),
-        Index("idx_sermon_illustrations_sermon_ord", "sermon_id", "ord"),
-        Index("ix_si_ord", "ord"),
-    )
-
-    sermon_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    illustration_id: Mapped[int] = mapped_column(
-        BIGINT(unsigned=True), primary_key=True
-    )
-    ord: Mapped[Optional[int]] = mapped_column(
-        SMALLINT(unsigned=True), server_default=text("'1'")
-    )
-
-    illustration: Mapped["Illustrations"] = relationship(
-        "Illustrations", back_populates="sermon_illustrations"
-    )
-    sermon: Mapped["Sermons"] = relationship(
-        "Sermons", back_populates="sermon_illustrations"
     )
 
 
