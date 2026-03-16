@@ -99,6 +99,7 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 ### Sermons (protected)
 
 - `GET /api/sermons`
+- `GET /api/sermons/suggestions`
 - `POST /api/sermons`
 - `GET /api/sermons/{sermon_id}`
 - `PUT /api/sermons/{sermon_id}`
@@ -113,7 +114,12 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `PUT /api/sermons/{sermon_id}/passages/{id}`
 - `PATCH /api/sermons/{sermon_id}/passages/{id}`
 - `DELETE /api/sermons/{sermon_id}/passages/{id}`
-- `GET /api/sermons/suggestions`
+
+`GET /api/sermons/suggestions` returns collection-level autocomplete values derived from existing sermons:
+
+- `speakers`
+- `series`
+- `locations`
 
 ### Attachments (protected)
 
@@ -127,6 +133,7 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 Public:
 - `GET /api/verses`
 - `GET /api/verses/search`
+- `GET /api/verses/translations`
 
 Protected:
 - `GET /api/verses/commentaries`
@@ -138,6 +145,8 @@ Protected:
 - `PATCH /api/verses/notes/{note_id}`
 - `DELETE /api/verses/notes/{note_id}`
 - `GET /api/verses/sermons`
+
+`GET /api/verses/translations` returns the distinct translation codes available for verse lookup and text search filters.
 
 ### Widget
 

@@ -24,6 +24,17 @@ def sermons_list(
     return sermons_service.list_sermons(db=db, q=q)
 
 
+@router.get(
+    "/suggestions",
+    response_model=SermonSuggestionsResponse,
+    operation_id="sermons_suggestions_list",
+)
+def sermons_suggestions_list(
+    db: Session = Depends(get_db),
+) -> SermonSuggestionsResponse:
+    return sermons_service.get_suggestions(db=db)
+
+
 @router.post(
     "",
     response_model=Sermon,
@@ -219,14 +230,3 @@ def sermons_passages_destroy_2(
     db: Session = Depends(get_db),
 ) -> None:
     sermons_service.delete_sermon_passage(db=db, sermon_id=sermon_id, passage_id=id)
-
-
-@router.get(
-    "/suggestions",
-    response_model=SermonSuggestionsResponse,
-    operation_id="sermons_suggestions_retrieve",
-)
-def sermons_suggestions_retrieve(
-    db: Session = Depends(get_db),
-) -> SermonSuggestionsResponse:
-    return sermons_service.get_suggestions(db=db)

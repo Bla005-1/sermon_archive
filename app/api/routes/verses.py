@@ -10,6 +10,7 @@ from app.schemas.verses import (
     VerseNote,
     VerseTextSearchResponse,
     VerseSermonResponse,
+    VerseTranslationsResponse,
 )
 from app.services import verses_service
 
@@ -40,9 +41,9 @@ def verses_search_retrieve(
     exact: bool = Query(default=False),
     page: int = Query(default=1),
     testament: str | None = Query(default=None),
-    translation: str | None = Query(default="ESV"),
+    translation: str | None = Query(default=None),
     db: Session = Depends(get_db),
-) -> VerseTextSearchResponse:
+    ) -> VerseTextSearchResponse:
     return verses_service.search_verse_text(
         db=db,
         q=q,
@@ -53,6 +54,17 @@ def verses_search_retrieve(
         exact=exact,
         translation=translation,
     )
+
+
+@router.get(
+    "/translations",
+    response_model=VerseTranslationsResponse,
+    operation_id="verses_translations_list",
+)
+def verses_translations_list(
+    db: Session = Depends(get_db),
+) -> VerseTranslationsResponse:
+    return verses_service.list_translations(db=db)
 
 
 @router.get(

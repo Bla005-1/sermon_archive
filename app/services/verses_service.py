@@ -33,6 +33,7 @@ from app.schemas.verses import (
     VerseQueryResponse,
     VerseNote,
     VerseTextSearchResponse,
+    VerseTranslationsResponse,
     VerseSearchResult,
     VerseSermonItem,
     VerseSermonResponse,
@@ -124,6 +125,17 @@ def _select_preferred_rows(rows: Sequence[VerseTextsMarked]) -> list[VerseTextsM
         if current.translation.upper() != "ESV" and row.translation.upper() == "ESV":
             by_verse[verse_id] = row
     return list(by_verse.values())
+
+
+def list_translations(db: Session) -> VerseTranslationsResponse:
+    """Return distinct verse text translations in display order."""
+    rows = db.scalars(
+        select(VerseTextsMarked.translation)
+        .where(VerseTextsMarked.translation.is_not(None), VerseTextsMarked.translation != "")
+        .distinct()
+        .order_by(func.lower(VerseTextsMarked.translation))
+    ).all()
+    return VerseTranslationsResponse(translations=list(rows))
 
 
 def resolve_query_intent(

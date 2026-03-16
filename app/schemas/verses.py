@@ -115,6 +115,10 @@ class VerseTextSearchResponse(APIModel):
     results: list[VerseSearchResult]
 
 
+class VerseTranslationsResponse(APIModel):
+    translations: list[str] = Field(default_factory=list)
+
+
 class VerseNote(APIModel):
     note_id: int | None = None
     verse: BibleVerse | None = None
