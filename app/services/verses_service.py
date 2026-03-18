@@ -105,6 +105,8 @@ def _verse_result_from_text_row(
         verse=verse.verse,
         available_translations=list(available_translations or []),
         translation=row.translation,
+        plain_text=row.plain_text,
+        marked_text=row.marked_text,
         text=row.plain_text,
     )
 

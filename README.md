@@ -168,3 +168,29 @@ Use the VS Code REST Client files in `tests/rest_client/`:
 - `tests/rest_client/protected_endpoints.rest`
 
 Set credentials in your environment (`API_USERNAME`, `API_PASSWORD`) before running requests.
+
+## Marked Bible Text
+- If a word contains a `*`, then all following characters indicate features of that word.
+  - `p` - Start a new paragraph.
+  - `l` - Start a new line.
+  - `n` - Start a new indented line.
+  - `d` - Start a new doubly-indented line.
+  - `c` - Start a new centered line.
+  - `g` - Start a new right-aligned line.
+  - `e` - Start a new left-aligned line.
+  - `s` - Render with smallcaps.
+  - `i` - Render with italics.
+  - `b` - Render with bold.
+  - `r` - Render as a redletter word of Christ.
+- For example, a verse text might be: `For*pn the Lord*s watches over the way of the righteous, but*ln the way of the wicked leads to ruin.`
+  - The first word (`For`) should start a new paragraph and be indented.
+  - The third word (`Lord`) should be rendered with smallcaps.
+  - The eleventh word (`but`) should start a new line and be indented.
+
+## Bible Footnotes
+- If a word contains a `*`, then all following characters indicate features of that word.
+  - `r` - Indicates that the word is a cross-reference.
+  - `i` - Render with italics.
+- For example, a footnote text might be `2:2*r Or anointed one`.
+  - The first word is a cross-reference that can be linked be `2:2` within the current book.
+  

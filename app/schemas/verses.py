@@ -98,6 +98,8 @@ class VerseSearchResult(APIModel):
     verse: int
     available_translations: list[str] = Field(default_factory=list)
     translation: str
+    plain_text: str
+    marked_text: str | None = None
     text: str
 
 
