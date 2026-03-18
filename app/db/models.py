@@ -14,7 +14,7 @@ from sqlalchemy import (
     Text,
     text,
 )
-from sqlalchemy.dialects.mysql import BIGINT, LONGTEXT, SMALLINT, TINYINT
+from sqlalchemy.dialects.mysql import BIGINT, INTEGER, LONGTEXT, SMALLINT, TINYINT
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -25,6 +25,41 @@ class Base(DeclarativeBase):
 class BibleBooksTestament(str, enum.Enum):
     OT = "OT"
     NT = "NT"
+
+
+class ApiUsers(Base):
+    __tablename__ = "api_users"
+    __table_args__ = (
+        Index("uq_api_users_email", "email", unique=True),
+        Index("uq_api_users_username", "username", unique=True),
+    )
+
+    user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
+    username: Mapped[str] = mapped_column(String(150), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[int] = mapped_column(
+        TINYINT(unsigned=True), nullable=False, server_default=text("'1'")
+    )
+    is_staff: Mapped[int] = mapped_column(
+        TINYINT(unsigned=True), nullable=False, server_default=text("'0'")
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+    )
+    email: Mapped[Optional[str]] = mapped_column(String(254))
+    last_login_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
+
+    api_access_tokens: Mapped[list["ApiAccessTokens"]] = relationship(
+        "ApiAccessTokens", back_populates="user"
+    )
+    api_sessions: Mapped[list["ApiSessions"]] = relationship(
+        "ApiSessions", back_populates="user"
+    )
 
 
 class BibleBooks(Base):
@@ -97,6 +132,71 @@ class Sermons(Base):
     sermon_passages: Mapped[list["SermonPassages"]] = relationship(
         "SermonPassages", back_populates="sermon"
     )
+
+
+class ApiAccessTokens(Base):
+    __tablename__ = "api_access_tokens"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id"],
+            ["api_users.user_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_api_tokens_user",
+        ),
+        Index("ix_api_access_tokens_expires", "expires_at"),
+        Index("ix_api_access_tokens_user", "user_id"),
+        Index("uq_api_access_tokens_hash", "token_hash", unique=True),
+    )
+
+    token_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
+    user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    expires_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False)
+    token_name: Mapped[Optional[str]] = mapped_column(String(128))
+    last_used_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
+    revoked_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
+    scopes: Mapped[Optional[str]] = mapped_column(String(512))
+
+    user: Mapped["ApiUsers"] = relationship(
+        "ApiUsers", back_populates="api_access_tokens"
+    )
+
+
+class ApiSessions(Base):
+    __tablename__ = "api_sessions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id"],
+            ["api_users.user_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_api_sessions_user",
+        ),
+        Index("ix_api_sessions_expires", "expires_at"),
+        Index("ix_api_sessions_user", "user_id"),
+    )
+
+    session_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    csrf_token: Mapped[str] = mapped_column(String(96), nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    expires_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False)
+    last_seen_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    is_revoked: Mapped[int] = mapped_column(
+        TINYINT(unsigned=True), nullable=False, server_default=text("'0'")
+    )
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64))
+    user_agent: Mapped[Optional[str]] = mapped_column(String(512))
+
+    user: Mapped["ApiUsers"] = relationship("ApiUsers", back_populates="api_sessions")
 
 
 class Attachments(Base):
@@ -214,6 +314,9 @@ class BibleVerses(Base):
         "VerseCrossrefs",
         foreign_keys="[VerseCrossrefs.to_start_verse_id]",
         back_populates="to_start_verse",
+    )
+    verse_headings: Mapped[list["VerseHeadings"]] = relationship(
+        "VerseHeadings", back_populates="start_verse"
     )
     verse_notes: Mapped[list["VerseNotes"]] = relationship(
         "VerseNotes", back_populates="verse"
@@ -553,6 +656,44 @@ class VerseCrossrefs(Base):
     )
 
 
+class VerseHeadings(Base):
+    __tablename__ = "verse_headings"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["start_verse_id"],
+            ["bible_verses.verse_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_vsh_start_verse",
+        ),
+        Index("idx_start_verse_id", "start_verse_id"),
+        Index("idx_translation_order", "translation", "order_index"),
+        Index("idx_translation_start", "translation", "start_verse_id"),
+        Index(
+            "translation",
+            "translation",
+            "start_verse_id",
+            "heading_level",
+            "heading_text",
+            mysql_length={"heading_text": 255},
+            unique=True,
+        ),
+    )
+
+    section_heading_id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True), primary_key=True
+    )
+    translation: Mapped[str] = mapped_column(String(16), nullable=False)
+    start_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    heading_level: Mapped[int] = mapped_column(TINYINT(unsigned=True), nullable=False)
+    heading_text: Mapped[str] = mapped_column(Text, nullable=False)
+    order_index: Mapped[int] = mapped_column(INTEGER(unsigned=True), nullable=False)
+
+    start_verse: Mapped["BibleVerses"] = relationship(
+        "BibleVerses", back_populates="verse_headings"
+    )
+
+
 class VerseNotes(Base):
     __tablename__ = "verse_notes"
     __table_args__ = (
@@ -605,101 +746,3 @@ class VerseTextsMarked(Base):
     verse: Mapped["BibleVerses"] = relationship(
         "BibleVerses", back_populates="verse_texts_marked"
     )
-
-
-class ApiUsers(Base):
-    __tablename__ = "api_users"
-    __table_args__ = (
-        Index("uq_api_users_username", "username", unique=True),
-        Index("uq_api_users_email", "email", unique=True),
-    )
-
-    user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    username: Mapped[str] = mapped_column(String(150), nullable=False)
-    email: Mapped[Optional[str]] = mapped_column(String(254))
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    is_active: Mapped[int] = mapped_column(
-        TINYINT(unsigned=True), nullable=False, server_default=text("'1'")
-    )
-    is_staff: Mapped[int] = mapped_column(
-        TINYINT(unsigned=True), nullable=False, server_default=text("'0'")
-    )
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
-    )
-    updated_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP,
-        nullable=False,
-        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
-    )
-    last_login_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
-
-    sessions: Mapped[list["ApiSessions"]] = relationship(
-        "ApiSessions", back_populates="user"
-    )
-    access_tokens: Mapped[list["ApiAccessTokens"]] = relationship(
-        "ApiAccessTokens", back_populates="user"
-    )
-
-
-class ApiSessions(Base):
-    __tablename__ = "api_sessions"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["user_id"],
-            ["api_users.user_id"],
-            ondelete="CASCADE",
-            onupdate="CASCADE",
-            name="fk_api_sessions_user",
-        ),
-        Index("ix_api_sessions_user", "user_id"),
-        Index("ix_api_sessions_expires", "expires_at"),
-    )
-
-    session_id: Mapped[str] = mapped_column(String(96), primary_key=True)
-    user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    csrf_token: Mapped[str] = mapped_column(String(96), nullable=False)
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
-    )
-    expires_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False)
-    last_seen_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
-    )
-    ip_address: Mapped[Optional[str]] = mapped_column(String(64))
-    user_agent: Mapped[Optional[str]] = mapped_column(String(512))
-    is_revoked: Mapped[int] = mapped_column(
-        TINYINT(unsigned=True), nullable=False, server_default=text("'0'")
-    )
-
-    user: Mapped["ApiUsers"] = relationship("ApiUsers", back_populates="sessions")
-
-
-class ApiAccessTokens(Base):
-    __tablename__ = "api_access_tokens"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["user_id"],
-            ["api_users.user_id"],
-            ondelete="CASCADE",
-            onupdate="CASCADE",
-            name="fk_api_tokens_user",
-        ),
-        Index("uq_api_access_tokens_hash", "token_hash", unique=True),
-        Index("ix_api_access_tokens_user", "user_id"),
-        Index("ix_api_access_tokens_expires", "expires_at"),
-    )
-
-    token_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    token_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    token_name: Mapped[Optional[str]] = mapped_column(String(128))
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
-    )
-    expires_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False)
-    last_used_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
-    revoked_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
-    scopes: Mapped[Optional[str]] = mapped_column(String(512))
-
-    user: Mapped["ApiUsers"] = relationship("ApiUsers", back_populates="access_tokens")

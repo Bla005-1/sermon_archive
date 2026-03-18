@@ -101,10 +101,20 @@ class VerseSearchResult(APIModel):
     text: str
 
 
+class VerseNavigationTarget(APIModel):
+    kind: str
+    reference: str
+    label: str
+
+
 class VerseQueryResponse(APIModel):
     intent: SearchIntentEnum
     query: str
     reference: str | None = None
+    scope: str | None = None
+    previous_target: VerseNavigationTarget | None = None
+    expand_target: VerseNavigationTarget | None = None
+    next_target: VerseNavigationTarget | None = None
     verses: list[VerseSearchResult] = Field(default_factory=list)
 
 

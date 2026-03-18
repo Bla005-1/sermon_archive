@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
+from functools import lru_cache
 from typing import Any
 from collections import OrderedDict
 from collections.abc import Sequence
@@ -16,6 +18,7 @@ from app.db.models import (
     BibleVerses,
     Commentaries,
     SermonPassages,
+    VerseHeadings,
     VerseCrossrefs,
     VerseNotes,
     VerseTextsMarked,
@@ -29,6 +32,7 @@ from app.schemas.verses import (
     PartialVerseNote,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
+    VerseNavigationTarget,
     SearchIntentEnum,
     VerseQueryResponse,
     VerseNote,
@@ -40,6 +44,9 @@ from app.schemas.verses import (
 )
 from app.services._mappers import verse_note_schema
 from app.services._reference import format_ref, parse_reference
+
+SECTION_BOUNDARY_TRANSLATION = "ESV"
+_section_start_id_cache: list[int] | None = None
 
 
 def _load_verse_range(
@@ -127,6 +134,268 @@ def _select_preferred_rows(rows: Sequence[VerseTextsMarked]) -> list[VerseTextsM
     return list(by_verse.values())
 
 
+def _chapter_bounds(
+    db: Session, verse: BibleVerses
+) -> tuple[BibleVerses, BibleVerses] | None:
+    verses = db.scalars(
+        select(BibleVerses)
+        .options(joinedload(BibleVerses.book))
+        .where(BibleVerses.book_id == verse.book_id, BibleVerses.chapter == verse.chapter)
+        .order_by(BibleVerses.verse_id)
+    ).all()
+    if not verses:
+        return None
+    return verses[0], verses[-1]
+
+
+@lru_cache(maxsize=1)
+def _cached_section_translation() -> str:
+    return SECTION_BOUNDARY_TRANSLATION.upper()
+
+
+def _section_start_ids(db: Session) -> list[int]:
+    global _section_start_id_cache
+    if _section_start_id_cache is not None:
+        return _section_start_id_cache
+
+    translation = _cached_section_translation()
+    rows = db.scalars(
+        select(VerseHeadings.start_verse_id)
+        .where(func.upper(VerseHeadings.translation) == translation)
+        .distinct()
+        .order_by(VerseHeadings.start_verse_id)
+    ).all()
+    _section_start_id_cache = list(rows)
+    return _section_start_id_cache
+
+
+def _verse_by_id(db: Session, verse_id: int) -> BibleVerses | None:
+    return db.scalar(
+        select(BibleVerses)
+        .options(joinedload(BibleVerses.book))
+        .where(BibleVerses.verse_id == verse_id)
+    )
+
+
+def _first_verse_after(db: Session, verse_id: int) -> BibleVerses | None:
+    return db.scalar(
+        select(BibleVerses)
+        .options(joinedload(BibleVerses.book))
+        .where(BibleVerses.verse_id > verse_id)
+        .order_by(BibleVerses.verse_id)
+        .limit(1)
+    )
+
+
+def _last_verse_before(db: Session, verse_id: int) -> BibleVerses | None:
+    return db.scalar(
+        select(BibleVerses)
+        .options(joinedload(BibleVerses.book))
+        .where(BibleVerses.verse_id < verse_id)
+        .order_by(desc(BibleVerses.verse_id))
+        .limit(1)
+    )
+
+
+def _last_verse(db: Session) -> BibleVerses | None:
+    return db.scalar(
+        select(BibleVerses)
+        .options(joinedload(BibleVerses.book))
+        .order_by(desc(BibleVerses.verse_id))
+        .limit(1)
+    )
+
+
+def _max_verse_before(db: Session, verse_id: int) -> BibleVerses | None:
+    return db.scalar(
+        select(BibleVerses)
+        .options(joinedload(BibleVerses.book))
+        .where(BibleVerses.verse_id < verse_id)
+        .order_by(desc(BibleVerses.verse_id))
+        .limit(1)
+    )
+
+
+def _nav_target(kind: str, start: BibleVerses, end: BibleVerses | None = None) -> VerseNavigationTarget:
+    range_end = end or start
+    reference = f"{start.book.name} {start.chapter}" if kind == "chapter" else format_ref(start, range_end)
+    return VerseNavigationTarget(kind=kind, reference=reference, label=reference)
+
+
+def _chapter_expand_target(verse: BibleVerses) -> VerseNavigationTarget:
+    chapter_reference = f"{verse.book.name} {verse.chapter}"
+    return VerseNavigationTarget(
+        kind="chapter",
+        reference=chapter_reference,
+        label=chapter_reference,
+    )
+
+
+def _section_bounds_for_verse(
+    db: Session, start: BibleVerses, end: BibleVerses
+) -> tuple[BibleVerses, BibleVerses, int | None] | None:
+    section_start_ids = _section_start_ids(db)
+    if not section_start_ids:
+        return None
+
+    current_index = bisect_right(section_start_ids, start.verse_id) - 1
+    if current_index < 0:
+        return None
+
+    section_start_id = section_start_ids[current_index]
+    next_section_start_id = (
+        section_start_ids[current_index + 1]
+        if current_index + 1 < len(section_start_ids)
+        else None
+    )
+    same_section = next_section_start_id is None or end.verse_id < next_section_start_id
+
+    if next_section_start_id is None:
+        section_end = _last_verse(db)
+    else:
+        section_end = _max_verse_before(db, next_section_start_id)
+
+    section_start = _verse_by_id(db, section_start_id)
+    if section_start is None or section_end is None or not same_section:
+        return None
+
+    return section_start, section_end, next_section_start_id
+
+
+def _compute_expand_target(
+    db: Session, start: BibleVerses, end: BibleVerses
+) -> VerseNavigationTarget | None:
+    chapter_bounds = _chapter_bounds(db, start)
+    if chapter_bounds is None:
+        return None
+
+    chapter_start, chapter_end = chapter_bounds
+    if start.verse_id == chapter_start.verse_id and end.verse_id == chapter_end.verse_id:
+        return None
+
+    section_bounds = _section_bounds_for_verse(db, start, end)
+    if section_bounds is None:
+        return _chapter_expand_target(start)
+
+    section_start, section_end, _next_section_start_id = section_bounds
+    query_matches_section = (
+        start.verse_id == section_start.verse_id and end.verse_id == section_end.verse_id
+    )
+
+    if (
+        query_matches_section
+        or section_start.book_id != start.book_id
+        or section_end.book_id != start.book_id
+        or section_start.chapter != start.chapter
+        or section_end.chapter != start.chapter
+    ):
+        return _chapter_expand_target(start)
+
+    return _nav_target("section", section_start, section_end)
+
+
+def _scope_for_range(
+    db: Session, start: BibleVerses, end: BibleVerses, expand_target: VerseNavigationTarget | None
+) -> str:
+    chapter_bounds = _chapter_bounds(db, start)
+    if chapter_bounds is not None:
+        chapter_start, chapter_end = chapter_bounds
+        if start.verse_id == chapter_start.verse_id and end.verse_id == chapter_end.verse_id:
+            return "chapter"
+
+    if start.verse_id == end.verse_id:
+        return "verse"
+
+    section_bounds = _section_bounds_for_verse(db, start, end)
+    if section_bounds is not None:
+        section_start, section_end, _ = section_bounds
+        if start.verse_id == section_start.verse_id and end.verse_id == section_end.verse_id:
+            return "section"
+
+    if expand_target is not None:
+        return expand_target.kind
+
+    return "verse"
+
+
+def _previous_target(
+    db: Session, scope: str, start: BibleVerses, end: BibleVerses
+) -> VerseNavigationTarget | None:
+    if scope == "verse":
+        previous_verse = _last_verse_before(db, start.verse_id)
+        return _nav_target("verse", previous_verse) if previous_verse is not None else None
+
+    if scope == "chapter":
+        chapter_bounds = _chapter_bounds(db, start)
+        if chapter_bounds is None:
+            return None
+        chapter_start, _chapter_end = chapter_bounds
+        previous_verse = _last_verse_before(db, chapter_start.verse_id)
+        if previous_verse is None:
+            return None
+        previous_bounds = _chapter_bounds(db, previous_verse)
+        if previous_bounds is None:
+            return None
+        previous_start, previous_end = previous_bounds
+        return _nav_target("chapter", previous_start, previous_end)
+
+    if scope == "section":
+        section_start_ids = _section_start_ids(db)
+        current_index = bisect_right(section_start_ids, start.verse_id) - 1
+        if current_index <= 0 or current_index >= len(section_start_ids):
+            return None
+        previous_start_id = section_start_ids[current_index - 1]
+        current_start_id = section_start_ids[current_index]
+        previous_start = _verse_by_id(db, previous_start_id)
+        previous_end = _max_verse_before(db, current_start_id)
+        if previous_start is None or previous_end is None:
+            return None
+        return _nav_target("section", previous_start, previous_end)
+
+    return None
+
+
+def _next_target(
+    db: Session, scope: str, start: BibleVerses, end: BibleVerses
+) -> VerseNavigationTarget | None:
+    if scope == "verse":
+        next_verse = _first_verse_after(db, end.verse_id)
+        return _nav_target("verse", next_verse) if next_verse is not None else None
+
+    if scope == "chapter":
+        chapter_bounds = _chapter_bounds(db, start)
+        if chapter_bounds is None:
+            return None
+        _chapter_start, chapter_end = chapter_bounds
+        next_verse = _first_verse_after(db, chapter_end.verse_id)
+        if next_verse is None:
+            return None
+        next_bounds = _chapter_bounds(db, next_verse)
+        if next_bounds is None:
+            return None
+        next_start, next_end = next_bounds
+        return _nav_target("chapter", next_start, next_end)
+
+    if scope == "section":
+        section_start_ids = _section_start_ids(db)
+        current_index = bisect_right(section_start_ids, start.verse_id) - 1
+        if current_index < 0 or current_index >= len(section_start_ids) - 1:
+            return None
+        next_start_id = section_start_ids[current_index + 1]
+        next_next_start_id = (
+            section_start_ids[current_index + 2]
+            if current_index + 2 < len(section_start_ids)
+            else None
+        )
+        next_start = _verse_by_id(db, next_start_id)
+        next_end = _last_verse(db) if next_next_start_id is None else _max_verse_before(db, next_next_start_id)
+        if next_start is None or next_end is None:
+            return None
+        return _nav_target("section", next_start, next_end)
+
+    return None
+
+
 def list_translations(db: Session) -> VerseTranslationsResponse:
     """Return distinct verse text translations in display order."""
     rows = db.scalars(
@@ -191,10 +460,16 @@ def resolve_query_intent(
     else:
         selected = _select_preferred_rows(text_rows)
 
+    expand_target = _compute_expand_target(db, start, end)
+    scope = _scope_for_range(db, start, end, expand_target)
     return VerseQueryResponse(
         intent=SearchIntentEnum.REFERENCE,
         query=format_ref(start, end),
         reference=format_ref(start, end),
+        scope=scope,
+        previous_target=_previous_target(db, scope, start, end),
+        expand_target=expand_target,
+        next_target=_next_target(db, scope, start, end),
         verses=[
             _verse_result_from_text_row(
                 row=row,
