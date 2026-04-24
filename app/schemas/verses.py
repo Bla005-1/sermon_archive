@@ -73,6 +73,26 @@ class CrossReferenceVerse(APIModel):
     cross_references: list[CrossReferenceItem]
 
 
+class FootnoteCrossReferenceItem(APIModel):
+    reference: str
+    reference_note: str
+    footnote_id: int
+    footnote_label: str
+    footnote_text: str
+    source_order_number: int | None = None
+    to_start_id: int
+    to_end_id: int
+    preview_text: str
+
+
+class FootnoteCrossReferenceVerse(APIModel):
+    verse_id: int
+    book: str
+    chapter: int
+    verse: int
+    cross_references: list[FootnoteCrossReferenceItem]
+
+
 class VerseCommentaryResponse(APIModel):
     reference: str
     count: int
@@ -82,6 +102,7 @@ class VerseCommentaryResponse(APIModel):
 class VerseCrossReferencesResponse(APIModel):
     reference: str
     verses: list[CrossReferenceVerse]
+    footnote_verses: list[FootnoteCrossReferenceVerse]
 
 
 class SearchIntentEnum(str, Enum):

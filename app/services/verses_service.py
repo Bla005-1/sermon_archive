@@ -17,6 +17,8 @@ from app.db.models import (
     BibleBooks,
     BibleVerses,
     Commentaries,
+    FootnoteCrossRefs,
+    Footnotes,
     SermonPassages,
     VerseHeadings,
     VerseCrossrefs,
@@ -27,6 +29,8 @@ from app.schemas.verses import (
     CommentaryEnd,
     CommentaryItem,
     CommentaryStart,
+    FootnoteCrossReferenceItem,
+    FootnoteCrossReferenceVerse,
     CrossReferenceItem,
     CrossReferenceVerse,
     PartialVerseNote,
@@ -671,7 +675,7 @@ def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
 
 
 def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
-    """Return verse-level outbound cross references for a resolved reference range."""
+    """Return verse-level and footnote outbound cross references for a resolved reference range."""
     reference = (ref or "").strip()
     if not reference:
         raise HTTPException(
@@ -731,8 +735,71 @@ def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
             )
         )
 
+    footnote_rows = (
+        db.execute(
+            select(FootnoteCrossRefs, Footnotes)
+            .join(Footnotes, Footnotes.id == FootnoteCrossRefs.footnote_id)
+            .where(Footnotes.verse_id.in_(verse_ids) if verse_ids else False)  # type: ignore
+            .options(
+                joinedload(FootnoteCrossRefs.to_start_verse).joinedload(BibleVerses.book),
+                joinedload(FootnoteCrossRefs.to_end_verse).joinedload(BibleVerses.book),
+            )
+            .order_by(
+                Footnotes.verse_id,
+                Footnotes.order_in_translation,
+                Footnotes.word_index,
+                Footnotes.footnote_label,
+                FootnoteCrossRefs.source_order_number.is_(None),
+                FootnoteCrossRefs.source_order_number,
+                FootnoteCrossRefs.id,
+            )
+        )
+        .unique()
+        .all()
+    )
+
+    footnote_by_from: dict[int, list[tuple[FootnoteCrossRefs, Footnotes]]] = {
+        vid: [] for vid in verse_ids
+    }
+    for cross_ref, footnote in footnote_rows:
+        footnote_by_from.setdefault(footnote.verse_id, []).append((cross_ref, footnote))
+
+    footnote_payload: list[FootnoteCrossReferenceVerse] = []
+    for verse in verses:
+        items: list[FootnoteCrossReferenceItem] = []
+        for row, footnote in footnote_by_from.get(verse.verse_id, []):
+            to_start = row.to_start_verse
+            to_end = row.to_end_verse or to_start
+            items.append(
+                FootnoteCrossReferenceItem(
+                    reference=format_ref(to_start, to_end),
+                    reference_note=row.reference_note or "",
+                    footnote_id=footnote.id,
+                    footnote_label=footnote.footnote_label,
+                    footnote_text=footnote.footnote_text or "",
+                    source_order_number=row.source_order_number,
+                    to_start_id=to_start.verse_id,
+                    to_end_id=to_end.verse_id,
+                    preview_text=_preview_text_for_range(
+                        db, to_start.verse_id, to_end.verse_id
+                    ),
+                )
+            )
+
+        footnote_payload.append(
+            FootnoteCrossReferenceVerse(
+                verse_id=verse.verse_id,
+                book=verse.book.name,
+                chapter=verse.chapter,
+                verse=verse.verse,
+                cross_references=items,
+            )
+        )
+
     return VerseCrossReferencesResponse(
-        reference=format_ref(start, end), verses=payload
+        reference=format_ref(start, end),
+        verses=payload,
+        footnote_verses=footnote_payload,
     )
 
 
