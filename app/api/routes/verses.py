@@ -43,7 +43,7 @@ def verses_search_retrieve(
     testament: str | None = Query(default=None),
     translation: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    ) -> VerseTextSearchResponse:
+) -> VerseTextSearchResponse:
     return verses_service.search_verse_text(
         db=db,
         q=q,

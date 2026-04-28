@@ -65,14 +65,13 @@ class ApiUsers(Base):
 class BibleBooks(Base):
     __tablename__ = "bible_books"
     __table_args__ = (
-        Index("idx_bible_books_order", "order_num"),
-        Index("uq_bible_books_name", "name", unique=True),
-        Index("ux_bible_books_name", "name", unique=True),
+        Index("idx_bible_books_book_order", "book_order"),
+        Index("uq_bible_books_book_name", "book_name", unique=True),
     )
 
     book_id: Mapped[int] = mapped_column(TINYINT(unsigned=True), primary_key=True)
-    name: Mapped[str] = mapped_column(String(64), nullable=False)
-    order_num: Mapped[int] = mapped_column(TINYINT(unsigned=True), nullable=False)
+    book_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    book_order: Mapped[int] = mapped_column(TINYINT(unsigned=True), nullable=False)
     testament: Mapped[BibleBooksTestament] = mapped_column(
         Enum(
             BibleBooksTestament,
@@ -91,10 +90,12 @@ class BibleBooks(Base):
 
 class ChurchFathers(Base):
     __tablename__ = "church_fathers"
-    __table_args__ = (Index("uq_church_fathers_name", "name", unique=True),)
+    __table_args__ = (
+        Index("uq_church_fathers_father_name", "father_name", unique=True),
+    )
 
     father_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    father_name: Mapped[str] = mapped_column(String(128), nullable=False)
     default_year: Mapped[Optional[int]] = mapped_column(Integer)
     wiki_url: Mapped[Optional[str]] = mapped_column(String(512))
 
@@ -107,9 +108,7 @@ class Sermons(Base):
     __tablename__ = "sermons"
     __table_args__ = (
         Index("idx_sermons_preached_on", "preached_on"),
-        Index("idx_sermons_speaker_date", "speaker_name", "preached_on"),
-        Index("ix_sermons_preached_on", "preached_on"),
-        Index("ix_sermons_speaker", "speaker_name"),
+        Index("idx_sermons_speaker_preached_on", "speaker_name", "preached_on"),
     )
 
     sermon_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
@@ -118,7 +117,7 @@ class Sermons(Base):
     speaker_name: Mapped[Optional[str]] = mapped_column(String(128))
     series_name: Mapped[Optional[str]] = mapped_column(String(128))
     location_name: Mapped[Optional[str]] = mapped_column(String(128))
-    notes_md: Mapped[Optional[str]] = mapped_column(LONGTEXT)
+    notes_markdown: Mapped[Optional[str]] = mapped_column(LONGTEXT)
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")
     )
@@ -126,8 +125,8 @@ class Sermons(Base):
         TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
     )
 
-    attachments: Mapped[list["Attachments"]] = relationship(
-        "Attachments", back_populates="sermon"
+    sermon_attachments: Mapped[list["SermonAttachments"]] = relationship(
+        "SermonAttachments", back_populates="sermon"
     )
     sermon_passages: Mapped[list["SermonPassages"]] = relationship(
         "SermonPassages", back_populates="sermon"
@@ -142,10 +141,10 @@ class ApiAccessTokens(Base):
             ["api_users.user_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="fk_api_tokens_user",
+            name="fk_api_access_tokens_user",
         ),
-        Index("ix_api_access_tokens_expires", "expires_at"),
-        Index("ix_api_access_tokens_user", "user_id"),
+        Index("idx_api_access_tokens_expires", "expires_at"),
+        Index("idx_api_access_tokens_user", "user_id"),
         Index("uq_api_access_tokens_hash", "token_hash", unique=True),
     )
 
@@ -176,8 +175,8 @@ class ApiSessions(Base):
             onupdate="CASCADE",
             name="fk_api_sessions_user",
         ),
-        Index("ix_api_sessions_expires", "expires_at"),
-        Index("ix_api_sessions_user", "user_id"),
+        Index("idx_api_sessions_expires", "expires_at"),
+        Index("idx_api_sessions_user", "user_id"),
     )
 
     session_id: Mapped[str] = mapped_column(String(96), primary_key=True)
@@ -199,35 +198,6 @@ class ApiSessions(Base):
     user: Mapped["ApiUsers"] = relationship("ApiUsers", back_populates="api_sessions")
 
 
-class Attachments(Base):
-    __tablename__ = "attachments"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["sermon_id"],
-            ["sermons.sermon_id"],
-            ondelete="CASCADE",
-            onupdate="CASCADE",
-            name="fk_att_sermon",
-        ),
-        Index("idx_attachments_created", "created_at"),
-        Index("idx_attachments_sermon", "sermon_id"),
-        Index("ix_attachments_rel_path", "rel_path"),
-        Index("ix_attachments_sermon", "sermon_id"),
-    )
-
-    attachment_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    sermon_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    rel_path: Mapped[str] = mapped_column(String(255), nullable=False)
-    original_filename: Mapped[Optional[str]] = mapped_column(String(255))
-    mime_type: Mapped[Optional[str]] = mapped_column(String(255))
-    byte_size: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
-    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(
-        TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")
-    )
-
-    sermon: Mapped["Sermons"] = relationship("Sermons", back_populates="attachments")
-
-
 class BibleVerses(Base):
     __tablename__ = "bible_verses"
     __table_args__ = (
@@ -236,34 +206,28 @@ class BibleVerses(Base):
             ["bible_books.book_id"],
             ondelete="RESTRICT",
             onupdate="CASCADE",
-            name="fk_bv_book",
+            name="fk_bible_verses_book",
         ),
-        Index("idx_bible_verses_book_ch", "book_id", "chapter"),
-        Index("ix_bible_verses_book_ch", "book_id", "chapter"),
-        Index("uq_bible_verses_loc", "book_id", "chapter", "verse", unique=True),
-        Index("ux_bible_verses_canonical", "book_id", "chapter", "verse", unique=True),
+        Index("idx_bible_verses_book_chapter", "book_id", "chapter_number"),
+        Index(
+            "uq_bible_verses_location",
+            "book_id",
+            "chapter_number",
+            "verse_number",
+            unique=True,
+        ),
     )
 
     verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
     book_id: Mapped[int] = mapped_column(TINYINT(unsigned=True), nullable=False)
-    chapter: Mapped[int] = mapped_column(SMALLINT(unsigned=True), nullable=False)
-    verse: Mapped[int] = mapped_column(SMALLINT(unsigned=True), nullable=False)
+    chapter_number: Mapped[int] = mapped_column(SMALLINT(unsigned=True), nullable=False)
+    verse_number: Mapped[int] = mapped_column(SMALLINT(unsigned=True), nullable=False)
     weight: Mapped[float] = mapped_column(
         Float, nullable=False, server_default=text("'1'")
     )
 
     book: Mapped["BibleBooks"] = relationship(
         "BibleBooks", back_populates="bible_verses"
-    )
-    bible_widget_verses_end_verse: Mapped[list["BibleWidgetVerses"]] = relationship(
-        "BibleWidgetVerses",
-        foreign_keys="[BibleWidgetVerses.end_verse_id]",
-        back_populates="end_verse",
-    )
-    bible_widget_verses_start_verse: Mapped[list["BibleWidgetVerses"]] = relationship(
-        "BibleWidgetVerses",
-        foreign_keys="[BibleWidgetVerses.start_verse_id]",
-        back_populates="start_verse",
     )
     commentaries_end_verse: Mapped[list["Commentaries"]] = relationship(
         "Commentaries",
@@ -275,20 +239,24 @@ class BibleVerses(Base):
         foreign_keys="[Commentaries.start_verse_id]",
         back_populates="start_verse",
     )
-    footnote_cross_refs_to_end_verse: Mapped[list["FootnoteCrossRefs"]] = relationship(
-        "FootnoteCrossRefs",
-        foreign_keys="[FootnoteCrossRefs.to_end_verse_id]",
-        back_populates="to_end_verse",
+    ml_cross_references_source_verse: Mapped[list["MlCrossReferences"]] = relationship(
+        "MlCrossReferences",
+        foreign_keys="[MlCrossReferences.source_verse_id]",
+        back_populates="source_verse",
     )
-    footnote_cross_refs_to_start_verse: Mapped[list["FootnoteCrossRefs"]] = (
+    ml_cross_references_target_end_verse: Mapped[list["MlCrossReferences"]] = (
         relationship(
-            "FootnoteCrossRefs",
-            foreign_keys="[FootnoteCrossRefs.to_start_verse_id]",
-            back_populates="to_start_verse",
+            "MlCrossReferences",
+            foreign_keys="[MlCrossReferences.target_end_verse_id]",
+            back_populates="target_end_verse",
         )
     )
-    footnotes: Mapped[list["Footnotes"]] = relationship(
-        "Footnotes", back_populates="verse"
+    ml_cross_references_target_start_verse: Mapped[list["MlCrossReferences"]] = (
+        relationship(
+            "MlCrossReferences",
+            foreign_keys="[MlCrossReferences.target_start_verse_id]",
+            back_populates="target_start_verse",
+        )
     )
     sermon_passages_end_verse: Mapped[list["SermonPassages"]] = relationship(
         "SermonPassages",
@@ -300,20 +268,8 @@ class BibleVerses(Base):
         foreign_keys="[SermonPassages.start_verse_id]",
         back_populates="start_verse",
     )
-    verse_crossrefs_from_verse: Mapped[list["VerseCrossrefs"]] = relationship(
-        "VerseCrossrefs",
-        foreign_keys="[VerseCrossrefs.from_verse_id]",
-        back_populates="from_verse",
-    )
-    verse_crossrefs_to_end_verse: Mapped[list["VerseCrossrefs"]] = relationship(
-        "VerseCrossrefs",
-        foreign_keys="[VerseCrossrefs.to_end_verse_id]",
-        back_populates="to_end_verse",
-    )
-    verse_crossrefs_to_start_verse: Mapped[list["VerseCrossrefs"]] = relationship(
-        "VerseCrossrefs",
-        foreign_keys="[VerseCrossrefs.to_start_verse_id]",
-        back_populates="to_start_verse",
+    verse_footnotes: Mapped[list["VerseFootnotes"]] = relationship(
+        "VerseFootnotes", back_populates="verse"
     )
     verse_headings: Mapped[list["VerseHeadings"]] = relationship(
         "VerseHeadings", back_populates="start_verse"
@@ -321,65 +277,62 @@ class BibleVerses(Base):
     verse_notes: Mapped[list["VerseNotes"]] = relationship(
         "VerseNotes", back_populates="verse"
     )
-    verse_texts_marked: Mapped[list["VerseTextsMarked"]] = relationship(
-        "VerseTextsMarked", back_populates="verse"
+    verse_texts: Mapped[list["VerseTexts"]] = relationship(
+        "VerseTexts", back_populates="verse"
+    )
+    widget_passages_end_verse: Mapped[list["WidgetPassages"]] = relationship(
+        "WidgetPassages",
+        foreign_keys="[WidgetPassages.end_verse_id]",
+        back_populates="end_verse",
+    )
+    widget_passages_start_verse: Mapped[list["WidgetPassages"]] = relationship(
+        "WidgetPassages",
+        foreign_keys="[WidgetPassages.start_verse_id]",
+        back_populates="start_verse",
+    )
+    footnote_cross_references_target_end_verse: Mapped[
+        list["FootnoteCrossReferences"]
+    ] = relationship(
+        "FootnoteCrossReferences",
+        foreign_keys="[FootnoteCrossReferences.target_end_verse_id]",
+        back_populates="target_end_verse",
+    )
+    footnote_cross_references_target_start_verse: Mapped[
+        list["FootnoteCrossReferences"]
+    ] = relationship(
+        "FootnoteCrossReferences",
+        foreign_keys="[FootnoteCrossReferences.target_start_verse_id]",
+        back_populates="target_start_verse",
     )
 
 
-class BibleWidgetVerses(Base):
-    __tablename__ = "bible_widget_verses"
+class SermonAttachments(Base):
+    __tablename__ = "sermon_attachments"
     __table_args__ = (
         ForeignKeyConstraint(
-            ["end_verse_id"],
-            ["bible_verses.verse_id"],
+            ["sermon_id"],
+            ["sermons.sermon_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="fk_widget_end_verse",
+            name="fk_sermon_attachments_sermon",
         ),
-        ForeignKeyConstraint(
-            ["start_verse_id"],
-            ["bible_verses.verse_id"],
-            ondelete="CASCADE",
-            onupdate="CASCADE",
-            name="fk_widget_start_verse",
-        ),
-        Index("fk_widget_end_verse", "end_verse_id"),
-        Index(
-            "uq_widget_passage_tr",
-            "start_verse_id",
-            "end_verse_id",
-            "translation",
-            unique=True,
-        ),
+        Index("idx_sermon_attachments_created", "created_at"),
+        Index("idx_sermon_attachments_relative_path", "relative_path"),
+        Index("idx_sermon_attachments_sermon", "sermon_id"),
     )
 
-    id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    start_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    end_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    translation: Mapped[str] = mapped_column(String(16), nullable=False)
-    ref: Mapped[str] = mapped_column(String(64), nullable=False)
-    display_text: Mapped[str] = mapped_column(Text, nullable=False)
-    weight: Mapped[int] = mapped_column(
-        SMALLINT(unsigned=True), nullable=False, server_default=text("'1'")
-    )
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
-    )
-    updated_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP,
-        nullable=False,
-        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+    attachment_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
+    sermon_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    relative_path: Mapped[str] = mapped_column(String(255), nullable=False)
+    original_filename: Mapped[Optional[str]] = mapped_column(String(255))
+    mime_type: Mapped[Optional[str]] = mapped_column(String(255))
+    byte_size: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
+    created_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")
     )
 
-    end_verse: Mapped["BibleVerses"] = relationship(
-        "BibleVerses",
-        foreign_keys=[end_verse_id],
-        back_populates="bible_widget_verses_end_verse",
-    )
-    start_verse: Mapped["BibleVerses"] = relationship(
-        "BibleVerses",
-        foreign_keys=[start_verse_id],
-        back_populates="bible_widget_verses_start_verse",
+    sermon: Mapped["Sermons"] = relationship(
+        "Sermons", back_populates="sermon_attachments"
     )
 
 
@@ -391,33 +344,33 @@ class Commentaries(Base):
             ["bible_books.book_id"],
             ondelete="RESTRICT",
             onupdate="CASCADE",
-            name="commentaries_ibfk_2",
+            name="fk_commentaries_book",
         ),
         ForeignKeyConstraint(
             ["end_verse_id"],
             ["bible_verses.verse_id"],
             ondelete="RESTRICT",
             onupdate="CASCADE",
-            name="commentaries_ibfk_4",
+            name="fk_commentaries_end_verse",
         ),
         ForeignKeyConstraint(
             ["father_id"],
             ["church_fathers.father_id"],
             ondelete="RESTRICT",
             onupdate="CASCADE",
-            name="commentaries_ibfk_1",
+            name="fk_commentaries_father",
         ),
         ForeignKeyConstraint(
             ["start_verse_id"],
             ["bible_verses.verse_id"],
             ondelete="RESTRICT",
             onupdate="CASCADE",
-            name="commentaries_ibfk_3",
+            name="fk_commentaries_start_verse",
         ),
-        Index("book_id", "book_id"),
-        Index("end_verse_id", "end_verse_id"),
-        Index("father_id", "father_id"),
-        Index("start_verse_id", "start_verse_id"),
+        Index("idx_commentaries_book", "book_id"),
+        Index("idx_commentaries_end_verse", "end_verse_id"),
+        Index("idx_commentaries_father", "father_id"),
+        Index("idx_commentaries_start_verse", "start_verse_id"),
     )
 
     commentary_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
@@ -425,7 +378,7 @@ class Commentaries(Base):
     book_id: Mapped[int] = mapped_column(TINYINT(unsigned=True), nullable=False)
     start_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
     end_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    txt: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
+    commentary_text: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
     append_to_author_name: Mapped[Optional[str]] = mapped_column(String(255))
     source_url: Mapped[Optional[str]] = mapped_column(String(2048))
     source_title: Mapped[Optional[str]] = mapped_column(String(512))
@@ -448,92 +401,66 @@ class Commentaries(Base):
     )
 
 
-class FootnoteCrossRefs(Base):
-    __tablename__ = "footnote_cross_refs"
+class MlCrossReferences(Base):
+    __tablename__ = "ml_cross_references"
     __table_args__ = (
         ForeignKeyConstraint(
-            ["to_end_verse_id"],
+            ["source_verse_id"],
             ["bible_verses.verse_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="footnote_cross_refs_ibfk_2",
+            name="fk_ml_cross_references_source_verse",
         ),
         ForeignKeyConstraint(
-            ["to_start_verse_id"],
+            ["target_end_verse_id"],
             ["bible_verses.verse_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="footnote_cross_refs_ibfk_1",
+            name="fk_ml_cross_references_target_end",
         ),
-        Index("idx_crossref_footnote", "footnote_id"),
-        Index("idx_crossref_target_end", "to_end_verse_id"),
-        Index("idx_crossref_target_start", "to_start_verse_id"),
+        ForeignKeyConstraint(
+            ["target_start_verse_id"],
+            ["bible_verses.verse_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_ml_cross_references_target_start",
+        ),
+        Index("idx_ml_cross_references_target_end", "target_end_verse_id"),
+        Index("idx_ml_cross_references_target_start", "target_start_verse_id"),
         Index(
-            "uq_cross",
-            "footnote_id",
-            "to_start_verse_id",
-            "to_end_verse_id",
-            "source_order_number",
+            "uq_ml_cross_references_source_target",
+            "source_verse_id",
+            "target_start_verse_id",
+            "target_end_verse_id",
             unique=True,
         ),
     )
 
-    id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    footnote_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    to_start_verse_id: Mapped[int] = mapped_column(
+    ml_cross_reference_id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True), primary_key=True
+    )
+    source_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    target_start_verse_id: Mapped[int] = mapped_column(
         BIGINT(unsigned=True), nullable=False
     )
-    created_at: Mapped[datetime.datetime] = mapped_column(
-        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
-    )
-    to_end_verse_id: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
-    source_order_number: Mapped[Optional[int]] = mapped_column(Integer)
-    reference_note: Mapped[Optional[str]] = mapped_column(String(255))
+    target_end_verse_id: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
+    vote_count: Mapped[Optional[int]] = mapped_column(Integer)
+    note: Mapped[Optional[str]] = mapped_column(String(255))
 
-    to_end_verse: Mapped[Optional["BibleVerses"]] = relationship(
+    source_verse: Mapped["BibleVerses"] = relationship(
         "BibleVerses",
-        foreign_keys=[to_end_verse_id],
-        back_populates="footnote_cross_refs_to_end_verse",
+        foreign_keys=[source_verse_id],
+        back_populates="ml_cross_references_source_verse",
     )
-    to_start_verse: Mapped["BibleVerses"] = relationship(
+    target_end_verse: Mapped[Optional["BibleVerses"]] = relationship(
         "BibleVerses",
-        foreign_keys=[to_start_verse_id],
-        back_populates="footnote_cross_refs_to_start_verse",
+        foreign_keys=[target_end_verse_id],
+        back_populates="ml_cross_references_target_end_verse",
     )
-
-
-class Footnotes(Base):
-    __tablename__ = "footnotes"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["verse_id"],
-            ["bible_verses.verse_id"],
-            ondelete="CASCADE",
-            onupdate="CASCADE",
-            name="footnotes_ibfk_1",
-        ),
-        Index("idx_footnotes_translation", "translation"),
-        Index("idx_footnotes_verse", "verse_id"),
-        Index(
-            "uq_footnote_location",
-            "verse_id",
-            "translation",
-            "word_index",
-            "footnote_label",
-            unique=True,
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    translation: Mapped[str] = mapped_column(String(16), nullable=False)
-    order_in_translation: Mapped[int] = mapped_column(Integer, nullable=False)
-    word_index: Mapped[int] = mapped_column(SMALLINT(unsigned=True), nullable=False)
-    footnote_label: Mapped[str] = mapped_column(String(8), nullable=False)
-    footnote_text: Mapped[Optional[str]] = mapped_column(LONGTEXT)
-
-    verse: Mapped["BibleVerses"] = relationship(
-        "BibleVerses", back_populates="footnotes"
+    target_start_verse: Mapped["BibleVerses"] = relationship(
+        "BibleVerses",
+        foreign_keys=[target_start_verse_id],
+        back_populates="ml_cross_references_target_start_verse",
     )
 
 
@@ -545,38 +472,41 @@ class SermonPassages(Base):
             ["bible_verses.verse_id"],
             ondelete="RESTRICT",
             onupdate="CASCADE",
-            name="fk_sp_end",
+            name="fk_sermon_passages_end_verse",
         ),
         ForeignKeyConstraint(
             ["sermon_id"],
             ["sermons.sermon_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="fk_sp_sermon",
+            name="fk_sermon_passages_sermon",
         ),
         ForeignKeyConstraint(
             ["start_verse_id"],
             ["bible_verses.verse_id"],
             ondelete="RESTRICT",
             onupdate="CASCADE",
-            name="fk_sp_start",
+            name="fk_sermon_passages_start_verse",
         ),
-        Index("idx_sermon_passages_end", "end_verse_id"),
-        Index("idx_sermon_passages_start", "start_verse_id"),
-        Index("ix_sp_end", "end_verse_id"),
-        Index("ix_sp_ord", "ord"),
-        Index("ix_sp_sermon", "sermon_id"),
-        Index("ix_sp_start", "start_verse_id"),
-        Index("uq_sermon_ord", "sermon_id", "ord", unique=True),
+        Index("idx_sermon_passages_end_verse", "end_verse_id"),
+        Index("idx_sermon_passages_start_verse", "start_verse_id"),
+        Index(
+            "uq_sermon_passages_sermon_display_order",
+            "sermon_id",
+            "display_order",
+            unique=True,
+        ),
     )
 
-    id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
+    sermon_passage_id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True), primary_key=True
+    )
     sermon_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
     start_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
     end_verse_id: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
-    ref_text: Mapped[Optional[str]] = mapped_column(String(64))
+    reference_text: Mapped[Optional[str]] = mapped_column(String(64))
     context_note: Mapped[Optional[str]] = mapped_column(String(512))
-    ord: Mapped[Optional[int]] = mapped_column(
+    display_order: Mapped[Optional[int]] = mapped_column(
         SMALLINT(unsigned=True), server_default=text("'1'")
     )
 
@@ -595,64 +525,41 @@ class SermonPassages(Base):
     )
 
 
-class VerseCrossrefs(Base):
-    __tablename__ = "verse_crossrefs"
+class VerseFootnotes(Base):
+    __tablename__ = "verse_footnotes"
     __table_args__ = (
         ForeignKeyConstraint(
-            ["from_verse_id"],
+            ["verse_id"],
             ["bible_verses.verse_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="verse_crossrefs_ibfk_1",
+            name="fk_verse_footnotes_verse",
         ),
-        ForeignKeyConstraint(
-            ["to_end_verse_id"],
-            ["bible_verses.verse_id"],
-            ondelete="CASCADE",
-            onupdate="CASCADE",
-            name="verse_crossrefs_ibfk_3",
-        ),
-        ForeignKeyConstraint(
-            ["to_start_verse_id"],
-            ["bible_verses.verse_id"],
-            ondelete="CASCADE",
-            onupdate="CASCADE",
-            name="verse_crossrefs_ibfk_2",
-        ),
-        Index("to_end_verse_id", "to_end_verse_id"),
-        Index("to_start_verse_id", "to_start_verse_id"),
+        Index("idx_verse_footnotes_translation", "translation"),
+        Index("idx_verse_footnotes_verse", "verse_id"),
         Index(
-            "uq_cross",
-            "from_verse_id",
-            "to_start_verse_id",
-            "to_end_verse_id",
+            "uq_verse_footnotes_location",
+            "verse_id",
+            "translation",
+            "word_index",
+            "footnote_label",
             unique=True,
         ),
     )
 
-    id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    from_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    to_start_verse_id: Mapped[int] = mapped_column(
-        BIGINT(unsigned=True), nullable=False
-    )
-    to_end_verse_id: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
-    votes: Mapped[Optional[int]] = mapped_column(Integer)
-    note: Mapped[Optional[str]] = mapped_column(String(255))
+    footnote_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
+    verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    translation: Mapped[str] = mapped_column(String(16), nullable=False)
+    order_in_translation: Mapped[int] = mapped_column(Integer, nullable=False)
+    word_index: Mapped[int] = mapped_column(SMALLINT(unsigned=True), nullable=False)
+    footnote_label: Mapped[str] = mapped_column(String(8), nullable=False)
+    footnote_text: Mapped[Optional[str]] = mapped_column(LONGTEXT)
 
-    from_verse: Mapped["BibleVerses"] = relationship(
-        "BibleVerses",
-        foreign_keys=[from_verse_id],
-        back_populates="verse_crossrefs_from_verse",
+    verse: Mapped["BibleVerses"] = relationship(
+        "BibleVerses", back_populates="verse_footnotes"
     )
-    to_end_verse: Mapped[Optional["BibleVerses"]] = relationship(
-        "BibleVerses",
-        foreign_keys=[to_end_verse_id],
-        back_populates="verse_crossrefs_to_end_verse",
-    )
-    to_start_verse: Mapped["BibleVerses"] = relationship(
-        "BibleVerses",
-        foreign_keys=[to_start_verse_id],
-        back_populates="verse_crossrefs_to_start_verse",
+    footnote_cross_references: Mapped[list["FootnoteCrossReferences"]] = relationship(
+        "FootnoteCrossReferences", back_populates="footnote"
     )
 
 
@@ -664,13 +571,13 @@ class VerseHeadings(Base):
             ["bible_verses.verse_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="fk_vsh_start_verse",
+            name="fk_verse_headings_start_verse",
         ),
-        Index("idx_start_verse_id", "start_verse_id"),
-        Index("idx_translation_order", "translation", "order_index"),
-        Index("idx_translation_start", "translation", "start_verse_id"),
+        Index("idx_verse_headings_start_verse", "start_verse_id"),
+        Index("idx_verse_headings_translation_order", "translation", "order_index"),
+        Index("idx_verse_headings_translation_start", "translation", "start_verse_id"),
         Index(
-            "translation",
+            "uq_verse_headings_translation_start_level_text",
             "translation",
             "start_verse_id",
             "heading_level",
@@ -680,7 +587,7 @@ class VerseHeadings(Base):
         ),
     )
 
-    section_heading_id: Mapped[int] = mapped_column(
+    verse_heading_id: Mapped[int] = mapped_column(
         BIGINT(unsigned=True), primary_key=True
     )
     translation: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -702,15 +609,14 @@ class VerseNotes(Base):
             ["bible_verses.verse_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="fk_vn_verse",
+            name="fk_verse_notes_verse",
         ),
         Index("idx_verse_notes_verse", "verse_id"),
-        Index("ix_verse_notes_verse", "verse_id"),
     )
 
     note_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
     verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    note_md: Mapped[Optional[str]] = mapped_column(LONGTEXT)
+    note_markdown: Mapped[Optional[str]] = mapped_column(LONGTEXT)
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")
     )
@@ -723,18 +629,20 @@ class VerseNotes(Base):
     )
 
 
-class VerseTextsMarked(Base):
-    __tablename__ = "verse_texts_marked"
+class VerseTexts(Base):
+    __tablename__ = "verse_texts"
     __table_args__ = (
         ForeignKeyConstraint(
             ["verse_id"],
             ["bible_verses.verse_id"],
             ondelete="CASCADE",
             onupdate="CASCADE",
-            name="verse_texts_marked_ibfk_1",
+            name="fk_verse_texts_verse",
         ),
-        Index("uq_translation_verse", "translation", "verse_id", unique=True),
-        Index("verse_id", "verse_id"),
+        Index("idx_verse_texts_verse", "verse_id"),
+        Index(
+            "uq_verse_texts_translation_verse", "translation", "verse_id", unique=True
+        ),
     )
 
     verse_text_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
@@ -744,5 +652,130 @@ class VerseTextsMarked(Base):
     plain_text: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
 
     verse: Mapped["BibleVerses"] = relationship(
-        "BibleVerses", back_populates="verse_texts_marked"
+        "BibleVerses", back_populates="verse_texts"
+    )
+
+
+class WidgetPassages(Base):
+    __tablename__ = "widget_passages"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["end_verse_id"],
+            ["bible_verses.verse_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_widget_passages_end_verse",
+        ),
+        ForeignKeyConstraint(
+            ["start_verse_id"],
+            ["bible_verses.verse_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_widget_passages_start_verse",
+        ),
+        Index("idx_widget_passages_end_verse", "end_verse_id"),
+        Index(
+            "uq_widget_passages_translation_range",
+            "start_verse_id",
+            "end_verse_id",
+            "translation",
+            unique=True,
+        ),
+    )
+
+    widget_passage_id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True), primary_key=True
+    )
+    start_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    end_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    translation: Mapped[str] = mapped_column(String(16), nullable=False)
+    reference_text: Mapped[str] = mapped_column(String(64), nullable=False)
+    display_text: Mapped[str] = mapped_column(Text, nullable=False)
+    weight: Mapped[int] = mapped_column(
+        SMALLINT(unsigned=True), nullable=False, server_default=text("'1'")
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+    )
+
+    end_verse: Mapped["BibleVerses"] = relationship(
+        "BibleVerses",
+        foreign_keys=[end_verse_id],
+        back_populates="widget_passages_end_verse",
+    )
+    start_verse: Mapped["BibleVerses"] = relationship(
+        "BibleVerses",
+        foreign_keys=[start_verse_id],
+        back_populates="widget_passages_start_verse",
+    )
+
+
+class FootnoteCrossReferences(Base):
+    __tablename__ = "footnote_cross_references"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["footnote_id"],
+            ["verse_footnotes.footnote_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_footnote_cross_references_footnote",
+        ),
+        ForeignKeyConstraint(
+            ["target_end_verse_id"],
+            ["bible_verses.verse_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_footnote_cross_references_target_end",
+        ),
+        ForeignKeyConstraint(
+            ["target_start_verse_id"],
+            ["bible_verses.verse_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+            name="fk_footnote_cross_references_target_start",
+        ),
+        Index("idx_footnote_cross_references_footnote", "footnote_id"),
+        Index("idx_footnote_cross_references_target_end", "target_end_verse_id"),
+        Index("idx_footnote_cross_references_target_start", "target_start_verse_id"),
+        Index(
+            "uq_footnote_cross_references_target",
+            "footnote_id",
+            "target_start_verse_id",
+            "target_end_verse_id",
+            "source_order_number",
+            unique=True,
+        ),
+    )
+
+    footnote_cross_reference_id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True), primary_key=True
+    )
+    footnote_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    target_start_verse_id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True), nullable=False
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    target_end_verse_id: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
+    source_order_number: Mapped[Optional[int]] = mapped_column(Integer)
+    reference_note: Mapped[Optional[str]] = mapped_column(String(255))
+
+    footnote: Mapped["VerseFootnotes"] = relationship(
+        "VerseFootnotes", back_populates="footnote_cross_references"
+    )
+    target_end_verse: Mapped[Optional["BibleVerses"]] = relationship(
+        "BibleVerses",
+        foreign_keys=[target_end_verse_id],
+        back_populates="footnote_cross_references_target_end_verse",
+    )
+    target_start_verse: Mapped["BibleVerses"] = relationship(
+        "BibleVerses",
+        foreign_keys=[target_start_verse_id],
+        back_populates="footnote_cross_references_target_start_verse",
     )

@@ -6,22 +6,24 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.db.models import BibleVerses, BibleWidgetVerses
+from app.db.models import BibleVerses, WidgetPassages
 from app.schemas.widget import BibleWidget, PartialBibleWidget
 from app.services._mappers import widget_schema
 
 
 def _widget_query():
     """Build the base widget select statement with verse relations loaded."""
-    return select(BibleWidgetVerses).options(
-        joinedload(BibleWidgetVerses.start_verse).joinedload(BibleVerses.book),
-        joinedload(BibleWidgetVerses.end_verse).joinedload(BibleVerses.book),
+    return select(WidgetPassages).options(
+        joinedload(WidgetPassages.start_verse).joinedload(BibleVerses.book),
+        joinedload(WidgetPassages.end_verse).joinedload(BibleVerses.book),
     )
 
 
-def _get_widget_or_404(db: Session, widget_id: int) -> BibleWidgetVerses:
+def _get_widget_or_404(db: Session, widget_id: int) -> WidgetPassages:
     """Load one widget entry or raise a 404 error."""
-    row = db.scalar(_widget_query().where(BibleWidgetVerses.id == widget_id))
+    row = db.scalar(
+        _widget_query().where(WidgetPassages.widget_passage_id == widget_id)
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="Widget entry not found.")
     return row
@@ -45,7 +47,7 @@ def list_widgets(db: Session) -> list[BibleWidget]:
     """List widget entries ordered by weight desc then reference."""
     rows = db.scalars(
         _widget_query().order_by(
-            BibleWidgetVerses.weight.desc(), BibleWidgetVerses.ref.asc()
+            WidgetPassages.weight.desc(), WidgetPassages.reference_text.asc()
         )
     ).all()
     return [widget_schema(row) for row in rows]
@@ -57,40 +59,45 @@ def create_widget(db: Session, payload: BibleWidget) -> BibleWidget:
         raise HTTPException(
             status_code=400, detail="start_verse_id and end_verse_id are required."
         )
-    if not payload.translation or not payload.ref or not payload.display_text:
+    if (
+        not payload.translation
+        or not payload.reference_text
+        or not payload.display_text
+    ):
         raise HTTPException(
-            status_code=400, detail="translation, ref, and display_text are required."
+            status_code=400,
+            detail="translation, reference_text, and display_text are required.",
         )
 
     _validate_verse_ids(db, payload.start_verse_id, payload.end_verse_id)
 
     existing = db.scalar(
         _widget_query().where(
-            BibleWidgetVerses.start_verse_id == payload.start_verse_id,
-            BibleWidgetVerses.end_verse_id == payload.end_verse_id,
-            BibleWidgetVerses.translation == payload.translation,
+            WidgetPassages.start_verse_id == payload.start_verse_id,
+            WidgetPassages.end_verse_id == payload.end_verse_id,
+            WidgetPassages.translation == payload.translation,
         )
     )
 
     if existing is None:
-        existing = BibleWidgetVerses(
+        existing = WidgetPassages(
             start_verse_id=payload.start_verse_id,
             end_verse_id=payload.end_verse_id,
             translation=payload.translation,
-            ref=payload.ref,
+            reference_text=payload.reference_text,
             display_text=payload.display_text,
             weight=payload.weight or 1,
         )
         db.add(existing)
     else:
-        existing.ref = payload.ref
+        existing.reference_text = payload.reference_text
         existing.display_text = payload.display_text
         if payload.weight is not None:
             existing.weight = payload.weight
 
     db.commit()
     db.refresh(existing)
-    return get_widget(db, existing.id)
+    return get_widget(db, existing.widget_passage_id)
 
 
 def get_widget(db: Session, widget_id: int) -> BibleWidget:
@@ -105,9 +112,14 @@ def update_widget(db: Session, widget_id: int, payload: BibleWidget) -> BibleWid
         raise HTTPException(
             status_code=400, detail="start_verse_id and end_verse_id are required."
         )
-    if not payload.translation or not payload.ref or not payload.display_text:
+    if (
+        not payload.translation
+        or not payload.reference_text
+        or not payload.display_text
+    ):
         raise HTTPException(
-            status_code=400, detail="translation, ref, and display_text are required."
+            status_code=400,
+            detail="translation, reference_text, and display_text are required.",
         )
 
     _validate_verse_ids(db, payload.start_verse_id, payload.end_verse_id)
@@ -115,7 +127,7 @@ def update_widget(db: Session, widget_id: int, payload: BibleWidget) -> BibleWid
     row.start_verse_id = payload.start_verse_id
     row.end_verse_id = payload.end_verse_id
     row.translation = payload.translation
-    row.ref = payload.ref
+    row.reference_text = payload.reference_text
     row.display_text = payload.display_text
     row.weight = payload.weight or row.weight
     db.commit()

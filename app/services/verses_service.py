@@ -17,13 +17,13 @@ from app.db.models import (
     BibleBooks,
     BibleVerses,
     Commentaries,
-    FootnoteCrossRefs,
-    Footnotes,
+    FootnoteCrossReferences,
+    VerseFootnotes,
     SermonPassages,
     VerseHeadings,
-    VerseCrossrefs,
+    MlCrossReferences,
     VerseNotes,
-    VerseTextsMarked,
+    VerseTexts,
 )
 from app.schemas.verses import (
     CommentaryEnd,
@@ -72,12 +72,12 @@ def _preview_text_for_range(db: Session, start_id: int, end_id: int) -> str:
     lo = min(start_id, end_id)
     hi = max(start_id, end_id)
     rows = db.scalars(
-        select(VerseTextsMarked)
-        .where(VerseTextsMarked.verse_id >= lo, VerseTextsMarked.verse_id <= hi)
-        .order_by(VerseTextsMarked.verse_id, func.lower(VerseTextsMarked.translation))
+        select(VerseTexts)
+        .where(VerseTexts.verse_id >= lo, VerseTexts.verse_id <= hi)
+        .order_by(VerseTexts.verse_id, func.lower(VerseTexts.translation))
     ).all()
 
-    chosen_by_verse: dict[int, VerseTextsMarked] = {}
+    chosen_by_verse: dict[int, VerseTexts] = {}
     for row in rows:
         current = chosen_by_verse.get(row.verse_id)
         if current is None:
@@ -97,16 +97,18 @@ def _tokenize_search_terms(query: str) -> list[str]:
 
 
 def _verse_result_from_text_row(
-    row: VerseTextsMarked, order_num: int, available_translations: Sequence[str] | None = None
+    row: VerseTexts,
+    result_order: int,
+    available_translations: Sequence[str] | None = None,
 ) -> VerseSearchResult:
     verse = row.verse
     return VerseSearchResult(
-        order_num=order_num,
+        result_order=result_order,
         verse_id=verse.verse_id,
         reference=format_ref(verse, verse),
-        book=verse.book.name,
-        chapter=verse.chapter,
-        verse=verse.verse,
+        book=verse.book.book_name,
+        chapter_number=verse.chapter_number,
+        verse_number=verse.verse_number,
         available_translations=list(available_translations or []),
         translation=row.translation,
         plain_text=row.plain_text,
@@ -116,7 +118,7 @@ def _verse_result_from_text_row(
 
 
 def _available_translations_by_verse(
-    rows: Sequence[VerseTextsMarked],
+    rows: Sequence[VerseTexts],
 ) -> dict[int, list[str]]:
     translations_by_verse: dict[int, list[str]] = {}
     for row in rows:
@@ -126,9 +128,9 @@ def _available_translations_by_verse(
     return translations_by_verse
 
 
-def _select_preferred_rows(rows: Sequence[VerseTextsMarked]) -> list[VerseTextsMarked]:
+def _select_preferred_rows(rows: Sequence[VerseTexts]) -> list[VerseTexts]:
     """Keep one row per verse, preferring ESV when multiple translations exist."""
-    by_verse: OrderedDict[int, VerseTextsMarked] = OrderedDict()
+    by_verse: OrderedDict[int, VerseTexts] = OrderedDict()
     for row in rows:
         verse_id = row.verse_id
         current = by_verse.get(verse_id)
@@ -146,7 +148,10 @@ def _chapter_bounds(
     verses = db.scalars(
         select(BibleVerses)
         .options(joinedload(BibleVerses.book))
-        .where(BibleVerses.book_id == verse.book_id, BibleVerses.chapter == verse.chapter)
+        .where(
+            BibleVerses.book_id == verse.book_id,
+            BibleVerses.chapter_number == verse.chapter_number,
+        )
         .order_by(BibleVerses.verse_id)
     ).all()
     if not verses:
@@ -222,14 +227,20 @@ def _max_verse_before(db: Session, verse_id: int) -> BibleVerses | None:
     )
 
 
-def _nav_target(kind: str, start: BibleVerses, end: BibleVerses | None = None) -> VerseNavigationTarget:
+def _nav_target(
+    kind: str, start: BibleVerses, end: BibleVerses | None = None
+) -> VerseNavigationTarget:
     range_end = end or start
-    reference = f"{start.book.name} {start.chapter}" if kind == "chapter" else format_ref(start, range_end)
+    reference = (
+        f"{start.book.book_name} {start.chapter_number}"
+        if kind == "chapter"
+        else format_ref(start, range_end)
+    )
     return VerseNavigationTarget(kind=kind, reference=reference, label=reference)
 
 
 def _chapter_expand_target(verse: BibleVerses) -> VerseNavigationTarget:
-    chapter_reference = f"{verse.book.name} {verse.chapter}"
+    chapter_reference = f"{verse.book.book_name} {verse.chapter_number}"
     return VerseNavigationTarget(
         kind="chapter",
         reference=chapter_reference,
@@ -276,7 +287,10 @@ def _compute_expand_target(
         return None
 
     chapter_start, chapter_end = chapter_bounds
-    if start.verse_id == chapter_start.verse_id and end.verse_id == chapter_end.verse_id:
+    if (
+        start.verse_id == chapter_start.verse_id
+        and end.verse_id == chapter_end.verse_id
+    ):
         return None
 
     section_bounds = _section_bounds_for_verse(db, start, end)
@@ -285,15 +299,16 @@ def _compute_expand_target(
 
     section_start, section_end, _next_section_start_id = section_bounds
     query_matches_section = (
-        start.verse_id == section_start.verse_id and end.verse_id == section_end.verse_id
+        start.verse_id == section_start.verse_id
+        and end.verse_id == section_end.verse_id
     )
 
     if (
         query_matches_section
         or section_start.book_id != start.book_id
         or section_end.book_id != start.book_id
-        or section_start.chapter != start.chapter
-        or section_end.chapter != start.chapter
+        or section_start.chapter_number != start.chapter_number
+        or section_end.chapter_number != start.chapter_number
     ):
         return _chapter_expand_target(start)
 
@@ -301,12 +316,18 @@ def _compute_expand_target(
 
 
 def _scope_for_range(
-    db: Session, start: BibleVerses, end: BibleVerses, expand_target: VerseNavigationTarget | None
+    db: Session,
+    start: BibleVerses,
+    end: BibleVerses,
+    expand_target: VerseNavigationTarget | None,
 ) -> str:
     chapter_bounds = _chapter_bounds(db, start)
     if chapter_bounds is not None:
         chapter_start, chapter_end = chapter_bounds
-        if start.verse_id == chapter_start.verse_id and end.verse_id == chapter_end.verse_id:
+        if (
+            start.verse_id == chapter_start.verse_id
+            and end.verse_id == chapter_end.verse_id
+        ):
             return "chapter"
 
     if start.verse_id == end.verse_id:
@@ -315,7 +336,10 @@ def _scope_for_range(
     section_bounds = _section_bounds_for_verse(db, start, end)
     if section_bounds is not None:
         section_start, section_end, _ = section_bounds
-        if start.verse_id == section_start.verse_id and end.verse_id == section_end.verse_id:
+        if (
+            start.verse_id == section_start.verse_id
+            and end.verse_id == section_end.verse_id
+        ):
             return "section"
 
     if expand_target is not None:
@@ -329,7 +353,9 @@ def _previous_target(
 ) -> VerseNavigationTarget | None:
     if scope == "verse":
         previous_verse = _last_verse_before(db, start.verse_id)
-        return _nav_target("verse", previous_verse) if previous_verse is not None else None
+        return (
+            _nav_target("verse", previous_verse) if previous_verse is not None else None
+        )
 
     if scope == "chapter":
         chapter_bounds = _chapter_bounds(db, start)
@@ -394,7 +420,11 @@ def _next_target(
             else None
         )
         next_start = _verse_by_id(db, next_start_id)
-        next_end = _last_verse(db) if next_next_start_id is None else _max_verse_before(db, next_next_start_id)
+        next_end = (
+            _last_verse(db)
+            if next_next_start_id is None
+            else _max_verse_before(db, next_next_start_id)
+        )
         if next_start is None or next_end is None:
             return None
         return _nav_target("section", next_start, next_end)
@@ -405,10 +435,13 @@ def _next_target(
 def list_translations(db: Session) -> VerseTranslationsResponse:
     """Return distinct verse text translations in display order."""
     rows = db.scalars(
-        select(VerseTextsMarked.translation)
-        .where(VerseTextsMarked.translation.is_not(None), VerseTextsMarked.translation != "")
+        select(VerseTexts.translation)
+        .where(
+            VerseTexts.translation.is_not(None),
+            VerseTexts.translation != "",
+        )
         .distinct()
-        .order_by(func.lower(VerseTextsMarked.translation))
+        .order_by(func.lower(VerseTexts.translation))
     ).all()
     return VerseTranslationsResponse(translations=list(rows))
 
@@ -441,18 +474,18 @@ def resolve_query_intent(
         )
 
     text_rows = db.scalars(
-        select(VerseTextsMarked)
-        .join(BibleVerses, VerseTextsMarked.verse_id == BibleVerses.verse_id)
-        .options(joinedload(VerseTextsMarked.verse).joinedload(BibleVerses.book))
-        .where(VerseTextsMarked.verse_id.in_(verse_ids))
-        .order_by(BibleVerses.verse_id, func.lower(VerseTextsMarked.translation))
+        select(VerseTexts)
+        .join(BibleVerses, VerseTexts.verse_id == BibleVerses.verse_id)
+        .options(joinedload(VerseTexts.verse).joinedload(BibleVerses.book))
+        .where(VerseTexts.verse_id.in_(verse_ids))
+        .order_by(BibleVerses.verse_id, func.lower(VerseTexts.translation))
     ).all()
     available_translations = _available_translations_by_verse(text_rows)
 
     if translation:
         wanted = translation.strip().upper()
-        picked_by_verse: OrderedDict[int, VerseTextsMarked] = OrderedDict()
-        fallback_by_verse: OrderedDict[int, VerseTextsMarked] = OrderedDict()
+        picked_by_verse: OrderedDict[int, VerseTexts] = OrderedDict()
+        fallback_by_verse: OrderedDict[int, VerseTexts] = OrderedDict()
         for row in text_rows:
             if row.verse_id not in fallback_by_verse:
                 fallback_by_verse[row.verse_id] = row
@@ -479,7 +512,7 @@ def resolve_query_intent(
         verses=[
             _verse_result_from_text_row(
                 row=row,
-                order_num=idx,
+                result_order=idx,
                 available_translations=available_translations.get(
                     row.verse_id, [row.translation]
                 ),
@@ -510,26 +543,26 @@ def search_verse_text(
     page_size = 20
 
     stmt = (
-        select(VerseTextsMarked)
-        .join(BibleVerses, VerseTextsMarked.verse_id == BibleVerses.verse_id)
+        select(VerseTexts)
+        .join(BibleVerses, VerseTexts.verse_id == BibleVerses.verse_id)
         .join(BibleBooks, BibleBooks.book_id == BibleVerses.book_id)
-        .options(joinedload(VerseTextsMarked.verse).joinedload(BibleVerses.book))
+        .options(joinedload(VerseTexts.verse).joinedload(BibleVerses.book))
     )
 
     filters = []
     if translation:
         filters.append(
-            func.upper(VerseTextsMarked.translation) == translation.strip().upper()
+            func.upper(VerseTexts.translation) == translation.strip().upper()
         )
     if book:
-        filters.append(func.lower(BibleBooks.name) == book.strip().lower())
+        filters.append(func.lower(BibleBooks.book_name) == book.strip().lower())
     if chapter is not None:
-        filters.append(BibleVerses.chapter == chapter)
+        filters.append(BibleVerses.chapter_number == chapter)
     if testament and testament.strip().upper() in {"OT", "NT"}:
         filters.append(BibleBooks.testament == testament.strip().upper())
 
     if exact:
-        filters.append(VerseTextsMarked.plain_text.ilike(f"%{query}%"))
+        filters.append(VerseTexts.plain_text.ilike(f"%{query}%"))
     else:
         terms = _tokenize_search_terms(query)
         if not terms:
@@ -537,21 +570,21 @@ def search_verse_text(
                 status_code=400, detail="Provide a non-empty search query."
             )
         filters.append(
-            and_(*[VerseTextsMarked.plain_text.ilike(f"%{term}%") for term in terms])
+            and_(*[VerseTexts.plain_text.ilike(f"%{term}%") for term in terms])
         )
 
     if filters:
         stmt = stmt.where(and_(*filters))
 
     stmt = stmt.order_by(
-        BibleBooks.order_num,
-        BibleVerses.chapter,
-        BibleVerses.verse,
-        func.lower(VerseTextsMarked.translation),
+        BibleBooks.book_order,
+        BibleVerses.chapter_number,
+        BibleVerses.verse_number,
+        func.lower(VerseTexts.translation),
     )
 
     rows = db.scalars(stmt).all()
-    selected_rows: Sequence[VerseTextsMarked]
+    selected_rows: Sequence[VerseTexts]
     if translation:
         selected_rows = rows
     else:
@@ -564,9 +597,9 @@ def search_verse_text(
     available_translations_by_verse: dict[int, list[str]] = {}
     if paged_verse_ids:
         translation_rows = db.scalars(
-            select(VerseTextsMarked)
-            .where(VerseTextsMarked.verse_id.in_(paged_verse_ids))
-            .order_by(VerseTextsMarked.verse_id, func.lower(VerseTextsMarked.translation))
+            select(VerseTexts)
+            .where(VerseTexts.verse_id.in_(paged_verse_ids))
+            .order_by(VerseTexts.verse_id, func.lower(VerseTexts.translation))
         ).all()
         available_translations_by_verse = _available_translations_by_verse(
             translation_rows
@@ -579,7 +612,7 @@ def search_verse_text(
         results=[
             _verse_result_from_text_row(
                 row=row,
-                order_num=offset + idx,
+                result_order=offset + idx,
                 available_translations=available_translations_by_verse.get(
                     row.verse_id, [row.translation]
                 ),
@@ -640,7 +673,7 @@ def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
             start_v, end_v = end_v, start_v
 
         father = row.father
-        father_name = father.name if father else ""
+        father_name = father.father_name if father else ""
         append = (row.append_to_author_name or "").strip()
         display_name = f"{father_name} {append}".strip() if append else father_name
 
@@ -651,7 +684,7 @@ def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
                 father_name=father_name,
                 display_name=display_name,
                 append_to_author_name=append,
-                text=row.txt or "",
+                commentary_text=row.commentary_text or "",
                 book_id=row.book_id,
                 start_verse_id=start_v.verse_id,
                 end_verse_id=end_v.verse_id,
@@ -661,10 +694,14 @@ def get_commentaries(db: Session, ref: str) -> VerseCommentaryResponse:
                 default_year=father.default_year if father else None,
                 wiki_url=father.wiki_url or "" if father else "",
                 start=CommentaryStart(
-                    book=start_v.book.name, chapter=start_v.chapter, verse=start_v.verse
+                    book=start_v.book.book_name,
+                    chapter_number=start_v.chapter_number,
+                    verse_number=start_v.verse_number,
                 ),
                 end=CommentaryEnd(
-                    book=end_v.book.name, chapter=end_v.chapter, verse=end_v.verse
+                    book=end_v.book.book_name,
+                    chapter_number=end_v.chapter_number,
+                    verse_number=end_v.verse_number,
                 ),
             )
         )
@@ -691,34 +728,38 @@ def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
     verse_ids = [v.verse_id for v in verses]
 
     rows = db.scalars(
-        select(VerseCrossrefs)
-        .where(VerseCrossrefs.from_verse_id.in_(verse_ids) if verse_ids else False)  # type: ignore
+        select(MlCrossReferences)
+        .where(MlCrossReferences.source_verse_id.in_(verse_ids) if verse_ids else False)  # type: ignore
         .options(
-            joinedload(VerseCrossrefs.to_start_verse).joinedload(BibleVerses.book),
-            joinedload(VerseCrossrefs.to_end_verse).joinedload(BibleVerses.book),
+            joinedload(MlCrossReferences.target_start_verse).joinedload(
+                BibleVerses.book
+            ),
+            joinedload(MlCrossReferences.target_end_verse).joinedload(BibleVerses.book),
         )
         .order_by(
-            VerseCrossrefs.from_verse_id, desc(VerseCrossrefs.votes), VerseCrossrefs.id
+            MlCrossReferences.source_verse_id,
+            desc(MlCrossReferences.vote_count),
+            MlCrossReferences.ml_cross_reference_id,
         )
     ).all()
 
-    by_from: dict[int, list[VerseCrossrefs]] = {vid: [] for vid in verse_ids}
+    by_from: dict[int, list[MlCrossReferences]] = {vid: [] for vid in verse_ids}
     for row in rows:
-        by_from.setdefault(row.from_verse_id, []).append(row)
+        by_from.setdefault(row.source_verse_id, []).append(row)
 
     payload: list[CrossReferenceVerse] = []
     for verse in verses:
-        items: list[CrossReferenceItem] = []
+        items1: list[CrossReferenceItem] = []
         for row in by_from.get(verse.verse_id, []):
-            to_start = row.to_start_verse
-            to_end = row.to_end_verse or to_start
-            items.append(
+            to_start = row.target_start_verse
+            to_end = row.target_end_verse or to_start
+            items1.append(
                 CrossReferenceItem(
                     reference=format_ref(to_start, to_end),
-                    votes=row.votes or 0,
+                    vote_count=row.vote_count or 0,
                     note=row.note or "",
-                    to_start_id=to_start.verse_id,
-                    to_end_id=to_end.verse_id,
+                    target_start_verse_id=to_start.verse_id,
+                    target_end_verse_id=to_end.verse_id,
                     preview_text=_preview_text_for_range(
                         db, to_start.verse_id, to_end.verse_id
                     ),
@@ -728,58 +769,65 @@ def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
         payload.append(
             CrossReferenceVerse(
                 verse_id=verse.verse_id,
-                book=verse.book.name,
-                chapter=verse.chapter,
-                verse=verse.verse,
-                cross_references=items,
+                book=verse.book.book_name,
+                chapter_number=verse.chapter_number,
+                verse_number=verse.verse_number,
+                cross_references=items1,
             )
         )
 
     footnote_rows = (
         db.execute(
-            select(FootnoteCrossRefs, Footnotes)
-            .join(Footnotes, Footnotes.id == FootnoteCrossRefs.footnote_id)
-            .where(Footnotes.verse_id.in_(verse_ids) if verse_ids else False)  # type: ignore
+            select(FootnoteCrossReferences, VerseFootnotes)
+            .join(
+                VerseFootnotes,
+                VerseFootnotes.footnote_id == FootnoteCrossReferences.footnote_id,
+            )
+            .where(VerseFootnotes.verse_id.in_(verse_ids) if verse_ids else False)  # type: ignore
             .options(
-                joinedload(FootnoteCrossRefs.to_start_verse).joinedload(BibleVerses.book),
-                joinedload(FootnoteCrossRefs.to_end_verse).joinedload(BibleVerses.book),
+                joinedload(FootnoteCrossReferences.target_start_verse).joinedload(
+                    BibleVerses.book
+                ),
+                joinedload(FootnoteCrossReferences.target_end_verse).joinedload(
+                    BibleVerses.book
+                ),
             )
             .order_by(
-                Footnotes.verse_id,
-                Footnotes.order_in_translation,
-                Footnotes.word_index,
-                Footnotes.footnote_label,
-                FootnoteCrossRefs.source_order_number.is_(None),
-                FootnoteCrossRefs.source_order_number,
-                FootnoteCrossRefs.id,
+                VerseFootnotes.verse_id,
+                VerseFootnotes.order_in_translation,
+                VerseFootnotes.word_index,
+                VerseFootnotes.footnote_label,
+                FootnoteCrossReferences.source_order_number.is_(None),
+                FootnoteCrossReferences.source_order_number,
+                FootnoteCrossReferences.footnote_cross_reference_id,
             )
         )
         .unique()
         .all()
     )
 
-    footnote_by_from: dict[int, list[tuple[FootnoteCrossRefs, Footnotes]]] = {
-        vid: [] for vid in verse_ids
-    }
+    footnote_by_from: dict[
+        int, list[tuple[FootnoteCrossReferences, VerseFootnotes]]
+    ] = {vid: [] for vid in verse_ids}
     for cross_ref, footnote in footnote_rows:
         footnote_by_from.setdefault(footnote.verse_id, []).append((cross_ref, footnote))
 
     footnote_payload: list[FootnoteCrossReferenceVerse] = []
     for verse in verses:
-        items: list[FootnoteCrossReferenceItem] = []
+        items2: list[FootnoteCrossReferenceItem] = []
         for row, footnote in footnote_by_from.get(verse.verse_id, []):
-            to_start = row.to_start_verse
-            to_end = row.to_end_verse or to_start
-            items.append(
+            to_start = row.target_start_verse
+            to_end = row.target_end_verse or to_start
+            items2.append(
                 FootnoteCrossReferenceItem(
                     reference=format_ref(to_start, to_end),
                     reference_note=row.reference_note or "",
-                    footnote_id=footnote.id,
+                    footnote_id=footnote.footnote_id,
                     footnote_label=footnote.footnote_label,
                     footnote_text=footnote.footnote_text or "",
                     source_order_number=row.source_order_number,
-                    to_start_id=to_start.verse_id,
-                    to_end_id=to_end.verse_id,
+                    target_start_verse_id=to_start.verse_id,
+                    target_end_verse_id=to_end.verse_id,
                     preview_text=_preview_text_for_range(
                         db, to_start.verse_id, to_end.verse_id
                     ),
@@ -789,10 +837,10 @@ def get_cross_references(db: Session, ref: str) -> VerseCrossReferencesResponse:
         footnote_payload.append(
             FootnoteCrossReferenceVerse(
                 verse_id=verse.verse_id,
-                book=verse.book.name,
-                chapter=verse.chapter,
-                verse=verse.verse,
-                cross_references=items,
+                book=verse.book.book_name,
+                chapter_number=verse.chapter_number,
+                verse_number=verse.verse_number,
+                cross_references=items2,
             )
         )
 
@@ -827,7 +875,7 @@ def create_note(db: Session, payload: VerseNote) -> VerseNote:
     if verse_exists is None:
         raise HTTPException(status_code=400, detail="verse_id is invalid.")
 
-    note = VerseNotes(verse_id=payload.verse_id, note_md=payload.note_md)
+    note = VerseNotes(verse_id=payload.verse_id, note_markdown=payload.note_markdown)
     db.add(note)
     db.commit()
     db.refresh(note)
@@ -867,7 +915,7 @@ def update_note(db: Session, note_id: int, payload: VerseNote) -> VerseNote:
         raise HTTPException(status_code=400, detail="verse_id is invalid.")
 
     note.verse_id = payload.verse_id
-    note.note_md = payload.note_md
+    note.note_markdown = payload.note_markdown
     db.commit()
     return get_note(db, note_id)
 
@@ -886,8 +934,8 @@ def patch_note(db: Session, note_id: int, payload: PartialVerseNote) -> VerseNot
         if verse_exists is None:
             raise HTTPException(status_code=400, detail="verse_id is invalid.")
         note.verse_id = payload.verse_id
-    if "note_md" in values:
-        note.note_md = payload.note_md
+    if "note_markdown" in values:
+        note.note_markdown = payload.note_markdown
 
     db.commit()
     return get_note(db, note_id)
@@ -983,7 +1031,7 @@ def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
                 -sermon.sermon_id,
             )
 
-        display_ref = passage.ref_text
+        display_ref = passage.reference_text
         if not display_ref:
             end_verse = passage.end_verse or passage.start_verse
             display_ref = format_ref(passage.start_verse, end_verse)

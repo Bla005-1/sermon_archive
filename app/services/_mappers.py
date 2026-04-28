@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from app.db.models import (
-    Attachments,
     BibleBooks,
     BibleVerses,
-    BibleWidgetVerses,
+    SermonAttachments,
     SermonPassages,
     Sermons,
     VerseNotes,
+    WidgetPassages,
 )
 from app.schemas.attachments import Attachment
 from app.schemas.sermons import Sermon, SermonPassage
@@ -21,8 +21,8 @@ def bible_book_schema(book: BibleBooks) -> BibleBook:
     """Convert a BibleBooks ORM row into a BibleBook schema object."""
     return BibleBook(
         book_id=book.book_id,
-        name=book.name,
-        order_num=book.order_num,
+        book_name=book.book_name,
+        book_order=book.book_order,
         testament=TestamentEnum[book.testament.value],
     )
 
@@ -32,17 +32,17 @@ def bible_verse_schema(verse: BibleVerses) -> BibleVerse:
     return BibleVerse(
         verse_id=verse.verse_id,
         book=bible_book_schema(verse.book),
-        chapter=verse.chapter,
-        verse=verse.verse,
+        chapter_number=verse.chapter_number,
+        verse_number=verse.verse_number,
     )
 
 
-def attachment_schema(attachment: Attachments) -> Attachment:
-    """Convert an Attachments ORM row into an Attachment schema object."""
+def attachment_schema(attachment: SermonAttachments) -> Attachment:
+    """Convert a SermonAttachments ORM row into an Attachment schema object."""
     return Attachment(
         attachment_id=attachment.attachment_id,
-        sermon=attachment.sermon_id,
-        rel_path=attachment.rel_path,
+        sermon_id=attachment.sermon_id,
+        relative_path=attachment.relative_path,
         original_filename=attachment.original_filename,
         mime_type=attachment.mime_type,
         byte_size=attachment.byte_size,
@@ -53,15 +53,15 @@ def attachment_schema(attachment: Attachments) -> Attachment:
 def sermon_passage_schema(passage: SermonPassages) -> SermonPassage:
     """Convert a SermonPassages ORM row into a SermonPassage schema object."""
     return SermonPassage(
-        id=passage.id,
-        sermon=passage.sermon_id,
+        sermon_passage_id=passage.sermon_passage_id,
+        sermon_id=passage.sermon_id,
         start_verse=bible_verse_schema(passage.start_verse),
         end_verse=bible_verse_schema(passage.end_verse) if passage.end_verse else None,
         start_verse_id=passage.start_verse_id,
         end_verse_id=passage.end_verse_id,
-        ref_text=passage.ref_text,
+        reference_text=passage.reference_text,
         context_note=passage.context_note,
-        ord=passage.ord,
+        display_order=passage.display_order,
     )
 
 
@@ -71,13 +71,19 @@ def sermon_schema(sermon: Sermons, *, include_nested: bool = True) -> Sermon:
     attachments = []
     if include_nested:
         attachments = [
-            attachment_schema(item) for item in getattr(sermon, "attachments", [])
+            attachment_schema(item)
+            for item in getattr(sermon, "sermon_attachments", [])
         ]
         passages = [
             sermon_passage_schema(item)
             for item in getattr(sermon, "sermon_passages", [])
         ]
-        passages.sort(key=lambda item: ((item.ord or 0), item.id or 0))
+        passages.sort(
+            key=lambda item: (
+                (item.display_order or 0),
+                item.sermon_passage_id or 0,
+            )
+        )
 
     return Sermon(
         sermon_id=sermon.sermon_id,
@@ -86,7 +92,7 @@ def sermon_schema(sermon: Sermons, *, include_nested: bool = True) -> Sermon:
         speaker_name=sermon.speaker_name,
         series_name=sermon.series_name,
         location_name=sermon.location_name,
-        notes_md=sermon.notes_md,
+        notes_markdown=sermon.notes_markdown,
         created_at=sermon.created_at,
         updated_at=sermon.updated_at,
         passages=passages,
@@ -100,22 +106,22 @@ def verse_note_schema(note: VerseNotes) -> VerseNote:
         note_id=note.note_id,
         verse=bible_verse_schema(note.verse),
         verse_id=note.verse_id,
-        note_md=note.note_md,
+        note_markdown=note.note_markdown,
         created_at=note.created_at,
         updated_at=note.updated_at,
     )
 
 
-def widget_schema(widget: BibleWidgetVerses) -> BibleWidget:
-    """Convert a BibleWidgetVerses ORM row into a BibleWidget schema object."""
+def widget_schema(widget: WidgetPassages) -> BibleWidget:
+    """Convert a WidgetPassages ORM row into a BibleWidget schema object."""
     return BibleWidget(
-        id=widget.id,
+        widget_passage_id=widget.widget_passage_id,
         start_verse=bible_verse_schema(widget.start_verse),
         end_verse=bible_verse_schema(widget.end_verse),
         start_verse_id=widget.start_verse_id,
         end_verse_id=widget.end_verse_id,
         translation=widget.translation,
-        ref=widget.ref,
+        reference_text=widget.reference_text,
         display_text=widget.display_text,
         weight=widget.weight,
         created_at=widget.created_at,

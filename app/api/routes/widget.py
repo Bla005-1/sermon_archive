@@ -24,42 +24,58 @@ def widget_create(payload: BibleWidget, db: Session = Depends(get_db)) -> BibleW
     return widget_Service.create_widget(db=db, payload=payload)
 
 
-@router.get("/{id}", response_model=BibleWidget, operation_id="widget_retrieve")
-def widget_retrieve(id: int = Path(...), db: Session = Depends(get_db)) -> BibleWidget:
-    return widget_Service.get_widget(db=db, widget_id=id)
+@router.get(
+    "/{widget_passage_id}", response_model=BibleWidget, operation_id="widget_retrieve"
+)
+def widget_retrieve(
+    widget_passage_id: int = Path(...), db: Session = Depends(get_db)
+) -> BibleWidget:
+    return widget_Service.get_widget(db=db, widget_id=widget_passage_id)
 
 
 @router.put(
-    "/{id}",
+    "/{widget_passage_id}",
     response_model=BibleWidget,
     operation_id="widget_update",
     dependencies=[Depends(require_auth)],
 )
 def widget_update(
-    payload: BibleWidget, id: int = Path(...), db: Session = Depends(get_db)
+    payload: BibleWidget,
+    widget_passage_id: int = Path(...),
+    db: Session = Depends(get_db),
 ) -> BibleWidget:
-    return widget_Service.update_widget(db=db, widget_id=id, payload=payload)
+    return widget_Service.update_widget(
+        db=db,
+        widget_id=widget_passage_id,
+        payload=payload,
+    )
 
 
 @router.patch(
-    "/{id}",
+    "/{widget_passage_id}",
     response_model=BibleWidget,
     operation_id="widget_partial_update",
     dependencies=[Depends(require_auth)],
 )
 def widget_partial_update(
     payload: PartialBibleWidget,
-    id: int = Path(...),
+    widget_passage_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> BibleWidget:
-    return widget_Service.patch_widget(db=db, widget_id=id, payload=payload)
+    return widget_Service.patch_widget(
+        db=db,
+        widget_id=widget_passage_id,
+        payload=payload,
+    )
 
 
 @router.delete(
-    "/{id}",
+    "/{widget_passage_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     operation_id="widget_destroy",
     dependencies=[Depends(require_auth)],
 )
-def widget_destroy(id: int = Path(...), db: Session = Depends(get_db)) -> None:
-    widget_Service.delete_widget(db=db, widget_id=id)
+def widget_destroy(
+    widget_passage_id: int = Path(...), db: Session = Depends(get_db)
+) -> None:
+    widget_Service.delete_widget(db=db, widget_id=widget_passage_id)

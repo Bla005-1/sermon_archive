@@ -169,64 +169,72 @@ def sermons_passages_create(
 
 
 @router.get(
-    "/{sermon_id}/passages/{id}",
+    "/{sermon_id}/passages/{sermon_passage_id}",
     response_model=SermonPassage,
     operation_id="sermons_passages_retrieve_2",
 )
 def sermons_passages_retrieve_2(
     sermon_id: int = Path(...),
-    id: int = Path(...),
+    sermon_passage_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> SermonPassage:
-    return sermons_service.get_sermon_passage(db=db, sermon_id=sermon_id, passage_id=id)
+    return sermons_service.get_sermon_passage(
+        db=db,
+        sermon_id=sermon_id,
+        passage_id=sermon_passage_id,
+    )
 
 
 @router.put(
-    "/{sermon_id}/passages/{id}",
+    "/{sermon_id}/passages/{sermon_passage_id}",
     response_model=SermonPassage,
     operation_id="sermons_passages_update_2",
 )
 def sermons_passages_update_2(
     payload: SermonPassage,
     sermon_id: int = Path(...),
-    id: int = Path(...),
+    sermon_passage_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> SermonPassage:
     return sermons_service.update_sermon_passage(
         db=db,
         sermon_id=sermon_id,
-        passage_id=id,
+        passage_id=sermon_passage_id,
         payload=payload,
     )
 
 
 @router.patch(
-    "/{sermon_id}/passages/{id}",
+    "/{sermon_id}/passages/{sermon_passage_id}",
     response_model=SermonPassage,
     operation_id="sermons_passages_partial_update_2",
 )
 def sermons_passages_partial_update_2(
     payload: PartialSermonPassage,
     sermon_id: int = Path(...),
-    id: int = Path(...),
+    sermon_passage_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> SermonPassage:
     return sermons_service.patch_sermon_passage(
         db=db,
         sermon_id=sermon_id,
-        passage_id=id,
+        passage_id=sermon_passage_id,
         payload=payload,
     )
 
 
 @router.delete(
-    "/{sermon_id}/passages/{id}",
+    "/{sermon_id}/passages/{sermon_passage_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     operation_id="sermons_passages_destroy_2",
 )
 def sermons_passages_destroy_2(
     sermon_id: int = Path(...),
-    id: int = Path(...),
+    sermon_passage_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> None:
-    sermons_service.delete_sermon_passage(db=db, sermon_id=sermon_id, passage_id=id)
+    sermons_service.delete_sermon_passage(
+        db=db,
+        sermon_id=sermon_id,
+        passage_id=sermon_passage_id,
+    )

@@ -13,7 +13,7 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Attachments, Sermons
+from app.db.models import SermonAttachments, Sermons
 from app.schemas.attachments import Attachment, PartialAttachment
 from app.services._mappers import attachment_schema
 
@@ -25,10 +25,10 @@ def _storage_root() -> str:
     return root
 
 
-def _safe_rel_to_abs(rel_path: str) -> str:
+def _safe_rel_to_abs(relative_path: str) -> str:
     """Resolve an attachment relative path inside the configured storage root."""
     root = _storage_root()
-    abs_path = os.path.abspath(os.path.join(root, rel_path))
+    abs_path = os.path.abspath(os.path.join(root, relative_path))
     if os.path.commonpath([root, abs_path]) != root:
         raise HTTPException(
             status_code=400, detail="Attachment path is outside storage root."
@@ -36,10 +36,12 @@ def _safe_rel_to_abs(rel_path: str) -> str:
     return abs_path
 
 
-def _get_attachment_or_404(db: Session, attachment_id: int) -> Attachments:
+def _get_attachment_or_404(db: Session, attachment_id: int) -> SermonAttachments:
     """Load one attachment row or raise a 404 error."""
     attachment = db.scalar(
-        select(Attachments).where(Attachments.attachment_id == attachment_id)
+        select(SermonAttachments).where(
+            SermonAttachments.attachment_id == attachment_id
+        )
     )
     if attachment is None:
         raise HTTPException(status_code=404, detail="Attachment not found.")
@@ -56,13 +58,13 @@ def _get_sermon_or_404(db: Session, sermon_id: int) -> Sermons:
 
 def _get_sermon_attachment_or_404(
     db: Session, sermon_id: int, attachment_id: int
-) -> Attachments:
+) -> SermonAttachments:
     """Load one attachment scoped to a sermon or raise a 404 error."""
     _get_sermon_or_404(db, sermon_id)
     attachment = db.scalar(
-        select(Attachments).where(
-            Attachments.attachment_id == attachment_id,
-            Attachments.sermon_id == sermon_id,
+        select(SermonAttachments).where(
+            SermonAttachments.attachment_id == attachment_id,
+            SermonAttachments.sermon_id == sermon_id,
         )
     )
     if attachment is None:
@@ -104,8 +106,8 @@ def patch_attachment(
 def delete_attachment(db: Session, attachment_id: int) -> None:
     """Delete an attachment row and its stored file when present."""
     attachment = _get_attachment_or_404(db, attachment_id)
-    if attachment.rel_path:
-        abs_path = _safe_rel_to_abs(attachment.rel_path)
+    if attachment.relative_path:
+        abs_path = _safe_rel_to_abs(attachment.relative_path)
         if os.path.exists(abs_path):
             os.remove(abs_path)
     db.delete(attachment)
@@ -116,9 +118,12 @@ def list_sermon_attachments(db: Session, sermon_id: int) -> list[Attachment]:
     """List attachments for a sermon ordered by newest upload first."""
     _get_sermon_or_404(db, sermon_id)
     rows = db.scalars(
-        select(Attachments)
-        .where(Attachments.sermon_id == sermon_id)
-        .order_by(Attachments.created_at.desc(), Attachments.attachment_id.desc())
+        select(SermonAttachments)
+        .where(SermonAttachments.sermon_id == sermon_id)
+        .order_by(
+            SermonAttachments.created_at.desc(),
+            SermonAttachments.attachment_id.desc(),
+        )
     ).all()
     return [attachment_schema(row) for row in rows]
 
@@ -144,7 +149,7 @@ def create_sermon_attachment(
     with open(abs_path, "wb") as handle:
         shutil.copyfileobj(file.file, handle)
 
-    rel_path = os.path.relpath(abs_path, root)
+    relative_path = os.path.relpath(abs_path, root)
     mime_type = (
         file.content_type
         or mimetypes.guess_type(file.filename)[0]
@@ -152,9 +157,9 @@ def create_sermon_attachment(
     )
     byte_size = os.path.getsize(abs_path)
 
-    attachment = Attachments(
+    attachment = SermonAttachments(
         sermon_id=sermon_id,
-        rel_path=rel_path,
+        relative_path=relative_path,
         original_filename=file.filename,
         mime_type=mime_type,
         byte_size=byte_size,
@@ -172,10 +177,10 @@ def get_sermon_attachment_download(
     attachment = _get_sermon_attachment_or_404(
         db=db, sermon_id=sermon_id, attachment_id=attachment_id
     )
-    if not attachment.rel_path:
+    if not attachment.relative_path:
         raise HTTPException(status_code=404, detail="Attachment file not found.")
 
-    abs_path = _safe_rel_to_abs(attachment.rel_path)
+    abs_path = _safe_rel_to_abs(attachment.relative_path)
     if not os.path.isfile(abs_path):
         raise HTTPException(status_code=404, detail="Attachment file not found.")
 

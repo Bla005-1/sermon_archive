@@ -54,35 +54,39 @@ def normalize_book(raw: str) -> str:
 def _find_book_tolerant(db: Session, name_normalized: str) -> Optional[BibleBooks]:
     """Find a Bible book with exact, prefix, word-boundary, and contains fallback matching."""
     exact = db.scalar(
-        select(BibleBooks).where(func.lower(BibleBooks.name) == name_normalized.lower())
+        select(BibleBooks).where(
+            func.lower(BibleBooks.book_name) == name_normalized.lower()
+        )
     )
     if exact is not None:
         return exact
 
     prefix = db.scalars(
         select(BibleBooks)
-        .where(BibleBooks.name.ilike(f"{name_normalized}%"))
-        .order_by(func.length(BibleBooks.name), BibleBooks.name)
+        .where(BibleBooks.book_name.ilike(f"{name_normalized}%"))
+        .order_by(func.length(BibleBooks.book_name), BibleBooks.book_name)
     ).all()
     if len(prefix) == 1:
         return prefix[0]
 
     contains = db.scalars(
         select(BibleBooks)
-        .where(BibleBooks.name.ilike(f"%{name_normalized}%"))
-        .order_by(func.length(BibleBooks.name), BibleBooks.name)
+        .where(BibleBooks.book_name.ilike(f"%{name_normalized}%"))
+        .order_by(func.length(BibleBooks.book_name), BibleBooks.book_name)
     ).all()
     if contains:
         return contains[0]
     return None
 
 
-def parse_reference(db: Session, ref_text: str) -> tuple[BibleVerses, BibleVerses]:
+def parse_reference(
+    db: Session, reference_text: str
+) -> tuple[BibleVerses, BibleVerses]:
     """Parse book/chapter[/verse[-verse]] input and return canonical start/end verse rows."""
-    if not ref_text or not ref_text.strip():
+    if not reference_text or not reference_text.strip():
         raise ValueError("Empty reference.")
 
-    cleaned = re.sub(DASHES, "-", ref_text.strip())
+    cleaned = re.sub(DASHES, "-", reference_text.strip())
     match = _REF_RE.match(cleaned)
     chapter_match = None if match else _CHAPTER_ONLY_RE.match(cleaned)
     if not match and not chapter_match:
@@ -107,8 +111,11 @@ def parse_reference(db: Session, ref_text: str) -> tuple[BibleVerses, BibleVerse
     if chapter_match is not None:
         verses = db.scalars(
             select(BibleVerses)
-            .where(BibleVerses.book_id == book.book_id, BibleVerses.chapter == chapter)
-            .order_by(BibleVerses.verse)
+            .where(
+                BibleVerses.book_id == book.book_id,
+                BibleVerses.chapter_number == chapter,
+            )
+            .order_by(BibleVerses.verse_number)
         ).all()
         if not verses:
             raise ValueError("We could not locate that chapter in the archive.")
@@ -124,15 +131,15 @@ def parse_reference(db: Session, ref_text: str) -> tuple[BibleVerses, BibleVerse
         start_v = db.scalar(
             select(BibleVerses).where(
                 BibleVerses.book_id == book.book_id,
-                BibleVerses.chapter == chapter,
-                BibleVerses.verse == low,
+                BibleVerses.chapter_number == chapter,
+                BibleVerses.verse_number == low,
             )
         )
         end_v = db.scalar(
             select(BibleVerses).where(
                 BibleVerses.book_id == book.book_id,
-                BibleVerses.chapter == chapter,
-                BibleVerses.verse == high,
+                BibleVerses.chapter_number == chapter,
+                BibleVerses.verse_number == high,
             )
         )
         if start_v is None or end_v is None:
@@ -146,11 +153,18 @@ def parse_reference(db: Session, ref_text: str) -> tuple[BibleVerses, BibleVerse
 def format_ref(start: BibleVerses, end: BibleVerses) -> str:
     """Render a verse range into a normalized human-readable reference."""
     if start.verse_id == end.verse_id:
-        return f"{start.book.name} {start.chapter}:{start.verse}"
+        return f"{start.book.book_name} {start.chapter_number}:{start.verse_number}"
     if start.book_id == end.book_id:
-        if start.chapter == end.chapter:
-            return f"{start.book.name} {start.chapter}:{start.verse}-{end.verse}"
+        if start.chapter_number == end.chapter_number:
+            return (
+                f"{start.book.book_name} {start.chapter_number}:"
+                f"{start.verse_number}-{end.verse_number}"
+            )
         return (
-            f"{start.book.name} {start.chapter}:{start.verse}-{end.chapter}:{end.verse}"
+            f"{start.book.book_name} {start.chapter_number}:{start.verse_number}-"
+            f"{end.chapter_number}:{end.verse_number}"
         )
-    return f"{start.book.name} {start.chapter}:{start.verse} - {end.book.name} {end.chapter}:{end.verse}"
+    return (
+        f"{start.book.book_name} {start.chapter_number}:{start.verse_number} - "
+        f"{end.book.book_name} {end.chapter_number}:{end.verse_number}"
+    )

@@ -13,28 +13,28 @@ class TestamentEnum(str, Enum):
 
 class BibleBook(APIModel):
     book_id: int | None = None
-    name: str
-    order_num: int
+    book_name: str
+    book_order: int
     testament: TestamentEnum
 
 
 class BibleVerse(APIModel):
     verse_id: int | None = None
     book: BibleBook | None = None
-    chapter: int
-    verse: int
+    chapter_number: int
+    verse_number: int
 
 
 class CommentaryStart(APIModel):
     book: str
-    chapter: int
-    verse: int
+    chapter_number: int
+    verse_number: int
 
 
 class CommentaryEnd(APIModel):
     book: str
-    chapter: int
-    verse: int
+    chapter_number: int
+    verse_number: int
 
 
 class CommentaryItem(APIModel):
@@ -43,7 +43,7 @@ class CommentaryItem(APIModel):
     father_name: str
     display_name: str
     append_to_author_name: str
-    text: str
+    commentary_text: str
     book_id: int
     start_verse_id: int
     end_verse_id: int
@@ -58,18 +58,18 @@ class CommentaryItem(APIModel):
 
 class CrossReferenceItem(APIModel):
     reference: str
-    votes: int
+    vote_count: int
     note: str
-    to_start_id: int
-    to_end_id: int
+    target_start_verse_id: int
+    target_end_verse_id: int
     preview_text: str
 
 
 class CrossReferenceVerse(APIModel):
     verse_id: int
     book: str
-    chapter: int
-    verse: int
+    chapter_number: int
+    verse_number: int
     cross_references: list[CrossReferenceItem]
 
 
@@ -80,16 +80,16 @@ class FootnoteCrossReferenceItem(APIModel):
     footnote_label: str
     footnote_text: str
     source_order_number: int | None = None
-    to_start_id: int
-    to_end_id: int
+    target_start_verse_id: int
+    target_end_verse_id: int
     preview_text: str
 
 
 class FootnoteCrossReferenceVerse(APIModel):
     verse_id: int
     book: str
-    chapter: int
-    verse: int
+    chapter_number: int
+    verse_number: int
     cross_references: list[FootnoteCrossReferenceItem]
 
 
@@ -111,12 +111,12 @@ class SearchIntentEnum(str, Enum):
 
 
 class VerseSearchResult(APIModel):
-    order_num: int
+    result_order: int
     verse_id: int
     reference: str
     book: str
-    chapter: int
-    verse: int
+    chapter_number: int
+    verse_number: int
     available_translations: list[str] = Field(default_factory=list)
     translation: str
     plain_text: str
@@ -156,14 +156,14 @@ class VerseNote(APIModel):
     note_id: int | None = None
     verse: BibleVerse | None = None
     verse_id: int | None = None
-    note_md: str | None = None
+    note_markdown: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
 
 class PartialVerseNote(APIModel):
     verse_id: int | None = None
-    note_md: str | None = None
+    note_markdown: str | None = None
 
 
 class VerseSermonItem(APIModel):

@@ -41,6 +41,19 @@ Notes:
 - This codebase is database-first and uses existing tables from `app/db/models.py`.
 - There are no migrations in this repository.
 
+## Naming Conventions
+
+Database, ORM, and API schema fields use explicit snake_case names that describe the domain object:
+
+- Table primary keys are table-specific, such as `sermon_id`, `sermon_passage_id`, `footnote_id`, and `widget_passage_id`.
+- Foreign keys include the target role when a table points to the same target more than once, such as `source_verse_id`, `target_start_verse_id`, and `target_end_verse_id`.
+- Bible location fields use `chapter_number` and `verse_number`.
+- Reference display strings use `reference_text`; markdown content uses `*_markdown`.
+- Avoid abbreviations in persistent/API names: use `display_order`, `relative_path`, `commentary_text`, and `vote_count` instead of short forms.
+- SQL indexes and constraints use `idx_*`, `uq_*`, and `fk_*` prefixes followed by the table and role.
+
+Route query parameters may stay concise where they are user-facing (`q`, `ref`, `chapter`), but request and response bodies should follow the schema names above.
+
 
 ## Environment Variables
 
@@ -110,10 +123,10 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `GET /api/sermons/{sermon_id}/attachments/{attachment_id}/download` (file download)
 - `GET /api/sermons/{sermon_id}/passages`
 - `POST /api/sermons/{sermon_id}/passages`
-- `GET /api/sermons/{sermon_id}/passages/{id}`
-- `PUT /api/sermons/{sermon_id}/passages/{id}`
-- `PATCH /api/sermons/{sermon_id}/passages/{id}`
-- `DELETE /api/sermons/{sermon_id}/passages/{id}`
+- `GET /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
+- `PUT /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
+- `PATCH /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
+- `DELETE /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
 
 `GET /api/sermons/suggestions` returns collection-level autocomplete values derived from existing sermons:
 
@@ -123,10 +136,10 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 
 ### Attachments (protected)
 
-- `GET /api/attachments/{id}`
-- `PUT /api/attachments/{id}`
-- `PATCH /api/attachments/{id}`
-- `DELETE /api/attachments/{id}`
+- `GET /api/attachments/{attachment_id}`
+- `PUT /api/attachments/{attachment_id}`
+- `PATCH /api/attachments/{attachment_id}`
+- `DELETE /api/attachments/{attachment_id}`
 
 ### Verses
 
@@ -152,13 +165,13 @@ Protected:
 
 Public:
 - `GET /api/widget`
-- `GET /api/widget/{id}`
+- `GET /api/widget/{widget_passage_id}`
 
 Protected:
 - `POST /api/widget`
-- `PUT /api/widget/{id}`
-- `PATCH /api/widget/{id}`
-- `DELETE /api/widget/{id}`
+- `PUT /api/widget/{widget_passage_id}`
+- `PATCH /api/widget/{widget_passage_id}`
+- `DELETE /api/widget/{widget_passage_id}`
 
 ## Manual Testing
 

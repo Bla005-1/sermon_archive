@@ -24,7 +24,7 @@ from app.services._reference import format_ref, parse_reference
 def _sermon_with_relations_stmt() -> Select:
     """Build a base sermon select statement with relations eagerly loaded."""
     return select(Sermons).options(
-        joinedload(Sermons.attachments),
+        joinedload(Sermons.sermon_attachments),
         joinedload(Sermons.sermon_passages)
         .joinedload(SermonPassages.start_verse)
         .joinedload(BibleVerses.book),
@@ -57,7 +57,10 @@ def _get_passage_or_404(db: Session, sermon_id: int, passage_id: int) -> SermonP
     """Load a sermon passage scoped to a sermon or raise 404."""
     passage = db.scalar(
         select(SermonPassages)
-        .where(SermonPassages.sermon_id == sermon_id, SermonPassages.id == passage_id)
+        .where(
+            SermonPassages.sermon_id == sermon_id,
+            SermonPassages.sermon_passage_id == passage_id,
+        )
         .options(
             joinedload(SermonPassages.start_verse).joinedload(BibleVerses.book),
             joinedload(SermonPassages.end_verse).joinedload(BibleVerses.book),
@@ -79,7 +82,7 @@ def _coerce_sermon_fields(
         "speaker_name",
         "series_name",
         "location_name",
-        "notes_md",
+        "notes_markdown",
     }
     cleaned = {k: v for k, v in data.items() if k in writable_keys}
     if existing is None:
@@ -97,11 +100,11 @@ def _coerce_sermon_fields(
 def _resolve_passage_verse_ids(
     db: Session, payload: SermonPassage | PartialSermonPassage
 ) -> tuple[int | None, int | None, str | None]:
-    """Resolve passage verse ids from payload fields and optional `ref_text`."""
-    ref_text = payload.ref_text.strip() if payload.ref_text else None
-    if ref_text:
+    """Resolve passage verse ids from payload fields and optional `reference_text`."""
+    reference_text = payload.reference_text.strip() if payload.reference_text else None
+    if reference_text:
         try:
-            start_v, end_v = parse_reference(db, ref_text)
+            start_v, end_v = parse_reference(db, reference_text)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         normalized = format_ref(start_v, end_v)
@@ -111,7 +114,7 @@ def _resolve_passage_verse_ids(
     start_id = payload.start_verse_id
     end_id = payload.end_verse_id
     if start_id is None:
-        return None, None, ref_text
+        return None, None, reference_text
 
     start_v = db.scalar(
         select(BibleVerses)
@@ -173,7 +176,7 @@ def update_sermon(db: Session, sermon_id: int, payload: Sermon) -> Sermon:
         "speaker_name",
         "series_name",
         "location_name",
-        "notes_md",
+        "notes_markdown",
     ):
         setattr(sermon, key, values.get(key))
     db.commit()
@@ -198,7 +201,7 @@ def delete_sermon(db: Session, sermon_id: int) -> None:
 
 
 def list_sermon_passages(db: Session, sermon_id: int) -> list[SermonPassage]:
-    """List passages for a sermon ordered by `ord` then `id`."""
+    """List passages for a sermon ordered by display order then passage id."""
     _get_sermon_or_404(db, sermon_id)
     passages = db.scalars(
         select(SermonPassages)
@@ -207,7 +210,10 @@ def list_sermon_passages(db: Session, sermon_id: int) -> list[SermonPassage]:
             joinedload(SermonPassages.start_verse).joinedload(BibleVerses.book),
             joinedload(SermonPassages.end_verse).joinedload(BibleVerses.book),
         )
-        .order_by(SermonPassages.ord, SermonPassages.id)
+        .order_by(
+            SermonPassages.display_order,
+            SermonPassages.sermon_passage_id,
+        )
     ).all()
     return [sermon_passage_schema(row) for row in passages]
 
@@ -215,17 +221,17 @@ def list_sermon_passages(db: Session, sermon_id: int) -> list[SermonPassage]:
 def create_sermon_passage(
     db: Session, sermon_id: int, payload: SermonPassage
 ) -> SermonPassage:
-    """Create a sermon passage, deriving verse ids from `ref_text` when provided."""
+    """Create a sermon passage, deriving verse ids from `reference_text` when provided."""
     _get_sermon_or_404(db, sermon_id)
     start_id, end_id, normalized_ref = _resolve_passage_verse_ids(db, payload)
     if start_id is None:
         raise HTTPException(
-            status_code=400, detail="start_verse_id or ref_text is required."
+            status_code=400, detail="start_verse_id or reference_text is required."
         )
 
-    max_ord = (
+    max_display_order = (
         db.scalar(
-            select(func.max(SermonPassages.ord)).where(
+            select(func.max(SermonPassages.display_order)).where(
                 SermonPassages.sermon_id == sermon_id
             )
         )
@@ -235,13 +241,13 @@ def create_sermon_passage(
         sermon_id=sermon_id,
         start_verse_id=start_id,
         end_verse_id=end_id,
-        ref_text=normalized_ref,
+        reference_text=normalized_ref,
         context_note=payload.context_note,
-        ord=max_ord + 1,
+        display_order=max_display_order + 1,
     )
     db.add(passage)
     db.commit()
-    return get_sermon_passage(db, sermon_id, passage.id)
+    return get_sermon_passage(db, sermon_id, passage.sermon_passage_id)
 
 
 def get_sermon_passage(db: Session, sermon_id: int, passage_id: int) -> SermonPassage:
@@ -261,12 +267,12 @@ def update_sermon_passage(
     start_id, end_id, normalized_ref = _resolve_passage_verse_ids(db, payload)
     if start_id is None:
         raise HTTPException(
-            status_code=400, detail="start_verse_id or ref_text is required."
+            status_code=400, detail="start_verse_id or reference_text is required."
         )
 
     passage.start_verse_id = start_id
     passage.end_verse_id = end_id
-    passage.ref_text = normalized_ref
+    passage.reference_text = normalized_ref
     passage.context_note = payload.context_note
     db.commit()
     return get_sermon_passage(db, sermon_id, passage_id)
@@ -282,12 +288,14 @@ def patch_sermon_passage(
     passage = _get_passage_or_404(db, sermon_id, passage_id)
     values = payload.model_dump(exclude_unset=True)
 
-    if any(key in values for key in {"ref_text", "start_verse_id", "end_verse_id"}):
+    if any(
+        key in values for key in {"reference_text", "start_verse_id", "end_verse_id"}
+    ):
         start_id, end_id, normalized_ref = _resolve_passage_verse_ids(db, payload)
         if start_id is not None:
             passage.start_verse_id = start_id
             passage.end_verse_id = end_id
-            passage.ref_text = normalized_ref
+            passage.reference_text = normalized_ref
 
     if "context_note" in values:
         passage.context_note = payload.context_note

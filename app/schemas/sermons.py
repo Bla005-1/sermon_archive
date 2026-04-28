@@ -10,21 +10,21 @@ from app.schemas.verses import BibleVerse
 
 
 class SermonPassage(APIModel):
-    id: int | None = None
-    sermon: int | None = None
+    sermon_passage_id: int | None = None
+    sermon_id: int | None = None
     start_verse: BibleVerse | None = None
     end_verse: BibleVerse | None = None
     start_verse_id: int | None = None
     end_verse_id: int | None = None
-    ref_text: str | None = None
+    reference_text: str | None = None
     context_note: str | None = None
-    ord: int | None = None
+    display_order: int | None = None
 
 
 class PartialSermonPassage(APIModel):
     start_verse_id: int | None = None
     end_verse_id: int | None = None
-    ref_text: str | None = None
+    reference_text: str | None = None
     context_note: str | None = None
 
 
@@ -35,7 +35,7 @@ class Sermon(APIModel):
     speaker_name: str | None = None
     series_name: str | None = None
     location_name: str | None = None
-    notes_md: str | None = None
+    notes_markdown: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     passages: list[SermonPassage] = Field(default_factory=list)
@@ -48,7 +48,7 @@ class PatchedSermon(APIModel):
     speaker_name: str | None = None
     series_name: str | None = None
     location_name: str | None = None
-    notes_md: str | None = None
+    notes_markdown: str | None = None
 
 
 class SermonSuggestionsResponse(APIModel):
