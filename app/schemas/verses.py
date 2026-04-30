@@ -1,4 +1,4 @@
-from datetime import datetime, date
+import datetime as dt
 from enum import Enum
 
 from pydantic import Field
@@ -157,8 +157,8 @@ class VerseNote(APIModel):
     verse: BibleVerse | None = None
     verse_id: int | None = None
     note_markdown: str | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: dt.datetime | None = None
+    updated_at: dt.datetime | None = None
 
 
 class PartialVerseNote(APIModel):
@@ -169,7 +169,7 @@ class PartialVerseNote(APIModel):
 class VerseSermonItem(APIModel):
     sermon_id: int
     title: str
-    preached_on: date | None = None
+    preached_on: dt.date | None = None
     speaker_name: str
     series_name: str
     reference: str

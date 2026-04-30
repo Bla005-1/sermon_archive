@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 import hashlib
 import hmac
 import secrets
@@ -23,7 +23,6 @@ from app.schemas.auth import (
     UserResponse,
 )
 
-
 _CSRF_HEADER_NAME = "X-CSRF-Token"
 _CSRF_PROTECTED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -38,9 +37,9 @@ class AuthContext:
     token: ApiAccessTokens | None = None
 
 
-def _utcnow() -> datetime.datetime:
+def _utcnow() -> dt.datetime:
     """Return UTC now as a naive datetime for DB compatibility."""
-    return datetime.datetime.utcnow()
+    return dt.datetime.now(dt.UTC)
 
 
 def _password_hash(password: str) -> str:
@@ -132,7 +131,7 @@ def _create_session(db: Session, user: ApiUsers, request: Request) -> ApiSession
         session_id=secrets.token_urlsafe(48),
         user_id=user.user_id,
         csrf_token=secrets.token_urlsafe(32),
-        expires_at=now + datetime.timedelta(minutes=settings.session_ttl_minutes),
+        expires_at=now + dt.timedelta(minutes=settings.session_ttl_minutes),
         last_seen_at=now,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
@@ -299,7 +298,7 @@ def issue_token(
         user_id=user.user_id,
         token_hash=_token_hash(raw_token),
         token_name=payload.token_name,
-        expires_at=now + datetime.timedelta(minutes=settings.token_ttl_minutes),
+        expires_at=now + dt.timedelta(minutes=settings.token_ttl_minutes),
         last_used_at=now,
     )
     user.last_login_at = now
@@ -358,7 +357,7 @@ def refresh_user(db: Session, request: Request, response: Response) -> UserRespo
     """Refresh active session expiry and return the current authenticated user."""
     context = require_authenticated_context(db, request)
     if context.session is not None:
-        context.session.expires_at = _utcnow() + datetime.timedelta(
+        context.session.expires_at = _utcnow() + dt.timedelta(
             minutes=settings.session_ttl_minutes
         )
         db.commit()

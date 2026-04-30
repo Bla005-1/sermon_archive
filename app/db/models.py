@@ -126,10 +126,10 @@ class Sermons(Base):
     )
 
     sermon_attachments: Mapped[list["SermonAttachments"]] = relationship(
-        "SermonAttachments", back_populates="sermon"
+        "SermonAttachments", back_populates="sermon", passive_deletes="all"
     )
     sermon_passages: Mapped[list["SermonPassages"]] = relationship(
-        "SermonPassages", back_populates="sermon"
+        "SermonPassages", back_populates="sermon", passive_deletes="all"
     )
 
 

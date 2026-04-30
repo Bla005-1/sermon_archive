@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, date
+import datetime as dt
 
 from pydantic import Field
 
@@ -30,20 +30,20 @@ class PartialSermonPassage(APIModel):
 
 class Sermon(APIModel):
     sermon_id: int | None = None
-    preached_on: date | None = None
+    preached_on: dt.date | None = None
     title: str
     speaker_name: str | None = None
     series_name: str | None = None
     location_name: str | None = None
     notes_markdown: str | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: dt.datetime | None = None
+    updated_at: dt.datetime | None = None
     passages: list[SermonPassage] = Field(default_factory=list)
     attachments: list[Attachment] = Field(default_factory=list)
 
 
 class PatchedSermon(APIModel):
-    preached_on: date | None = None
+    preached_on: dt.date | None = None
     title: str | None = None
     speaker_name: str | None = None
     series_name: str | None = None

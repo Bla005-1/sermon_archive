@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime as dt
 
 from app.schemas.base import APIModel
 
@@ -10,7 +10,7 @@ class Attachment(APIModel):
     original_filename: str | None = None
     mime_type: str | None = None
     byte_size: int | None = None
-    created_at: datetime | None = None
+    created_at: dt.datetime | None = None
 
 
 class PartialAttachment(APIModel):

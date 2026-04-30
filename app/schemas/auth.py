@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime as dt
 
 from app.schemas.base import APIModel
 
@@ -35,7 +35,7 @@ class CsrfResponse(APIModel):
 class TokenResponse(APIModel):
     access_token: str
     token_type: str
-    expires_at: datetime
+    expires_at: dt.datetime
 
 
 class TokenRevokeResponse(APIModel):

@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime as dt
 
 from app.schemas.base import APIModel
 from app.schemas.verses import BibleVerse
@@ -14,8 +14,8 @@ class BibleWidget(APIModel):
     reference_text: str
     display_text: str
     weight: int | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: dt.datetime | None = None
+    updated_at: dt.datetime | None = None
 
 
 class PartialBibleWidget(APIModel):
