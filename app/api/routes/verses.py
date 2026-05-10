@@ -30,6 +30,23 @@ def verses_lookup(
 
 
 @router.get(
+    "/reference",
+    response_model=VerseQueryResponse,
+    operation_id="verses_reference_retrieve",
+)
+def verses_reference_retrieve(
+    ref: str = Query(..., description="Bible reference to retrieve directly."),
+    translation: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> VerseQueryResponse:
+    return verses_service.get_verse_by_reference(
+        db=db,
+        ref=ref,
+        translation=translation,
+    )
+
+
+@router.get(
     "/search",
     response_model=VerseTextSearchResponse,
     operation_id="verses_search_retrieve",

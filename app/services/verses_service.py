@@ -446,6 +446,31 @@ def list_translations(db: Session) -> VerseTranslationsResponse:
     return VerseTranslationsResponse(translations=list(rows))
 
 
+def get_verse_by_reference(
+    db: Session,
+    ref: str,
+    translation: str | None = None,
+) -> VerseQueryResponse:
+    """Resolve input strictly as a Bible reference and return matching verse text."""
+    reference = (ref or "").strip()
+    if not reference:
+        raise HTTPException(
+            status_code=400, detail="Provide a reference in the 'ref' query param."
+        )
+
+    try:
+        start, end = parse_reference(db, reference)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return _reference_query_response(
+        db=db,
+        start=start,
+        end=end,
+        translation=translation,
+    )
+
+
 def resolve_query_intent(
     db: Session,
     q: str,
@@ -463,13 +488,28 @@ def resolve_query_intent(
     except ValueError:
         return VerseQueryResponse(intent=SearchIntentEnum.TEXT, query=query)
 
+    return _reference_query_response(
+        db=db,
+        start=start,
+        end=end,
+        translation=translation,
+    )
+
+
+def _reference_query_response(
+    db: Session,
+    start: BibleVerses,
+    end: BibleVerses,
+    translation: str | None = None,
+) -> VerseQueryResponse:
+    reference = format_ref(start, end)
     verses = _load_verse_range(db, start, end)
     verse_ids = [verse.verse_id for verse in verses]
     if not verse_ids:
         return VerseQueryResponse(
             intent=SearchIntentEnum.REFERENCE,
-            query=format_ref(start, end),
-            reference=format_ref(start, end),
+            query=reference,
+            reference=reference,
             verses=[],
         )
 
@@ -503,8 +543,8 @@ def resolve_query_intent(
     scope = _scope_for_range(db, start, end, expand_target)
     return VerseQueryResponse(
         intent=SearchIntentEnum.REFERENCE,
-        query=format_ref(start, end),
-        reference=format_ref(start, end),
+        query=reference,
+        reference=reference,
         scope=scope,
         previous_target=_previous_target(db, scope, start, end),
         expand_target=expand_target,

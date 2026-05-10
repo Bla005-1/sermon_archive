@@ -41,6 +41,34 @@ Notes:
 - This codebase is database-first and uses existing tables from `app/db/models.py`.
 - There are no migrations in this repository.
 
+## Installable Client Package
+
+This backend project also installs a small sync Python client package:
+
+```bash
+poetry install
+```
+
+Or from the `backend` directory with pip:
+
+```bash
+pip install .
+```
+
+Basic usage:
+
+```python
+from sermon_archive_client import SermonArchiveClient
+
+with SermonArchiveClient("http://localhost:8000") as client:
+    token = client.issue_token("reader", "secret")
+    client.set_bearer_token(token.access_token)
+    sermons = client.list_sermons(q="creation")
+    verse = client.get_verse("Genesis 1:1", translation="ESV")
+```
+
+The client reuses the backend Pydantic schemas for typed responses. Its first version covers auth routes and GET routes for CRUD-style resources; attachment downloads and non-CRUD verse lookup/search routes are intentionally left out.
+
 ## Naming Conventions
 
 Database, ORM, and API schema fields use explicit snake_case names that describe the domain object:
@@ -145,6 +173,7 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 
 Public:
 - `GET /api/verses`
+- `GET /api/verses/reference`
 - `GET /api/verses/search`
 - `GET /api/verses/translations`
 

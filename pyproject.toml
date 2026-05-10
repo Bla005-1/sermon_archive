@@ -3,11 +3,15 @@ name = "sermon-archive"
 version = "0.1.0"
 description = "Sermon Archive API backend"
 readme = "README.md"
-package-mode = false
+packages = [
+    { include = "app" },
+    { include = "sermon_archive_client" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = {extras = ["standard"], version = "^0.135.1"}
+httpx = "^0.28.1"
 sqlalchemy = "^2.0.48"
 pymysql = "^1.1.2"
 sqlacodegen = "^4.0.2"

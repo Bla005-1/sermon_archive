@@ -78,6 +78,29 @@ def test_verses_lookup_rejects_blank_query(client, db_session):
     assert response.json()["detail"] == "Provide a query in the 'q' query param."
 
 
+def test_verses_reference_gets_reference_without_text_intent(client, db_session):
+    seed_bible(db_session)
+
+    response = client.get(
+        "/api/verses/reference",
+        params={"ref": "Genesis 1:1", "translation": "kjv"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intent"] == "reference"
+    assert body["reference"] == "Genesis 1:1"
+    assert body["scope"] == "verse"
+    assert body["verses"][0]["translation"] == "KJV"
+
+    non_reference = client.get(
+        "/api/verses/reference",
+        params={"ref": "created heaven"},
+    )
+    assert non_reference.status_code == 400
+    assert "References should be formatted" in non_reference.json()["detail"]
+
+
 def test_verse_search_filters_and_clamps_page(client, db_session):
     seed_bible(db_session)
 
