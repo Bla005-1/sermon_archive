@@ -58,7 +58,7 @@ pip install .
 Basic usage:
 
 ```python
-from sermon_client import SermonArchiveClient
+from sermon_archive.client import SermonArchiveClient
 
 with SermonArchiveClient("http://localhost:8000") as client:
     token = client.issue_token("reader", "secret")
@@ -67,7 +67,7 @@ with SermonArchiveClient("http://localhost:8000") as client:
     verse = client.get_verse("Genesis 1:1", translation="ESV")
 ```
 
-The client reuses the shared `schemas` Pydantic package for typed responses. Its first version covers auth routes and GET routes for CRUD-style resources; attachment downloads and non-CRUD verse lookup/search routes are intentionally left out.
+The client reuses the shared `sermon_archive.schemas` Pydantic package for typed responses. Its first version covers auth routes and GET routes for CRUD-style resources; attachment downloads and non-CRUD verse lookup/search routes are intentionally left out.
 
 ## Naming Conventions
 

@@ -1,7 +1,7 @@
 import datetime as dt
 
-from schemas.base import APIModel
-from schemas.verses import BibleVerse
+from sermon_archive.schemas.base import APIModel
+from sermon_archive.schemas.verses import BibleVerse
 
 
 class BibleWidget(APIModel):

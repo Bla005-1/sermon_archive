@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql import Select
 
 from app.db.models import BibleVerses, SermonPassages, Sermons
-from schemas import (
+from sermon_archive.schemas import (
     PatchedSermon,
     PartialSermonPassage,
     Sermon,

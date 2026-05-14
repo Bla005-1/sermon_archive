@@ -25,7 +25,7 @@ from app.db.models import (
     VerseNotes,
     VerseTexts,
 )
-from schemas import (
+from sermon_archive.schemas import (
     CommentaryEnd,
     CommentaryItem,
     CommentaryStart,

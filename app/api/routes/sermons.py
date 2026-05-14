@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
-from schemas import (
+from sermon_archive.schemas import (
     Attachment,
     PatchedSermon,
     PartialSermonPassage,

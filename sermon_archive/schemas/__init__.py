@@ -1,7 +1,7 @@
 """Pydantic schemas shared by the backend and client package."""
 
-from schemas.attachments import Attachment, PartialAttachment
-from schemas.auth import (
+from sermon_archive.schemas.attachments import Attachment, PartialAttachment
+from sermon_archive.schemas.auth import (
     AuthDetailResponse,
     CsrfResponse,
     LoginRequest,
@@ -10,15 +10,15 @@ from schemas.auth import (
     TokenRevokeResponse,
     UserResponse,
 )
-from schemas.base import APIModel
-from schemas.sermons import (
+from sermon_archive.schemas.base import APIModel
+from sermon_archive.schemas.sermons import (
     PatchedSermon,
     PartialSermonPassage,
     Sermon,
     SermonPassage,
     SermonSuggestionsResponse,
 )
-from schemas.verses import (
+from sermon_archive.schemas.verses import (
     BibleBook,
     BibleVerse,
     CommentaryEnd,
@@ -42,7 +42,7 @@ from schemas.verses import (
     VerseTextSearchResponse,
     VerseTranslationsResponse,
 )
-from schemas.widget import BibleWidget, PartialBibleWidget
+from sermon_archive.schemas.widget import BibleWidget, PartialBibleWidget
 
 __all__ = [
     "APIModel",

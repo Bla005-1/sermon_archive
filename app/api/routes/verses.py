@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
-from schemas import (
+from sermon_archive.schemas import (
     PartialVerseNote,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,

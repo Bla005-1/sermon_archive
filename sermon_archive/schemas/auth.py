@@ -1,6 +1,6 @@
 import datetime as dt
 
-from schemas.base import APIModel
+from sermon_archive.schemas.base import APIModel
 
 
 class LoginRequest(APIModel):

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
-from schemas import BibleWidget, PartialBibleWidget
+from sermon_archive.schemas import BibleWidget, PartialBibleWidget
 from app.services import widget_Service
 
 router = APIRouter(tags=["widget"])

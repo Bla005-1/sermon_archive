@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
-from schemas import (
+from sermon_archive.schemas import (
     CsrfResponse,
     LoginRequest,
     TokenLoginRequest,

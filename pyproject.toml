@@ -1,11 +1,10 @@
 [tool.poetry]
 name = "sermon-archive"
-version = "0.1.0"
-description = "Sermon Archive API"
+version = "0.1.1"
+description = "Sermon Archive API Client and server dependencies"
 readme = "README.md"
 packages = [
-    { include = "sermon_client" },
-    { include = "schemas" },
+    { include = "sermon_archive" },
 ]
 
 [tool.poetry.dependencies]

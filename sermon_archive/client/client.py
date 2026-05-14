@@ -5,7 +5,7 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel, TypeAdapter
 
-from schemas import (
+from sermon_archive.schemas import (
     Attachment,
     BibleWidget,
     CsrfResponse,

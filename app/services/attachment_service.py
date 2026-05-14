@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import SermonAttachments, Sermons
-from schemas import Attachment, PartialAttachment
+from sermon_archive.schemas import Attachment, PartialAttachment
 from app.services._mappers import attachment_schema
 
 

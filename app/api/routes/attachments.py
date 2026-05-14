@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
-from schemas import Attachment, PartialAttachment
+from sermon_archive.schemas import Attachment, PartialAttachment
 from app.services import attachment_service
 
 router = APIRouter(tags=["attachments"], dependencies=[Depends(require_auth)])

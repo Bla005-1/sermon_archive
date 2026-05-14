@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import BibleVerses, WidgetPassages
-from schemas import BibleWidget, PartialBibleWidget
+from sermon_archive.schemas import BibleWidget, PartialBibleWidget
 from app.services._mappers import widget_schema
 
 

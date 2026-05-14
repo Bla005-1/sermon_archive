@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 
-from schemas import (
+from sermon_archive.schemas import (
     Attachment,
     BibleWidget,
     Sermon,
@@ -16,7 +16,7 @@ from schemas import (
     VerseNote,
     VerseQueryResponse,
 )
-from sermon_client import SermonArchiveClient, SermonArchiveClientError
+from sermon_archive.client import SermonArchiveClient, SermonArchiveClientError
 
 
 SERMON = {"sermon_id": 10, "title": "Creation and Light"}

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.models import ApiAccessTokens, ApiSessions, ApiUsers
-from schemas import (
+from sermon_archive.schemas import (
     CsrfResponse,
     LoginRequest,
     TokenLoginRequest,

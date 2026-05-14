@@ -11,7 +11,7 @@ from app.db.models import (
     VerseNotes,
     WidgetPassages,
 )
-from schemas import (
+from sermon_archive.schemas import (
     Attachment,
     BibleBook,
     BibleVerse,
