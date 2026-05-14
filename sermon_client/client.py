@@ -5,18 +5,21 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel, TypeAdapter
 
-from app.schemas.attachments import Attachment
-from app.schemas.auth import (
+from schemas import (
+    Attachment,
+    BibleWidget,
     CsrfResponse,
     LoginRequest,
+    Sermon,
+    SermonPassage,
+    SermonSuggestionsResponse,
     TokenLoginRequest,
     TokenResponse,
     TokenRevokeResponse,
     UserResponse,
+    VerseNote,
+    VerseQueryResponse,
 )
-from app.schemas.sermons import Sermon, SermonPassage, SermonSuggestionsResponse
-from app.schemas.verses import VerseNote, VerseQueryResponse
-from app.schemas.widget import BibleWidget
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 

@@ -3,7 +3,7 @@ from enum import Enum
 
 from pydantic import Field
 
-from app.schemas.base import APIModel
+from schemas.base import APIModel
 
 
 class TestamentEnum(str, Enum):

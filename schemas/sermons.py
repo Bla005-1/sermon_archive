@@ -4,9 +4,9 @@ import datetime as dt
 
 from pydantic import Field
 
-from app.schemas.attachments import Attachment
-from app.schemas.base import APIModel
-from app.schemas.verses import BibleVerse
+from schemas.attachments import Attachment
+from schemas.base import APIModel
+from schemas.verses import BibleVerse
 
 
 class SermonPassage(APIModel):

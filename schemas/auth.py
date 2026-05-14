@@ -1,6 +1,6 @@
 import datetime as dt
 
-from app.schemas.base import APIModel
+from schemas.base import APIModel
 
 
 class LoginRequest(APIModel):

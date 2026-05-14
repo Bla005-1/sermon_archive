@@ -1,24 +1,38 @@
 [tool.poetry]
 name = "sermon-archive"
 version = "0.1.0"
-description = "Sermon Archive API backend"
+description = "Sermon Archive API"
 readme = "README.md"
 packages = [
-    { include = "app" },
-    { include = "sermon_archive_client" },
+    { include = "sermon_client" },
+    { include = "schemas" },
 ]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = {extras = ["standard"], version = "^0.135.1"}
 httpx = "^0.28.1"
+pydantic = "^2.12.5"
+
+[tool.poetry.group.backend]
+optional = true
+
+[tool.poetry.group.backend.dependencies]
+fastapi = {extras = ["standard"], version = "^0.135.1"}
 sqlalchemy = "^2.0.48"
 pymysql = "^1.1.2"
 sqlacodegen = "^4.0.2"
 uvicorn = "^0.41.0"
-pydantic = "^2.12.5"
 cryptography = "^46.0.5"
 pydantic-settings = "^2.13.1"
 gunicorn = "^25.1.0"
 starlette = "^0.52.1"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

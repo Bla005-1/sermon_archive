@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
-from app.schemas.verses import (
+from schemas import (
     PartialVerseNote,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
-    VerseQueryResponse,
     VerseNote,
-    VerseTextSearchResponse,
+    VerseQueryResponse,
     VerseSermonResponse,
+    VerseTextSearchResponse,
     VerseTranslationsResponse,
 )
 from app.services import verses_service

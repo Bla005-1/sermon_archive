@@ -5,12 +5,18 @@ import json
 import httpx
 import pytest
 
-from app.schemas.attachments import Attachment
-from app.schemas.auth import TokenResponse, UserResponse
-from app.schemas.sermons import Sermon, SermonPassage, SermonSuggestionsResponse
-from app.schemas.verses import VerseNote, VerseQueryResponse
-from app.schemas.widget import BibleWidget
-from sermon_archive_client import SermonArchiveClient, SermonArchiveClientError
+from schemas import (
+    Attachment,
+    BibleWidget,
+    Sermon,
+    SermonPassage,
+    SermonSuggestionsResponse,
+    TokenResponse,
+    UserResponse,
+    VerseNote,
+    VerseQueryResponse,
+)
+from sermon_client import SermonArchiveClient, SermonArchiveClientError
 
 
 SERMON = {"sermon_id": 10, "title": "Creation and Light"}

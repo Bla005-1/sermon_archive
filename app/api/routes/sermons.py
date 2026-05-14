@@ -3,8 +3,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
-from app.schemas.attachments import Attachment
-from app.schemas.sermons import (
+from schemas import (
+    Attachment,
     PatchedSermon,
     PartialSermonPassage,
     Sermon,

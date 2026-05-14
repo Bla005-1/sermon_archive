@@ -25,26 +25,26 @@ from app.db.models import (
     VerseNotes,
     VerseTexts,
 )
-from app.schemas.verses import (
+from schemas import (
     CommentaryEnd,
     CommentaryItem,
     CommentaryStart,
-    FootnoteCrossReferenceItem,
-    FootnoteCrossReferenceVerse,
     CrossReferenceItem,
     CrossReferenceVerse,
+    FootnoteCrossReferenceItem,
+    FootnoteCrossReferenceVerse,
     PartialVerseNote,
+    SearchIntentEnum,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
     VerseNavigationTarget,
-    SearchIntentEnum,
-    VerseQueryResponse,
     VerseNote,
-    VerseTextSearchResponse,
-    VerseTranslationsResponse,
+    VerseQueryResponse,
     VerseSearchResult,
     VerseSermonItem,
     VerseSermonResponse,
+    VerseTextSearchResponse,
+    VerseTranslationsResponse,
 )
 from app.services._mappers import verse_note_schema
 from app.services._reference import format_ref, parse_reference

@@ -11,10 +11,16 @@ from app.db.models import (
     VerseNotes,
     WidgetPassages,
 )
-from app.schemas.attachments import Attachment
-from app.schemas.sermons import Sermon, SermonPassage
-from app.schemas.verses import BibleBook, BibleVerse, VerseNote, TestamentEnum
-from app.schemas.widget import BibleWidget
+from schemas import (
+    Attachment,
+    BibleBook,
+    BibleVerse,
+    BibleWidget,
+    Sermon,
+    SermonPassage,
+    TestamentEnum,
+    VerseNote,
+)
 
 
 def bible_book_schema(book: BibleBooks) -> BibleBook:
