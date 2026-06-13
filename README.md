@@ -1,6 +1,6 @@
 # Sermon Archive API
 
-FastAPI backend for sermon records, Bible reference lookup/search, commentary and cross-reference retrieval, verse notes, and widget passage management.
+FastAPI backend for sermon records, library item content, Bible reference lookup/search, commentary and cross-reference retrieval, verse notes, and widget passage management.
 
 ## Stack
 
@@ -16,6 +16,7 @@ FastAPI backend for sermon records, Bible reference lookup/search, commentary an
   - Session cookie (`/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`)
   - Bearer token (`/api/auth/token`, `/api/auth/token/revoke`)
 - Sermons CRUD with nested passages and attachments
+- Library item lookup, hierarchical content units, file uploads/downloads, and inline PDF/DOC/DOCX previews
 - Bible reference parsing + verse text lookup
 - Free-text verse search with paging/filters
 - Commentary and cross-reference lookup for references
@@ -64,10 +65,15 @@ with SermonArchiveClient("http://localhost:8000") as client:
     token = client.issue_token("reader", "secret")
     client.set_bearer_token(token.access_token)
     sermons = client.list_sermons(q="creation")
+    library_items = client.list_library_items(q="institutes")
+    units = client.list_library_item_units(
+        library_items[0].library_item_id,
+        root_unit_type="chapter",
+    )
     verse = client.get_verse("Genesis 1:1", translation="ESV")
 ```
 
-The client reuses the shared `sermon_archive.schemas` Pydantic package for typed responses. Its first version covers auth routes and GET routes for CRUD-style resources; attachment downloads and non-CRUD verse lookup/search routes are intentionally left out.
+The client reuses the shared `sermon_archive.schemas` Pydantic package for typed responses. It covers auth routes, common GET routes for CRUD-style resources, library file upload/download/preview helpers, and direct verse reference lookup.
 
 ## Naming Conventions
 
@@ -105,6 +111,10 @@ For a browser client on a different domain, set:
 Attachment files are written under:
 
 - `<SERMON_STORAGE_ROOT>/<year>/<sermon_id>/<generated_filename>`
+
+Library item files are written under:
+
+- `<SERMON_STORAGE_ROOT>/library/<library_item_id>/<generated_filename>`
 
 ## Authentication
 
@@ -168,6 +178,18 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `PUT /api/attachments/{attachment_id}`
 - `PATCH /api/attachments/{attachment_id}`
 - `DELETE /api/attachments/{attachment_id}`
+
+### Library (protected)
+
+- `GET /api/library/items`
+- `GET /api/library/items/{library_item_id}`
+- `GET /api/library/items/{library_item_id}/files`
+- `POST /api/library/items/{library_item_id}/files` (multipart file upload)
+- `GET /api/library/items/{library_item_id}/files/{library_item_file_id}/download` (file download)
+- `GET /api/library/items/{library_item_id}/files/{library_item_file_id}/preview` (inline PDF/DOC/DOCX preview response)
+- `GET /api/library/items/{library_item_id}/units`
+
+`GET /api/library/items/{library_item_id}/units` returns units nested under `children`. Pass `root_unit_type` with one of `page`, `paragraph`, `section`, `chapter`, `summary`, or `unknown` to choose the returned root level while preserving descendant hierarchy.
 
 ### Verses
 

@@ -13,6 +13,11 @@ from app.db.models import (
     ChurchFathers,
     Commentaries,
     FootnoteCrossReferences,
+    LibraryItemFiles,
+    LibraryItems,
+    LibraryItemsContentType,
+    LibraryItemUnits,
+    LibraryItemUnitsUnitType,
     MlCrossReferences,
     SermonAttachments,
     SermonPassages,
@@ -242,6 +247,58 @@ def seed_widget(db: Session) -> WidgetPassages:
     db.add(widget)
     db.commit()
     return widget
+
+
+def seed_library(db: Session) -> LibraryItems:
+    item = LibraryItems(
+        library_item_id=100,
+        title="Institutes",
+        content_type=LibraryItemsContentType.BOOK,
+        author_name="John Calvin",
+        description_text="A test library item",
+    )
+    db.add(item)
+    db.flush()
+    db.add_all(
+        [
+            LibraryItemFiles(
+                library_item_file_id=110,
+                library_item_id=100,
+                relative_path="library/100/institutes.pdf",
+                original_filename="institutes.pdf",
+                mime_type="application/pdf",
+                byte_size=13,
+            ),
+            LibraryItemUnits(
+                library_item_unit_id=120,
+                library_item_id=100,
+                parent_library_item_unit_id=None,
+                unit_order=1,
+                unit_type=LibraryItemUnitsUnitType.CHAPTER,
+                unit_title="Chapter 1",
+                content_text="Chapter text",
+            ),
+            LibraryItemUnits(
+                library_item_unit_id=121,
+                library_item_id=100,
+                parent_library_item_unit_id=120,
+                unit_order=2,
+                unit_type=LibraryItemUnitsUnitType.SECTION,
+                unit_title="Section 1",
+                content_text="Section text",
+            ),
+            LibraryItemUnits(
+                library_item_unit_id=122,
+                library_item_id=100,
+                parent_library_item_unit_id=121,
+                unit_order=3,
+                unit_type=LibraryItemUnitsUnitType.PARAGRAPH,
+                content_text="Paragraph text",
+            ),
+        ]
+    )
+    db.commit()
+    return item
 
 
 def seed_user(db: Session, *, active: bool = True) -> ApiUsers:

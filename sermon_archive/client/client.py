@@ -9,6 +9,10 @@ from sermon_archive.schemas import (
     Attachment,
     BibleWidget,
     CsrfResponse,
+    LibraryItem,
+    LibraryItemFile,
+    LibraryItemUnit,
+    LibraryUnitTypeEnum,
     LoginRequest,
     Sermon,
     SermonPassage,
@@ -168,6 +172,89 @@ class SermonArchiveClient:
             "GET",
             f"/api/attachments/{attachment_id}",
             Attachment,
+        )
+
+    def list_library_items(self, q: str | None = None) -> list[LibraryItem]:
+        params = {"q": q} if q is not None else None
+        return self._request_model_list(
+            "GET",
+            "/api/library/items",
+            LibraryItem,
+            params=params,
+        )
+
+    def get_library_item(self, library_item_id: int) -> LibraryItem:
+        return self._request_model(
+            "GET",
+            f"/api/library/items/{library_item_id}",
+            LibraryItem,
+        )
+
+    def list_library_item_files(
+        self, library_item_id: int
+    ) -> list[LibraryItemFile]:
+        return self._request_model_list(
+            "GET",
+            f"/api/library/items/{library_item_id}/files",
+            LibraryItemFile,
+        )
+
+    def upload_library_item_file(
+        self,
+        library_item_id: int,
+        filename: str,
+        content: bytes,
+        content_type: str | None = None,
+    ) -> LibraryItemFile:
+        file_tuple = (
+            (filename, content, content_type)
+            if content_type
+            else (filename, content)
+        )
+        return self._request_model(
+            "POST",
+            f"/api/library/items/{library_item_id}/files",
+            LibraryItemFile,
+            files={"file": file_tuple},
+            include_csrf=True,
+        )
+
+    def download_library_item_file(
+        self, library_item_id: int, library_item_file_id: int
+    ) -> bytes:
+        response = self._request(
+            "GET",
+            f"/api/library/items/{library_item_id}/files/{library_item_file_id}/download",
+        )
+        return response.content
+
+    def preview_library_item_file(
+        self, library_item_id: int, library_item_file_id: int
+    ) -> bytes:
+        response = self._request(
+            "GET",
+            f"/api/library/items/{library_item_id}/files/{library_item_file_id}/preview",
+        )
+        return response.content
+
+    def list_library_item_units(
+        self,
+        library_item_id: int,
+        root_unit_type: LibraryUnitTypeEnum | str | None = None,
+    ) -> list[LibraryItemUnit]:
+        params = None
+        if root_unit_type is not None:
+            value = (
+                root_unit_type.value
+                if isinstance(root_unit_type, LibraryUnitTypeEnum)
+                else root_unit_type
+            )
+            params = {"root_unit_type": value}
+        return self._request_model_list(
+            "GET",
+            f"/api/library/items/{library_item_id}/units",
+            LibraryItemUnit,
+            params=params,
         )
 
     def list_sermon_passages(self, sermon_id: int) -> list[SermonPassage]:

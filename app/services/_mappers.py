@@ -5,6 +5,9 @@ from __future__ import annotations
 from app.db.models import (
     BibleBooks,
     BibleVerses,
+    LibraryItemFiles,
+    LibraryItemUnits,
+    LibraryItems,
     SermonAttachments,
     SermonPassages,
     Sermons,
@@ -16,6 +19,11 @@ from sermon_archive.schemas import (
     BibleBook,
     BibleVerse,
     BibleWidget,
+    LibraryContentTypeEnum,
+    LibraryItem,
+    LibraryItemFile,
+    LibraryItemUnit,
+    LibraryUnitTypeEnum,
     Sermon,
     SermonPassage,
     TestamentEnum,
@@ -53,6 +61,72 @@ def attachment_schema(attachment: SermonAttachments) -> Attachment:
         mime_type=attachment.mime_type,
         byte_size=attachment.byte_size,
         created_at=attachment.created_at,
+    )
+
+
+def library_item_file_schema(file: LibraryItemFiles) -> LibraryItemFile:
+    """Convert a LibraryItemFiles ORM row into a LibraryItemFile schema object."""
+    return LibraryItemFile(
+        library_item_file_id=file.library_item_file_id,
+        library_item_id=file.library_item_id,
+        relative_path=file.relative_path,
+        original_filename=file.original_filename,
+        mime_type=file.mime_type,
+        byte_size=file.byte_size,
+        created_at=file.created_at,
+    )
+
+
+def library_item_schema(
+    item: LibraryItems, *, include_files: bool = False
+) -> LibraryItem:
+    """Convert a LibraryItems ORM row into a LibraryItem schema object."""
+    files = []
+    if include_files:
+        files = [
+            library_item_file_schema(file)
+            for file in getattr(item, "library_item_files", [])
+        ]
+        files.sort(
+            key=lambda file: (
+                file.created_at is None,
+                file.created_at,
+                file.library_item_file_id or 0,
+            ),
+            reverse=True,
+        )
+
+    return LibraryItem(
+        library_item_id=item.library_item_id,
+        title=item.title,
+        content_type=LibraryContentTypeEnum(item.content_type.value),
+        author_name=item.author_name,
+        description_text=item.description_text,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        files=files,
+    )
+
+
+def library_item_unit_schema(
+    unit: LibraryItemUnits,
+    *,
+    children: list[LibraryItemUnit] | None = None,
+) -> LibraryItemUnit:
+    """Convert a LibraryItemUnits ORM row into a LibraryItemUnit schema object."""
+    return LibraryItemUnit(
+        library_item_unit_id=unit.library_item_unit_id,
+        library_item_id=unit.library_item_id,
+        parent_library_item_unit_id=unit.parent_library_item_unit_id,
+        unit_order=unit.unit_order,
+        unit_type=LibraryUnitTypeEnum(unit.unit_type.value),
+        unit_title=unit.unit_title,
+        content_text=unit.content_text,
+        content_text_markdown=unit.content_text_markdown,
+        source_start_page_number=unit.source_start_page_number,
+        source_end_page_number=unit.source_end_page_number,
+        created_at=unit.created_at,
+        children=children or [],
     )
 
 

@@ -11,6 +11,13 @@ from sermon_archive.schemas.auth import (
     UserResponse,
 )
 from sermon_archive.schemas.base import APIModel
+from sermon_archive.schemas.library import (
+    LibraryContentTypeEnum,
+    LibraryItem,
+    LibraryItemFile,
+    LibraryItemUnit,
+    LibraryUnitTypeEnum,
+)
 from sermon_archive.schemas.sermons import (
     PatchedSermon,
     PartialSermonPassage,
@@ -60,6 +67,11 @@ __all__ = [
     "FootnoteCrossReferenceItem",
     "FootnoteCrossReferenceVerse",
     "LoginRequest",
+    "LibraryContentTypeEnum",
+    "LibraryItem",
+    "LibraryItemFile",
+    "LibraryItemUnit",
+    "LibraryUnitTypeEnum",
     "PartialAttachment",
     "PartialBibleWidget",
     "PartialSermonPassage",

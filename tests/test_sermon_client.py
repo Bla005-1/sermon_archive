@@ -8,6 +8,10 @@ import pytest
 from sermon_archive.schemas import (
     Attachment,
     BibleWidget,
+    LibraryItem,
+    LibraryItemFile,
+    LibraryItemUnit,
+    LibraryUnitTypeEnum,
     Sermon,
     SermonPassage,
     SermonSuggestionsResponse,
@@ -21,6 +25,22 @@ from sermon_archive.client import SermonArchiveClient, SermonArchiveClientError
 
 SERMON = {"sermon_id": 10, "title": "Creation and Light"}
 ATTACHMENT = {"attachment_id": 30, "sermon_id": 10}
+LIBRARY_ITEM = {
+    "library_item_id": 100,
+    "title": "Institutes",
+    "content_type": "book",
+}
+LIBRARY_FILE = {
+    "library_item_file_id": 110,
+    "library_item_id": 100,
+    "original_filename": "institutes.pdf",
+}
+LIBRARY_UNIT = {
+    "library_item_unit_id": 120,
+    "library_item_id": 100,
+    "unit_type": "chapter",
+    "children": [],
+}
 SERMON_PASSAGE = {"sermon_passage_id": 20, "sermon_id": 10}
 VERSE_NOTE = {"note_id": 70, "verse_id": 1, "note_markdown": "Note"}
 WIDGET = {
@@ -71,6 +91,12 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
         },
         ("GET", "/api/sermons/10/attachments", ""): [ATTACHMENT],
         ("GET", "/api/attachments/30", ""): ATTACHMENT,
+        ("GET", "/api/library/items", "q=institutes"): [LIBRARY_ITEM],
+        ("GET", "/api/library/items/100", ""): LIBRARY_ITEM,
+        ("GET", "/api/library/items/100/files", ""): [LIBRARY_FILE],
+        ("GET", "/api/library/items/100/units", "root_unit_type=chapter"): [
+            LIBRARY_UNIT
+        ],
         ("GET", "/api/sermons/10/passages", ""): [SERMON_PASSAGE],
         ("GET", "/api/sermons/10/passages/20", ""): SERMON_PASSAGE,
         ("GET", "/api/verses/notes", "verse_id=1"): [VERSE_NOTE],
@@ -96,6 +122,13 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
     assert isinstance(client.get_sermon_suggestions(), SermonSuggestionsResponse)
     assert isinstance(client.list_sermon_attachments(10)[0], Attachment)
     assert isinstance(client.get_attachment(30), Attachment)
+    assert isinstance(client.list_library_items(q="institutes")[0], LibraryItem)
+    assert isinstance(client.get_library_item(100), LibraryItem)
+    assert isinstance(client.list_library_item_files(100)[0], LibraryItemFile)
+    assert isinstance(
+        client.list_library_item_units(100, LibraryUnitTypeEnum.chapter)[0],
+        LibraryItemUnit,
+    )
     assert isinstance(client.list_sermon_passages(10)[0], SermonPassage)
     assert isinstance(client.get_sermon_passage(10, 20), SermonPassage)
     assert isinstance(client.list_verse_notes(verse_id=1)[0], VerseNote)
@@ -104,6 +137,42 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
     assert isinstance(client.get_widget(50), BibleWidget)
 
     assert seen == list(responses)
+
+
+def test_library_file_helpers_upload_download_and_preview():
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/api/library/items/100/files":
+            assert request.method == "POST"
+            assert b'name="file"; filename="outline.docx"' in request.content
+            return _json_response(LIBRARY_FILE, status_code=201)
+        if request.url.path.endswith("/download"):
+            return httpx.Response(200, content=b"download bytes")
+        if request.url.path.endswith("/preview"):
+            return httpx.Response(200, content=b"preview bytes")
+        raise AssertionError(f"Unexpected path {request.url.path}")
+
+    client = SermonArchiveClient(
+        "http://testserver",
+        bearer_token="token-123",
+        transport=httpx.MockTransport(handler),
+    )
+
+    uploaded = client.upload_library_item_file(
+        100,
+        "outline.docx",
+        b"docx bytes",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    downloaded = client.download_library_item_file(100, 110)
+    previewed = client.preview_library_item_file(100, 110)
+
+    assert isinstance(uploaded, LibraryItemFile)
+    assert downloaded == b"download bytes"
+    assert previewed == b"preview bytes"
+    assert requests[0].headers["Authorization"] == "Bearer token-123"
 
 
 def test_bearer_auth_header_is_sent_and_can_be_updated():
