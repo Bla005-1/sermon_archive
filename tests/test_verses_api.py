@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from app.db.models import VerseNotes
+from app.db.models import (
+    LibraryItemUnits,
+    ScriptureReferences,
+    ScriptureReferencesSourceType,
+    VerseNotes,
+)
 from tests.factories import (
     seed_bible,
     seed_commentary_and_crossrefs,
+    seed_library,
     seed_sermons,
     seed_verse_notes,
 )
@@ -222,7 +228,7 @@ def test_commentaries_reject_blank_reference(client, db_session):
     assert response.json()["detail"] == "Provide a reference in the 'ref' query param."
 
 
-def test_verses_sermons_returns_overlapping_sermons(client, db_session):
+def test_verses_sermons_returns_overlapping_scripture_references(client, db_session):
     seed_bible(db_session)
     seed_sermons(db_session)
 
@@ -242,3 +248,88 @@ def test_verses_sermons_returns_overlapping_sermons(client, db_session):
             "end_verse_id": 3,
         }
     ]
+
+
+def test_verses_sermons_rejects_bad_reference(client, db_session):
+    seed_bible(db_session)
+
+    blank = client.get("/api/verses/sermons", params={"ref": " "})
+    assert blank.status_code == 400
+    assert blank.json()["detail"] == "Provide a reference in the 'ref' query param."
+
+    invalid = client.get("/api/verses/sermons", params={"ref": "Genesis 99:99"})
+    assert invalid.status_code == 400
+    assert invalid.json()["detail"] == "We could not locate that verse in the archive."
+
+
+def test_verses_library_items_returns_overlapping_units(client, db_session):
+    seed_bible(db_session)
+    seed_library(db_session)
+    paragraph = db_session.scalar(
+        select(LibraryItemUnits).where(LibraryItemUnits.library_item_unit_id == 122)
+    )
+    paragraph.unit_title = "Opening paragraph"
+    paragraph.source_start_page_number = 7
+    paragraph.source_end_page_number = 8
+    db_session.add(
+        ScriptureReferences(
+            scripture_reference_id=91,
+            source_type=ScriptureReferencesSourceType.LIBRARY_ITEM_UNIT,
+            source_id=122,
+            start_verse_id=1,
+            end_verse_id=3,
+            reference_text="Genesis 1:1-3",
+            matched_text="Gen 1:1-3",
+            context_text="Chapter 1 > Section 1",
+            display_order=1,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/api/verses/library-items", params={"ref": "Genesis 1:2"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "reference": "Genesis 1:2",
+        "library_items": [
+            {
+                "library_item_id": 100,
+                "library_item_unit_id": 122,
+                "title": "Institutes",
+                "content_type": "book",
+                "author_name": "John Calvin",
+                "unit_title": "Opening paragraph",
+                "unit_type": "paragraph",
+                "unit_order": 3,
+                "source_start_page_number": 7,
+                "source_end_page_number": 8,
+                "reference": "Genesis 1:1-3",
+                "context_text": "Chapter 1 > Section 1",
+                "start_verse_id": 1,
+                "end_verse_id": 3,
+                "chapter_title": "Chapter 1",
+                "chapter_unit_id": 120,
+                "section_title": "Section 1",
+                "section_unit_id": 121,
+            }
+        ],
+    }
+
+
+def test_verses_library_items_rejects_bad_reference_and_returns_empty(
+    client, db_session
+):
+    seed_bible(db_session)
+    seed_library(db_session)
+
+    blank = client.get("/api/verses/library-items", params={"ref": " "})
+    assert blank.status_code == 400
+    assert blank.json()["detail"] == "Provide a reference in the 'ref' query param."
+
+    invalid = client.get("/api/verses/library-items", params={"ref": "Genesis 99:99"})
+    assert invalid.status_code == 400
+    assert invalid.json()["detail"] == "We could not locate that verse in the archive."
+
+    empty = client.get("/api/verses/library-items", params={"ref": "John 3:16"})
+    assert empty.status_code == 200
+    assert empty.json() == {"reference": "John 3:16", "library_items": []}

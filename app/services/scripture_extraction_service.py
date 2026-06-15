@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.models import (
     BibleVerses,
     LibraryItemUnits,
+    LibraryItemUnitsUnitType,
     ScriptureReferences,
     ScriptureReferencesSourceType,
     Sermons,
@@ -31,7 +32,6 @@ from sermon_archive.schemas import (
     UnresolvedScriptureReference,
 )
 
-TEXT_CONTEXT_LIMIT = 512
 PRIOR_CONTEXT_LIMIT = 1200
 
 
@@ -162,13 +162,6 @@ def _is_inside(span: tuple[int, int], occupied: Iterable[tuple[int, int]]) -> bo
     return any(
         start >= taken_start and end <= taken_end for taken_start, taken_end in occupied
     )
-
-
-def _context_snippet(text: str, start: int, end: int) -> str:
-    low = max(0, start - 180)
-    high = min(len(text), end + 180)
-    snippet = re.sub(r"\s+", " ", text[low:high]).strip()
-    return snippet[:TEXT_CONTEXT_LIMIT]
 
 
 def _reference_text(
@@ -378,7 +371,6 @@ def extract_references_from_text(
                 matched_text=match.group(0).strip(),
                 start_offset=max(0, start - source_start),
                 end_offset=max(0, end - source_start),
-                context_text=_context_snippet(combined, start, end),
             )
             resolved, failed = _resolve_candidate(db, candidate, source_type, source_id)
             if resolved is not None:
@@ -745,6 +737,18 @@ def _unit_has_text(unit: LibraryItemUnits) -> bool:
     return bool(_unit_text(unit))
 
 
+def _unit_type_value(unit: LibraryItemUnits) -> str:
+    unit_type = unit.unit_type
+    return unit_type.value if hasattr(unit_type, "value") else str(unit_type)
+
+
+def _unit_is_text_source(unit: LibraryItemUnits) -> bool:
+    return (
+        _unit_type_value(unit) == LibraryItemUnitsUnitType.PARAGRAPH.value
+        and _unit_has_text(unit)
+    )
+
+
 def _descendant_ids(
     unit_id: int, children_by_parent: dict[int | None, list[LibraryItemUnits]]
 ) -> set[int]:
@@ -777,10 +781,23 @@ def _root_id(unit: LibraryItemUnits, units_by_id: dict[int, LibraryItemUnits]) -
     return current.library_item_unit_id
 
 
+def _context_branch_id(
+    unit: LibraryItemUnits, units_by_id: dict[int, LibraryItemUnits]
+) -> int:
+    ancestors = _ancestor_units(unit, units_by_id)
+    for ancestor in reversed(ancestors):
+        if _unit_type_value(ancestor) == LibraryItemUnitsUnitType.SECTION.value:
+            return ancestor.library_item_unit_id
+    for ancestor in reversed(ancestors):
+        if _unit_type_value(ancestor) == LibraryItemUnitsUnitType.CHAPTER.value:
+            return ancestor.library_item_unit_id
+    return _root_id(unit, units_by_id)
+
+
 def _library_context(
     unit: LibraryItemUnits,
     units_by_id: dict[int, LibraryItemUnits],
-    prior_text_by_root: dict[int, str],
+    prior_text_by_branch: dict[int, str],
 ) -> str | None:
     parts: list[str] = []
     for ancestor in _ancestor_units(unit, units_by_id):
@@ -788,7 +805,7 @@ def _library_context(
             parts.append(ancestor.unit_title)
     if unit.unit_title and not _unit_has_text(unit):
         parts.append(unit.unit_title)
-    prior = prior_text_by_root.get(_root_id(unit, units_by_id))
+    prior = prior_text_by_branch.get(_context_branch_id(unit, units_by_id))
     if prior:
         parts.append(prior[-PRIOR_CONTEXT_LIMIT:])
     context = "\n".join(part for part in parts if part.strip()).strip()
@@ -807,7 +824,7 @@ def _library_target_units(
         for unit in sorted(
             units, key=lambda item: (item.unit_order, item.library_item_unit_id)
         )
-        if unit.library_item_unit_id in wanted_ids and _unit_has_text(unit)
+        if unit.library_item_unit_id in wanted_ids and _unit_is_text_source(unit)
     ]
 
 
@@ -869,21 +886,21 @@ def extract_library_unit_references(
 
     saved: list[ScriptureReference] = []
     unresolved: list[UnresolvedScriptureReference] = []
-    prior_text_by_root: dict[int, str] = {}
+    prior_text_by_branch: dict[int, str] = {}
     for unit in sorted(
         units, key=lambda item: (item.unit_order, item.library_item_unit_id)
     ):
-        if not _unit_has_text(unit):
+        if not _unit_is_text_source(unit):
             continue
         text = _unit_text(unit)
-        root_id = _root_id(unit, units_by_id)
+        branch_id = _context_branch_id(unit, units_by_id)
         if unit.library_item_unit_id not in target_ids:
-            prior_text_by_root[root_id] = text
+            prior_text_by_branch[branch_id] = text
             continue
         extracted = extract_references_from_text(
             db,
             text,
-            context_text=_library_context(unit, units_by_id, prior_text_by_root),
+            context_text=_library_context(unit, units_by_id, prior_text_by_branch),
             source_type=ScriptureReferenceSourceType.library_item_unit,
             source_id=unit.library_item_unit_id,
         )
@@ -896,7 +913,7 @@ def extract_library_unit_references(
             )
         )
         unresolved.extend(extracted.unresolved)
-        prior_text_by_root[root_id] = text
+        prior_text_by_branch[branch_id] = text
 
     return ScriptureExtractionResponse(references=saved, unresolved=unresolved)
 

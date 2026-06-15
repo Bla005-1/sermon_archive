@@ -4,7 +4,7 @@ from datetime import date
 
 from sqlalchemy import select
 
-from app.db.models import SermonPassages, Sermons
+from app.db.models import Sermons
 from tests.factories import seed_bible, seed_sermons
 
 
@@ -18,10 +18,7 @@ def test_sermons_list_orders_newest_first_and_filters(client, db_session):
     body = response.json()
     assert [item["title"] for item in body] == ["Creation and Light"]
     assert body[0]["attachments"][0]["original_filename"] == "notes.txt"
-    assert [p["reference_text"] for p in body[0]["passages"]] == [
-        "Genesis 1:4",
-        "Genesis 1:1-3",
-    ]
+    assert "passages" not in body[0]
 
 
 def test_sermons_create_requires_non_blank_title(client):
@@ -39,7 +36,6 @@ def test_sermons_create_defaults_preached_on_and_returns_nested_lists(client, db
         json={
             "title": "A New Sermon",
             "speaker_name": "Ada",
-            "passages": [{"reference_text": "Genesis 1:1"}],
             "attachments": [{"original_filename": "ignored.txt"}],
         },
     )
@@ -49,7 +45,6 @@ def test_sermons_create_defaults_preached_on_and_returns_nested_lists(client, db
     assert body["sermon_id"] is not None
     assert body["title"] == "A New Sermon"
     assert body["preached_on"] is not None
-    assert body["passages"] == []
     assert body["attachments"] == []
 
 
@@ -122,57 +117,3 @@ def test_sermon_suggestions_exclude_blank_values_and_order_by_recent(client, db_
         "locations": ["Chapel", "Main Hall"],
     }
 
-
-def test_sermon_passage_crud_and_reference_validation(client, db_session):
-    seed_bible(db_session)
-    seed_sermons(db_session)
-
-    missing_reference = client.post(
-        "/api/sermons/10/passages",
-        json={"context_note": "No reference"},
-    )
-    assert missing_reference.status_code == 400
-    assert (
-        missing_reference.json()["detail"]
-        == "start_verse_id or reference_text is required."
-    )
-
-    created = client.post(
-        "/api/sermons/10/passages",
-        json={"reference_text": "Genesis 1:2-3", "context_note": "Middle"},
-    )
-    assert created.status_code == 201
-    created_body = created.json()
-    assert created_body["reference_text"] == "Genesis 1:2-3"
-    assert created_body["display_order"] == 3
-
-    patched = client.patch(
-        f"/api/sermons/10/passages/{created_body['sermon_passage_id']}",
-        json={"context_note": "Updated middle"},
-    )
-    assert patched.status_code == 200
-    assert patched.json()["context_note"] == "Updated middle"
-
-    deleted = client.delete(
-        f"/api/sermons/10/passages/{created_body['sermon_passage_id']}"
-    )
-    assert deleted.status_code == 204
-    assert (
-        db_session.scalar(
-            select(SermonPassages).where(
-                SermonPassages.sermon_passage_id
-                == created_body["sermon_passage_id"]
-            )
-        )
-        is None
-    )
-
-
-def test_sermon_passage_is_scoped_to_sermon(client, db_session):
-    seed_bible(db_session)
-    seed_sermons(db_session)
-
-    response = client.get("/api/sermons/11/passages/20")
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Sermon passage not found."

@@ -20,7 +20,8 @@ from app.db.models import (
     LibraryItemUnitsUnitType,
     MlCrossReferences,
     SermonAttachments,
-    SermonPassages,
+    ScriptureReferences,
+    ScriptureReferencesSourceType,
     Sermons,
     VerseFootnotes,
     VerseHeadings,
@@ -202,31 +203,37 @@ def seed_sermons(db: Session) -> tuple[Sermons, Sermons]:
     db.flush()
     db.add_all(
         [
-            SermonPassages(
-                sermon_passage_id=20,
-                sermon_id=10,
+            ScriptureReferences(
+                scripture_reference_id=20,
+                source_type=ScriptureReferencesSourceType.SERMON,
+                source_id=10,
                 start_verse_id=1,
                 end_verse_id=3,
                 reference_text="Genesis 1:1-3",
-                context_note="Creation opening",
+                matched_text="Genesis 1:1-3",
+                context_text="Creation opening",
                 display_order=2,
             ),
-            SermonPassages(
-                sermon_passage_id=21,
-                sermon_id=10,
+            ScriptureReferences(
+                scripture_reference_id=21,
+                source_type=ScriptureReferencesSourceType.SERMON,
+                source_id=10,
                 start_verse_id=4,
                 end_verse_id=None,
                 reference_text="Genesis 1:4",
-                context_note="Good light",
+                matched_text="Genesis 1:4",
+                context_text="Good light",
                 display_order=1,
             ),
-            SermonPassages(
-                sermon_passage_id=22,
-                sermon_id=11,
+            ScriptureReferences(
+                scripture_reference_id=22,
+                source_type=ScriptureReferencesSourceType.SERMON,
+                source_id=11,
                 start_verse_id=100,
                 end_verse_id=101,
                 reference_text="John 3:16-17",
-                context_note="Gospel summary",
+                matched_text="John 3:16-17",
+                context_text="Gospel summary",
                 display_order=1,
             ),
             SermonAttachments(
@@ -340,7 +347,6 @@ def seed_library(db: Session) -> LibraryItems:
                 unit_order=1,
                 unit_type=LibraryItemUnitsUnitType.CHAPTER,
                 unit_title="Chapter 1",
-                content_text="Chapter text",
             ),
             LibraryItemUnits(
                 library_item_unit_id=121,
@@ -349,7 +355,6 @@ def seed_library(db: Session) -> LibraryItems:
                 unit_order=2,
                 unit_type=LibraryItemUnitsUnitType.SECTION,
                 unit_title="Section 1",
-                content_text="Section text",
             ),
             LibraryItemUnits(
                 library_item_unit_id=122,

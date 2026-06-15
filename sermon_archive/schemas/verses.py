@@ -4,6 +4,10 @@ from enum import Enum
 from pydantic import Field
 
 from sermon_archive.schemas.base import APIModel
+from sermon_archive.schemas.library import (
+    LibraryContentTypeEnum,
+    LibraryUnitTypeEnum,
+)
 
 
 class TestamentEnum(str, Enum):
@@ -181,3 +185,29 @@ class VerseSermonItem(APIModel):
 class VerseSermonResponse(APIModel):
     reference: str
     sermons: list[VerseSermonItem]
+
+
+class VerseLibraryItemReferenceItem(APIModel):
+    library_item_id: int
+    library_item_unit_id: int
+    title: str
+    content_type: LibraryContentTypeEnum
+    author_name: str | None = None
+    unit_title: str | None = None
+    unit_type: LibraryUnitTypeEnum
+    unit_order: int
+    source_start_page_number: int | None = None
+    source_end_page_number: int | None = None
+    reference: str
+    context_text: str | None = None
+    start_verse_id: int
+    end_verse_id: int
+    chapter_title: str | None = None
+    chapter_unit_id: int | None = None
+    section_title: str | None = None
+    section_unit_id: int | None = None
+
+
+class VerseLibraryItemReferenceResponse(APIModel):
+    reference: str
+    library_items: list[VerseLibraryItemReferenceItem]

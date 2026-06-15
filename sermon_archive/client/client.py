@@ -15,7 +15,6 @@ from sermon_archive.schemas import (
     LibraryUnitTypeEnum,
     LoginRequest,
     Sermon,
-    SermonPassage,
     SermonSuggestionsResponse,
     PartialScriptureReference,
     ScriptureExtractionRequest,
@@ -28,8 +27,10 @@ from sermon_archive.schemas import (
     TokenResponse,
     TokenRevokeResponse,
     UserResponse,
+    VerseLibraryItemReferenceResponse,
     VerseNote,
     VerseQueryResponse,
+    VerseSermonResponse,
 )
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -289,22 +290,6 @@ class SermonArchiveClient:
             include_csrf=True,
         )
 
-    def list_sermon_passages(self, sermon_id: int) -> list[SermonPassage]:
-        return self._request_model_list(
-            "GET",
-            f"/api/sermons/{sermon_id}/passages",
-            SermonPassage,
-        )
-
-    def get_sermon_passage(
-        self, sermon_id: int, sermon_passage_id: int
-    ) -> SermonPassage:
-        return self._request_model(
-            "GET",
-            f"/api/sermons/{sermon_id}/passages/{sermon_passage_id}",
-            SermonPassage,
-        )
-
     def list_sermon_scripture_references(
         self, sermon_id: int
     ) -> list[ScriptureReference]:
@@ -429,6 +414,24 @@ class SermonArchiveClient:
             "/api/verses/reference",
             VerseQueryResponse,
             params=params,
+        )
+
+    def get_sermons_for_reference(self, reference: str) -> VerseSermonResponse:
+        return self._request_model(
+            "GET",
+            "/api/verses/sermons",
+            VerseSermonResponse,
+            params={"ref": reference},
+        )
+
+    def get_library_items_for_reference(
+        self, reference: str
+    ) -> VerseLibraryItemReferenceResponse:
+        return self._request_model(
+            "GET",
+            "/api/verses/library-items",
+            VerseLibraryItemReferenceResponse,
+            params={"ref": reference},
         )
 
     def list_widgets(self) -> list[BibleWidget]:

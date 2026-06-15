@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.db.models import LibraryItemFiles
+from app.db.models import (
+    LibraryItemFiles,
+    LibraryItems,
+    LibraryItemsContentType,
+    LibraryItemUnits,
+    LibraryItemUnitsUnitType,
+)
+from app.services.library_service import library_unit_structure_issues
 from tests.factories import seed_library
 
 
@@ -69,6 +76,89 @@ def test_library_item_units_can_return_requested_root_type(client, db_session):
 
     invalid = client.get("/api/library/items/100/units?root_unit_type=heading")
     assert invalid.status_code == 422
+
+
+def test_library_item_units_allow_chapter_direct_paragraphs(client, db_session):
+    db_session.add(
+        LibraryItems(
+            library_item_id=200,
+            title="Direct Paragraphs",
+            content_type=LibraryItemsContentType.BOOK,
+        )
+    )
+    db_session.add_all(
+        [
+            LibraryItemUnits(
+                library_item_unit_id=201,
+                library_item_id=200,
+                parent_library_item_unit_id=None,
+                unit_order=1,
+                unit_type=LibraryItemUnitsUnitType.CHAPTER,
+                unit_title="Chapter 1",
+            ),
+            LibraryItemUnits(
+                library_item_unit_id=202,
+                library_item_id=200,
+                parent_library_item_unit_id=201,
+                unit_order=2,
+                unit_type=LibraryItemUnitsUnitType.PARAGRAPH,
+                content_text="Direct paragraph text.",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get("/api/library/items/200/units")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body[0]["unit_type"] == "chapter"
+    assert body[0]["content_text"] is None
+    assert body[0]["children"][0]["unit_type"] == "paragraph"
+
+
+def test_library_unit_structure_validation_reports_loose_shapes(db_session):
+    chapter = LibraryItemUnits(
+        library_item_unit_id=201,
+        library_item_id=200,
+        unit_order=1,
+        unit_type=LibraryItemUnitsUnitType.CHAPTER,
+        unit_title="Chapter 1",
+        content_text="Heading should not hold body text.",
+    )
+    section = LibraryItemUnits(
+        library_item_unit_id=202,
+        library_item_id=200,
+        parent_library_item_unit_id=201,
+        unit_order=2,
+        unit_type=LibraryItemUnitsUnitType.SECTION,
+    )
+    paragraph = LibraryItemUnits(
+        library_item_unit_id=203,
+        library_item_id=200,
+        parent_library_item_unit_id=202,
+        unit_order=3,
+        unit_type=LibraryItemUnitsUnitType.PARAGRAPH,
+    )
+    page = LibraryItemUnits(
+        library_item_unit_id=204,
+        library_item_id=200,
+        unit_order=4,
+        unit_type=LibraryItemUnitsUnitType.PAGE,
+    )
+
+    assert library_unit_structure_issues(chapter) == [
+        "chapter units should not contain body text."
+    ]
+    assert library_unit_structure_issues(section, parent=chapter) == [
+        "section units should have unit_title."
+    ]
+    assert library_unit_structure_issues(paragraph, parent=section) == [
+        "paragraph units should contain body text."
+    ]
+    assert library_unit_structure_issues(page) == [
+        'unit_type "page" is deprecated.'
+    ]
 
 
 def test_library_item_file_preview_rejects_non_preview_types(

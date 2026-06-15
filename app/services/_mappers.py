@@ -10,7 +10,6 @@ from app.db.models import (
     LibraryItems,
     ScriptureReferences,
     SermonAttachments,
-    SermonPassages,
     Sermons,
     VerseNotes,
     WidgetPassages,
@@ -26,7 +25,6 @@ from sermon_archive.schemas import (
     LibraryItemUnit,
     LibraryUnitTypeEnum,
     Sermon,
-    SermonPassage,
     ScriptureReference,
     ScriptureReferenceSourceType,
     TestamentEnum,
@@ -133,21 +131,6 @@ def library_item_unit_schema(
     )
 
 
-def sermon_passage_schema(passage: SermonPassages) -> SermonPassage:
-    """Convert a SermonPassages ORM row into a SermonPassage schema object."""
-    return SermonPassage(
-        sermon_passage_id=passage.sermon_passage_id,
-        sermon_id=passage.sermon_id,
-        start_verse=bible_verse_schema(passage.start_verse),
-        end_verse=bible_verse_schema(passage.end_verse) if passage.end_verse else None,
-        start_verse_id=passage.start_verse_id,
-        end_verse_id=passage.end_verse_id,
-        reference_text=passage.reference_text,
-        context_note=passage.context_note,
-        display_order=passage.display_order,
-    )
-
-
 def scripture_reference_schema(row: ScriptureReferences) -> ScriptureReference:
     """Convert a ScriptureReferences ORM row into a ScriptureReference schema object."""
     return ScriptureReference(
@@ -169,23 +152,12 @@ def scripture_reference_schema(row: ScriptureReferences) -> ScriptureReference:
 
 def sermon_schema(sermon: Sermons, *, include_nested: bool = True) -> Sermon:
     """Convert a Sermons ORM row into a Sermon schema object."""
-    passages = []
     attachments = []
     if include_nested:
         attachments = [
             attachment_schema(item)
             for item in getattr(sermon, "sermon_attachments", [])
         ]
-        passages = [
-            sermon_passage_schema(item)
-            for item in getattr(sermon, "sermon_passages", [])
-        ]
-        passages.sort(
-            key=lambda item: (
-                (item.display_order or 0),
-                item.sermon_passage_id or 0,
-            )
-        )
 
     return Sermon(
         sermon_id=sermon.sermon_id,
@@ -197,7 +169,6 @@ def sermon_schema(sermon: Sermons, *, include_nested: bool = True) -> Sermon:
         notes_markdown=sermon.notes_markdown,
         created_at=sermon.created_at,
         updated_at=sermon.updated_at,
-        passages=passages,
         attachments=attachments,
     )
 

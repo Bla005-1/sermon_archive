@@ -11,7 +11,6 @@ from app.db.models import (
     LibraryItemUnits,
     LibraryItemUnitsUnitType,
     ScriptureReferences,
-    SermonPassages,
     Sermons,
 )
 from app.services.scripture_extraction_service import extract_references_from_text
@@ -58,7 +57,9 @@ def test_preview_endpoint_reports_unresolved_candidates(client, db_session):
     assert response.status_code == 200
     body = response.json()
     assert [item["reference_text"] for item in body["references"]] == ["John 17:3"]
+    assert body["references"][0]["context_text"] is None
     assert body["unresolved"][0]["matched_text"] == "Jn 99:99"
+    assert body["unresolved"][0]["context_text"] is None
 
 
 def test_library_unit_extraction_is_structure_aware(client, db_session):
@@ -105,6 +106,7 @@ def test_library_unit_extraction_is_structure_aware(client, db_session):
     refs = [item["reference_text"] for item in body["references"]]
     assert "1 Corinthians 8:1-2" in refs
     assert body["references"][0]["source_id"] == 203
+    assert all(item["context_text"] is None for item in body["references"])
     assert (
         db_session.scalar(
             select(ScriptureReferences).where(
@@ -119,7 +121,77 @@ def test_library_unit_extraction_is_structure_aware(client, db_session):
     assert [item["reference_text"] for item in listed.json()] == refs
 
 
-def test_sermon_extraction_persists_without_changing_sermon_passages(client, db_session):
+def test_library_extraction_uses_only_paragraphs_and_same_branch_context(
+    client, db_session
+):
+    seed_scripture_extraction_bible(db_session)
+    item = LibraryItems(
+        library_item_id=210,
+        title="Branch Context",
+        content_type=LibraryItemsContentType.BOOK,
+    )
+    chapter = LibraryItemUnits(
+        library_item_unit_id=211,
+        library_item_id=210,
+        unit_order=1,
+        unit_type=LibraryItemUnitsUnitType.CHAPTER,
+        unit_title="Chapter 1",
+    )
+    first_section = LibraryItemUnits(
+        library_item_unit_id=212,
+        library_item_id=210,
+        parent_library_item_unit_id=211,
+        unit_order=2,
+        unit_type=LibraryItemUnitsUnitType.SECTION,
+        unit_title="First Section",
+        content_text="This section-level body text should be ignored (Jn 17:3).",
+    )
+    first_paragraph = LibraryItemUnits(
+        library_item_unit_id=213,
+        library_item_id=210,
+        parent_library_item_unit_id=212,
+        unit_order=3,
+        unit_type=LibraryItemUnitsUnitType.PARAGRAPH,
+        content_text="Look at Psalm 119: it says this.",
+    )
+    second_section = LibraryItemUnits(
+        library_item_unit_id=214,
+        library_item_id=210,
+        parent_library_item_unit_id=211,
+        unit_order=4,
+        unit_type=LibraryItemUnitsUnitType.SECTION,
+        unit_title="Second Section",
+    )
+    second_paragraph = LibraryItemUnits(
+        library_item_unit_id=215,
+        library_item_id=210,
+        parent_library_item_unit_id=214,
+        unit_order=5,
+        unit_type=LibraryItemUnitsUnitType.PARAGRAPH,
+        content_text="This shorthand should not cross sections (vv. 12, 18).",
+    )
+    db_session.add_all(
+        [
+            item,
+            chapter,
+            first_section,
+            first_paragraph,
+            second_section,
+            second_paragraph,
+        ]
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/library/items/210/units/211/scripture-references/extract"
+    )
+
+    assert response.status_code == 200
+    refs = [item["reference_text"] for item in response.json()["references"]]
+    assert refs == ["Psalms 119:1-125"]
+
+
+def test_sermon_extraction_persists_scripture_references(client, db_session):
     seed_scripture_extraction_bible(db_session)
     sermon = Sermons(
         sermon_id=300,
@@ -135,12 +207,7 @@ def test_sermon_extraction_persists_without_changing_sermon_passages(client, db_
     assert response.status_code == 200
     refs = [item["reference_text"] for item in response.json()["references"]]
     assert refs == ["John 17:3", "John 14:6", "Habakkuk 3:17-19"]
-    assert (
-        db_session.scalar(
-            select(SermonPassages).where(SermonPassages.sermon_id == 300)
-        )
-        is None
-    )
+    assert all(item["context_text"] is None for item in response.json()["references"])
 
     listed = client.get("/api/sermons/300/scripture-references")
     assert listed.status_code == 200

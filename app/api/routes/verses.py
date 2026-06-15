@@ -6,6 +6,7 @@ from sermon_archive.schemas import (
     PartialVerseNote,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
+    VerseLibraryItemReferenceResponse,
     VerseNote,
     VerseQueryResponse,
     VerseSermonResponse,
@@ -199,3 +200,16 @@ def verses_sermons_retrieve(
     db: Session = Depends(get_db),
 ) -> VerseSermonResponse:
     return verses_service.get_sermons_for_reference(db=db, ref=ref)
+
+
+@router.get(
+    "/library-items",
+    response_model=VerseLibraryItemReferenceResponse,
+    operation_id="verses_library_items_retrieve",
+    dependencies=[Depends(require_auth)],
+)
+def verses_library_items_retrieve(
+    ref: str = Query(...),
+    db: Session = Depends(get_db),
+) -> VerseLibraryItemReferenceResponse:
+    return verses_service.get_library_items_for_reference(db=db, ref=ref)

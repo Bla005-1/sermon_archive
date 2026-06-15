@@ -128,7 +128,6 @@ class Sermons(Base):
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP, server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
 
     sermon_attachments: Mapped[list['SermonAttachments']] = relationship('SermonAttachments', back_populates='sermon', cascade='all, delete-orphan')
-    sermon_passages: Mapped[list['SermonPassages']] = relationship('SermonPassages', back_populates='sermon', cascade='all, delete-orphan')
 
 
 class ApiAccessTokens(Base):
@@ -194,8 +193,6 @@ class BibleVerses(Base):
     ml_cross_references_source_verse: Mapped[list['MlCrossReferences']] = relationship('MlCrossReferences', foreign_keys='[MlCrossReferences.source_verse_id]', back_populates='source_verse')
     ml_cross_references_target_end_verse: Mapped[list['MlCrossReferences']] = relationship('MlCrossReferences', foreign_keys='[MlCrossReferences.target_end_verse_id]', back_populates='target_end_verse')
     ml_cross_references_target_start_verse: Mapped[list['MlCrossReferences']] = relationship('MlCrossReferences', foreign_keys='[MlCrossReferences.target_start_verse_id]', back_populates='target_start_verse')
-    sermon_passages_end_verse: Mapped[list['SermonPassages']] = relationship('SermonPassages', foreign_keys='[SermonPassages.end_verse_id]', back_populates='end_verse')
-    sermon_passages_start_verse: Mapped[list['SermonPassages']] = relationship('SermonPassages', foreign_keys='[SermonPassages.start_verse_id]', back_populates='start_verse')
     verse_footnotes: Mapped[list['VerseFootnotes']] = relationship('VerseFootnotes', back_populates='verse')
     verse_headings: Mapped[list['VerseHeadings']] = relationship('VerseHeadings', back_populates='start_verse')
     verse_notes: Mapped[list['VerseNotes']] = relationship('VerseNotes', back_populates='verse')
@@ -324,30 +321,6 @@ class MlCrossReferences(Base):
     source_verse: Mapped['BibleVerses'] = relationship('BibleVerses', foreign_keys=[source_verse_id], back_populates='ml_cross_references_source_verse')
     target_end_verse: Mapped[Optional['BibleVerses']] = relationship('BibleVerses', foreign_keys=[target_end_verse_id], back_populates='ml_cross_references_target_end_verse')
     target_start_verse: Mapped['BibleVerses'] = relationship('BibleVerses', foreign_keys=[target_start_verse_id], back_populates='ml_cross_references_target_start_verse')
-
-
-class SermonPassages(Base):
-    __tablename__ = 'sermon_passages'
-    __table_args__ = (
-        ForeignKeyConstraint(['end_verse_id'], ['bible_verses.verse_id'], ondelete='RESTRICT', onupdate='CASCADE', name='fk_sermon_passages_end_verse'),
-        ForeignKeyConstraint(['sermon_id'], ['sermons.sermon_id'], ondelete='CASCADE', onupdate='CASCADE', name='fk_sermon_passages_sermon'),
-        ForeignKeyConstraint(['start_verse_id'], ['bible_verses.verse_id'], ondelete='RESTRICT', onupdate='CASCADE', name='fk_sermon_passages_start_verse'),
-        Index('idx_sermon_passages_end_verse', 'end_verse_id'),
-        Index('idx_sermon_passages_start_verse', 'start_verse_id'),
-        Index('uq_sermon_passages_sermon_display_order', 'sermon_id', 'display_order', unique=True)
-    )
-
-    sermon_passage_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
-    sermon_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    start_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
-    end_verse_id: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
-    reference_text: Mapped[Optional[str]] = mapped_column(String(64))
-    context_note: Mapped[Optional[str]] = mapped_column(String(512))
-    display_order: Mapped[Optional[int]] = mapped_column(SMALLINT(unsigned=True), server_default=text("'1'"))
-
-    end_verse: Mapped[Optional['BibleVerses']] = relationship('BibleVerses', foreign_keys=[end_verse_id], back_populates='sermon_passages_end_verse')
-    sermon: Mapped['Sermons'] = relationship('Sermons', back_populates='sermon_passages')
-    start_verse: Mapped['BibleVerses'] = relationship('BibleVerses', foreign_keys=[start_verse_id], back_populates='sermon_passages_start_verse')
 
 
 class ScriptureReferences(Base):

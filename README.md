@@ -15,7 +15,7 @@ FastAPI backend for sermon records, library item content, Bible reference lookup
 - Auth with either:
   - Session cookie (`/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`)
   - Bearer token (`/api/auth/token`, `/api/auth/token/revoke`)
-- Sermons CRUD with nested passages and attachments
+- Sermons CRUD with attachments
 - Library item lookup, hierarchical content units, file uploads/downloads, and inline PDF/DOC/DOCX previews
 - Bible reference parsing + verse text lookup
 - Scripture reference extraction for arbitrary text, library item units, and sermons
@@ -80,7 +80,7 @@ The client reuses the shared `sermon_archive.schemas` Pydantic package for typed
 
 Database, ORM, and API schema fields use explicit snake_case names that describe the domain object:
 
-- Table primary keys are table-specific, such as `sermon_id`, `sermon_passage_id`, `footnote_id`, and `widget_passage_id`.
+- Table primary keys are table-specific, such as `sermon_id`, `footnote_id`, and `widget_passage_id`.
 - Foreign keys include the target role when a table points to the same target more than once, such as `source_verse_id`, `target_start_verse_id`, and `target_end_verse_id`.
 - Bible location fields use `chapter_number` and `verse_number`.
 - Reference display strings use `reference_text`; markdown content uses `*_markdown`.
@@ -160,14 +160,10 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `GET /api/sermons/{sermon_id}/attachments`
 - `POST /api/sermons/{sermon_id}/attachments` (multipart file upload)
 - `GET /api/sermons/{sermon_id}/attachments/{attachment_id}/download` (file download)
-- `GET /api/sermons/{sermon_id}/passages`
-- `POST /api/sermons/{sermon_id}/passages`
-- `GET /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
-- `PUT /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
-- `PATCH /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
-- `DELETE /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
 - `GET /api/sermons/{sermon_id}/scripture-references`
 - `POST /api/sermons/{sermon_id}/scripture-references/extract`
+
+Sermon scripture references are stored in the unified `scripture_references` table with `source_type=sermon`.
 
 `GET /api/sermons/suggestions` returns collection-level autocomplete values derived from existing sermons:
 
@@ -194,9 +190,11 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `GET /api/library/items/{library_item_id}/units/{library_item_unit_id}/scripture-references`
 - `POST /api/library/items/{library_item_id}/units/{library_item_unit_id}/scripture-references/extract`
 
-`GET /api/library/items/{library_item_id}/units` returns units nested under `children`. Pass `root_unit_type` with one of `page`, `paragraph`, `section`, `chapter`, `summary`, or `unknown` to choose the returned root level while preserving descendant hierarchy.
+`GET /api/library/items/{library_item_id}/units` returns units nested under `children`. New library ingestion should use a deterministic `chapter > section > paragraph` hierarchy. Chapters and sections are heading/context units; paragraphs hold body text. Paragraphs may be direct children of chapters when a source has no section heading. Page numbers are stored as `source_start_page_number` and `source_end_page_number` metadata rather than as page units.
 
-Scripture extraction for library units is structure-aware. Heading-only units such as chapters, sections, and pages provide context for descendant text-bearing units, while references are persisted on the smallest unit that actually holds text.
+The older `page`, `summary`, and `unknown` unit types remain readable for compatibility but are deprecated for new data. Use `audit_library_unit_structure.py` to report deprecated units, heading units with body text, and paragraphs without body text before cleanup.
+
+Scripture extraction for library units is structure-aware. Heading-only chapter and section units provide context for descendant paragraph units, while references are persisted on paragraphs. Shorthand reference context is scoped to the current section branch, or the chapter branch when no section exists.
 
 ### Scripture (protected)
 

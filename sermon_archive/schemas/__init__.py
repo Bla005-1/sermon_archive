@@ -20,9 +20,7 @@ from sermon_archive.schemas.library import (
 )
 from sermon_archive.schemas.sermons import (
     PatchedSermon,
-    PartialSermonPassage,
     Sermon,
-    SermonPassage,
     SermonSuggestionsResponse,
 )
 from sermon_archive.schemas.scripture import (
@@ -50,6 +48,8 @@ from sermon_archive.schemas.verses import (
     TestamentEnum,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
+    VerseLibraryItemReferenceItem,
+    VerseLibraryItemReferenceResponse,
     VerseNavigationTarget,
     VerseNote,
     VerseQueryResponse,
@@ -84,13 +84,11 @@ __all__ = [
     "LibraryUnitTypeEnum",
     "PartialAttachment",
     "PartialBibleWidget",
-    "PartialSermonPassage",
     "PartialScriptureReference",
     "PartialVerseNote",
     "PatchedSermon",
     "SearchIntentEnum",
     "Sermon",
-    "SermonPassage",
     "SermonSuggestionsResponse",
     "ScriptureExtractionRequest",
     "ScriptureExtractionResponse",
@@ -106,6 +104,8 @@ __all__ = [
     "UnresolvedScriptureReference",
     "VerseCommentaryResponse",
     "VerseCrossReferencesResponse",
+    "VerseLibraryItemReferenceItem",
+    "VerseLibraryItemReferenceResponse",
     "VerseNavigationTarget",
     "VerseNote",
     "VerseQueryResponse",

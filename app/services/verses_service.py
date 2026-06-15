@@ -18,8 +18,12 @@ from app.db.models import (
     BibleVerses,
     Commentaries,
     FootnoteCrossReferences,
+    LibraryItems,
+    LibraryItemUnits,
     VerseFootnotes,
-    SermonPassages,
+    ScriptureReferences,
+    ScriptureReferencesSourceType,
+    Sermons,
     VerseHeadings,
     MlCrossReferences,
     VerseNotes,
@@ -37,6 +41,8 @@ from sermon_archive.schemas import (
     SearchIntentEnum,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
+    VerseLibraryItemReferenceItem,
+    VerseLibraryItemReferenceResponse,
     VerseNavigationTarget,
     VerseNote,
     VerseQueryResponse,
@@ -990,8 +996,7 @@ def delete_note(db: Session, note_id: int) -> None:
     db.commit()
 
 
-def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
-    """Return sermons whose passages overlap a parsed verse reference range."""
+def _parse_reference_query(db: Session, ref: str) -> tuple[BibleVerses, BibleVerses]:
     reference = (ref or "").strip()
     if not reference:
         raise HTTPException(
@@ -1003,78 +1008,111 @@ def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    return start, end
+
+
+def _reference_rank_key(
+    *,
+    query_start: int,
+    query_end: int,
+    start_id: int,
+    end_id: int,
+) -> tuple[Any, ...] | None:
+    query_length = (query_end - query_start) + 1
+    length = (end_id - start_id) + 1
+
+    if query_start == query_end:
+        is_exact = start_id == query_start and end_id == query_end
+        boundary_distance = abs(start_id - query_start) + abs(end_id - query_end)
+        return (
+            0 if is_exact else 1,
+            length,
+            boundary_distance,
+            boundary_distance,
+        )
+
+    overlap_start = max(start_id, query_start)
+    overlap_end = min(end_id, query_end)
+    overlap_len = overlap_end - overlap_start + 1 if overlap_end >= overlap_start else 0
+    if overlap_len <= 0:
+        return None
+
+    coverage_ratio = overlap_len / query_length
+    length_diff = abs(length - query_length)
+    start_diff = abs(start_id - query_start)
+    end_diff = abs(end_id - query_end)
+    coverage_group = 0
+    if coverage_ratio < 1:
+        coverage_group = 1 if coverage_ratio >= 0.5 else 2
+    if coverage_ratio == 1 and length_diff >= query_length:
+        coverage_group = max(coverage_group, 1)
+    if coverage_ratio < 1 and length_diff >= query_length:
+        coverage_group = max(coverage_group, 2)
+
+    return (
+        coverage_group,
+        length_diff,
+        start_diff,
+        end_diff,
+    )
+
+
+def _reference_range_ids(row: ScriptureReferences) -> tuple[int, int]:
+    start_id = row.start_verse_id
+    end_id = row.end_verse_id or row.start_verse_id
+    return min(start_id, end_id), max(start_id, end_id)
+
+
+def _scripture_reference_text(row: ScriptureReferences) -> str:
+    if row.reference_text:
+        return row.reference_text
+    end_verse = row.end_verse or row.start_verse
+    return format_ref(row.start_verse, end_verse)
+
+
+def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
+    """Return sermons whose persisted scripture references overlap a reference."""
+    start, end = _parse_reference_query(db, ref)
     query_start = min(start.verse_id, end.verse_id)
     query_end = max(start.verse_id, end.verse_id)
 
-    passages = db.scalars(
-        select(SermonPassages)
+    rows = db.execute(
+        select(ScriptureReferences, Sermons)
+        .join(Sermons, ScriptureReferences.source_id == Sermons.sermon_id)
         .where(
-            SermonPassages.start_verse_id <= query_end,
-            func.coalesce(SermonPassages.end_verse_id, SermonPassages.start_verse_id)
+            ScriptureReferences.source_type == ScriptureReferencesSourceType.SERMON,
+            ScriptureReferences.start_verse_id <= query_end,
+            func.coalesce(
+                ScriptureReferences.end_verse_id, ScriptureReferences.start_verse_id
+            )
             >= query_start,
         )
         .options(
-            joinedload(SermonPassages.sermon),
-            joinedload(SermonPassages.start_verse).joinedload(BibleVerses.book),
-            joinedload(SermonPassages.end_verse).joinedload(BibleVerses.book),
+            joinedload(ScriptureReferences.start_verse).joinedload(BibleVerses.book),
+            joinedload(ScriptureReferences.end_verse).joinedload(BibleVerses.book),
         )
     ).all()
 
     ranked: list[tuple[tuple[Any, ...], VerseSermonItem]] = []
-    query_length = (query_end - query_start) + 1
 
-    for passage in passages:
-        sermon = passage.sermon
-        start_id = passage.start_verse_id
-        end_id = passage.end_verse_id or passage.start_verse_id
-        start_id, end_id = min(start_id, end_id), max(start_id, end_id)
-        length = (end_id - start_id) + 1
+    for scripture_ref, sermon in rows:
+        start_id, end_id = _reference_range_ids(scripture_ref)
+        rank_key = _reference_rank_key(
+            query_start=query_start,
+            query_end=query_end,
+            start_id=start_id,
+            end_id=end_id,
+        )
+        if rank_key is None:
+            continue
 
-        if query_start == query_end:
-            is_exact = start_id == query_start and end_id == query_end
-            boundary_distance = abs(start_id - query_start) + abs(end_id - query_end)
-            sort_key = (
-                0 if is_exact else 1,
-                length,
-                boundary_distance,
-                boundary_distance,
-                -(sermon.preached_on.toordinal() if sermon.preached_on else 0),
-                -sermon.sermon_id,
-            )
-        else:
-            overlap_start = max(start_id, query_start)
-            overlap_end = min(end_id, query_end)
-            overlap_len = (
-                overlap_end - overlap_start + 1 if overlap_end >= overlap_start else 0
-            )
-            if overlap_len <= 0:
-                continue
-
-            coverage_ratio = overlap_len / query_length
-            length_diff = abs(length - query_length)
-            start_diff = abs(start_id - query_start)
-            end_diff = abs(end_id - query_end)
-            coverage_group = 0
-            if coverage_ratio < 1:
-                coverage_group = 1 if coverage_ratio >= 0.5 else 2
-            if coverage_ratio == 1 and length_diff >= query_length:
-                coverage_group = max(coverage_group, 1)
-            if coverage_ratio < 1 and length_diff >= query_length:
-                coverage_group = max(coverage_group, 2)
-
-            sort_key = (
-                coverage_group,
-                length_diff,
-                start_diff,
-                end_diff,
-                -(sermon.preached_on.toordinal() if sermon.preached_on else 0),
-                -sermon.sermon_id,
-            )
-
-        display_ref = passage.reference_text
-        if not display_ref:
-            end_verse = passage.end_verse or passage.start_verse
-            display_ref = format_ref(passage.start_verse, end_verse)
+        sort_key = (
+            *rank_key,
+            -(sermon.preached_on.toordinal() if sermon.preached_on else 0),
+            -sermon.sermon_id,
+            scripture_ref.display_order,
+            scripture_ref.scripture_reference_id,
+        )
 
         ranked.append(
             (
@@ -1085,8 +1123,8 @@ def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
                     preached_on=sermon.preached_on,
                     speaker_name=sermon.speaker_name or "",
                     series_name=sermon.series_name or "",
-                    reference=display_ref,
-                    context_note=passage.context_note or "",
+                    reference=_scripture_reference_text(scripture_ref),
+                    context_note=scripture_ref.context_text or "",
                     start_verse_id=start_id,
                     end_verse_id=end_id,
                 ),
@@ -1096,3 +1134,128 @@ def get_sermons_for_reference(db: Session, ref: str) -> VerseSermonResponse:
     ranked.sort(key=lambda item: item[0])
     items = [item for _, item in ranked]
     return VerseSermonResponse(reference=format_ref(start, end), sermons=items)
+
+
+def get_library_items_for_reference(
+    db: Session, ref: str
+) -> VerseLibraryItemReferenceResponse:
+    """Return library item units whose persisted scripture references overlap a range."""
+    start, end = _parse_reference_query(db, ref)
+    query_start = min(start.verse_id, end.verse_id)
+    query_end = max(start.verse_id, end.verse_id)
+
+    rows = db.execute(
+        select(ScriptureReferences, LibraryItemUnits, LibraryItems)
+        .join(
+            LibraryItemUnits,
+            ScriptureReferences.source_id == LibraryItemUnits.library_item_unit_id,
+        )
+        .join(
+            LibraryItems,
+            LibraryItemUnits.library_item_id == LibraryItems.library_item_id,
+        )
+        .where(
+            ScriptureReferences.source_type
+            == ScriptureReferencesSourceType.LIBRARY_ITEM_UNIT,
+            ScriptureReferences.start_verse_id <= query_end,
+            func.coalesce(
+                ScriptureReferences.end_verse_id, ScriptureReferences.start_verse_id
+            )
+            >= query_start,
+        )
+        .options(
+            joinedload(ScriptureReferences.start_verse).joinedload(BibleVerses.book),
+            joinedload(ScriptureReferences.end_verse).joinedload(BibleVerses.book),
+        )
+    ).all()
+    library_item_ids = {item.library_item_id for _, _, item in rows}
+    units_by_item: dict[int, dict[int, LibraryItemUnits]] = {}
+    if library_item_ids:
+        all_units = db.scalars(
+            select(LibraryItemUnits).where(
+                LibraryItemUnits.library_item_id.in_(library_item_ids)
+            )
+        ).all()
+        for unit in all_units:
+            units_by_item.setdefault(unit.library_item_id, {})[
+                unit.library_item_unit_id
+            ] = unit
+
+    def unit_context(
+        item_id: int, unit_id: int
+    ) -> tuple[str | None, int | None, str | None, int | None]:
+        units_by_id = units_by_item.get(item_id, {})
+        current = units_by_id.get(unit_id)
+        chapter_title: str | None = None
+        chapter_unit_id: int | None = None
+        section_title: str | None = None
+        section_unit_id: int | None = None
+
+        while current is not None:
+            unit_type = current.unit_type.value
+            if unit_type == "section" and section_unit_id is None:
+                section_title = current.unit_title
+                section_unit_id = current.library_item_unit_id
+            if unit_type == "chapter":
+                chapter_title = current.unit_title
+                chapter_unit_id = current.library_item_unit_id
+                break
+            parent_id = current.parent_library_item_unit_id
+            current = units_by_id.get(parent_id) if parent_id is not None else None
+
+        return chapter_title, chapter_unit_id, section_title, section_unit_id
+
+    ranked: list[tuple[tuple[Any, ...], VerseLibraryItemReferenceItem]] = []
+    for scripture_ref, unit, item in rows:
+        start_id, end_id = _reference_range_ids(scripture_ref)
+        rank_key = _reference_rank_key(
+            query_start=query_start,
+            query_end=query_end,
+            start_id=start_id,
+            end_id=end_id,
+        )
+        if rank_key is None:
+            continue
+
+        chapter_title, chapter_unit_id, section_title, section_unit_id = unit_context(
+            item.library_item_id, unit.library_item_unit_id
+        )
+        sort_key = (
+            *rank_key,
+            item.title.lower(),
+            unit.unit_order,
+            scripture_ref.display_order,
+            scripture_ref.scripture_reference_id,
+        )
+        ranked.append(
+            (
+                sort_key,
+                VerseLibraryItemReferenceItem(
+                    library_item_id=item.library_item_id,
+                    library_item_unit_id=unit.library_item_unit_id,
+                    title=item.title,
+                    content_type=item.content_type,
+                    author_name=item.author_name,
+                    unit_title=unit.unit_title,
+                    unit_type=unit.unit_type,
+                    unit_order=unit.unit_order,
+                    source_start_page_number=unit.source_start_page_number,
+                    source_end_page_number=unit.source_end_page_number,
+                    reference=_scripture_reference_text(scripture_ref),
+                    context_text=scripture_ref.context_text,
+                    start_verse_id=start_id,
+                    end_verse_id=end_id,
+                    chapter_title=chapter_title,
+                    chapter_unit_id=chapter_unit_id,
+                    section_title=section_title,
+                    section_unit_id=section_unit_id,
+                ),
+            )
+        )
+
+    ranked.sort(key=lambda item: item[0])
+    items = [item for _, item in ranked]
+    return VerseLibraryItemReferenceResponse(
+        reference=format_ref(start, end),
+        library_items=items,
+    )

@@ -14,7 +14,6 @@ from sermon_archive.schemas import (
     LibraryUnitTypeEnum,
     PartialScriptureReference,
     Sermon,
-    SermonPassage,
     SermonSuggestionsResponse,
     ScriptureExtractionResponse,
     ScriptureReference,
@@ -22,8 +21,10 @@ from sermon_archive.schemas import (
     ScriptureReferenceUpdate,
     TokenResponse,
     UserResponse,
+    VerseLibraryItemReferenceResponse,
     VerseNote,
     VerseQueryResponse,
+    VerseSermonResponse,
 )
 from sermon_archive.client import SermonArchiveClient, SermonArchiveClientError
 
@@ -46,7 +47,6 @@ LIBRARY_UNIT = {
     "unit_type": "chapter",
     "children": [],
 }
-SERMON_PASSAGE = {"sermon_passage_id": 20, "sermon_id": 10}
 VERSE_NOTE = {"note_id": 70, "verse_id": 1, "note_markdown": "Note"}
 WIDGET = {
     "widget_passage_id": 50,
@@ -60,6 +60,43 @@ VERSE_QUERY = {
     "reference": "Genesis 1:1",
     "scope": "verse",
     "verses": [],
+}
+VERSE_SERMONS = {
+    "reference": "Genesis 1:1",
+    "sermons": [
+        {
+            "sermon_id": 10,
+            "title": "Creation and Light",
+            "preached_on": "2024-02-04",
+            "speaker_name": "Ada",
+            "series_name": "Beginnings",
+            "reference": "Genesis 1:1",
+            "context_note": "Opening text",
+            "start_verse_id": 1,
+            "end_verse_id": 1,
+        }
+    ],
+}
+VERSE_LIBRARY_ITEMS = {
+    "reference": "Genesis 1:1",
+    "library_items": [
+        {
+            "library_item_id": 100,
+            "library_item_unit_id": 120,
+            "title": "Institutes",
+            "content_type": "book",
+            "author_name": "John Calvin",
+            "unit_title": "Opening paragraph",
+            "unit_type": "paragraph",
+            "unit_order": 3,
+            "source_start_page_number": 7,
+            "source_end_page_number": 8,
+            "reference": "Genesis 1:1",
+            "context_text": "Chapter 1 > Section 1",
+            "start_verse_id": 1,
+            "end_verse_id": 1,
+        }
+    ],
 }
 SCRIPTURE_REFERENCE = {
     "scripture_reference_id": 80,
@@ -111,8 +148,6 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
         ("GET", "/api/library/items/100/units", "root_unit_type=chapter"): [
             LIBRARY_UNIT
         ],
-        ("GET", "/api/sermons/10/passages", ""): [SERMON_PASSAGE],
-        ("GET", "/api/sermons/10/passages/20", ""): SERMON_PASSAGE,
         ("GET", "/api/sermons/10/scripture-references", ""): [SCRIPTURE_REFERENCE],
         ("GET", "/api/scripture/references", "source_type=sermon&source_id=10"): [
             SCRIPTURE_REFERENCE
@@ -123,6 +158,12 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
             "/api/library/items/100/units/120/scripture-references",
             "",
         ): [SCRIPTURE_REFERENCE | {"source_type": "library_item_unit", "source_id": 120}],
+        ("GET", "/api/verses/sermons", "ref=Genesis+1%3A1"): VERSE_SERMONS,
+        (
+            "GET",
+            "/api/verses/library-items",
+            "ref=Genesis+1%3A1",
+        ): VERSE_LIBRARY_ITEMS,
         ("GET", "/api/verses/notes", "verse_id=1"): [VERSE_NOTE],
         ("GET", "/api/verses/notes/70", ""): VERSE_NOTE,
         ("GET", "/api/widget", ""): [WIDGET],
@@ -153,8 +194,6 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
         client.list_library_item_units(100, LibraryUnitTypeEnum.chapter)[0],
         LibraryItemUnit,
     )
-    assert isinstance(client.list_sermon_passages(10)[0], SermonPassage)
-    assert isinstance(client.get_sermon_passage(10, 20), SermonPassage)
     assert isinstance(client.list_sermon_scripture_references(10)[0], ScriptureReference)
     assert isinstance(
         client.list_scripture_references("sermon", 10)[0],
@@ -164,6 +203,14 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
     assert isinstance(
         client.list_library_item_unit_scripture_references(100, 120)[0],
         ScriptureReference,
+    )
+    assert isinstance(
+        client.get_sermons_for_reference("Genesis 1:1"),
+        VerseSermonResponse,
+    )
+    assert isinstance(
+        client.get_library_items_for_reference("Genesis 1:1"),
+        VerseLibraryItemReferenceResponse,
     )
     assert isinstance(client.list_verse_notes(verse_id=1)[0], VerseNote)
     assert isinstance(client.get_verse_note(70), VerseNote)

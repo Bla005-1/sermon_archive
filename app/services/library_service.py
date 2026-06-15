@@ -30,6 +30,74 @@ PREVIEW_MIME_TYPES = {
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
+CANONICAL_UNIT_TYPES = {
+    LibraryItemUnitsUnitType.CHAPTER.value,
+    LibraryItemUnitsUnitType.SECTION.value,
+    LibraryItemUnitsUnitType.PARAGRAPH.value,
+}
+DEPRECATED_UNIT_TYPES = {
+    LibraryItemUnitsUnitType.PAGE.value,
+    LibraryItemUnitsUnitType.SUMMARY.value,
+    LibraryItemUnitsUnitType.UNKNOWN.value,
+}
+STRUCTURAL_UNIT_TYPES = {
+    LibraryItemUnitsUnitType.CHAPTER.value,
+    LibraryItemUnitsUnitType.SECTION.value,
+}
+TEXT_UNIT_TYPES = {LibraryItemUnitsUnitType.PARAGRAPH.value}
+
+
+def _unit_type_value(unit: LibraryItemUnits) -> str:
+    unit_type = unit.unit_type
+    return unit_type.value if hasattr(unit_type, "value") else str(unit_type)
+
+
+def library_unit_has_body_text(unit: LibraryItemUnits) -> bool:
+    """Return whether a library unit currently holds body text."""
+    return bool(
+        (unit.content_text_markdown and unit.content_text_markdown.strip())
+        or (unit.content_text and unit.content_text.strip())
+    )
+
+
+def library_unit_structure_issues(
+    unit: LibraryItemUnits,
+    *,
+    parent: LibraryItemUnits | None = None,
+) -> list[str]:
+    """Return deterministic hierarchy issues for one library item unit."""
+    issues: list[str] = []
+    unit_type = _unit_type_value(unit)
+    parent_type = _unit_type_value(parent) if parent is not None else None
+
+    if unit_type in DEPRECATED_UNIT_TYPES:
+        issues.append(f'unit_type "{unit_type}" is deprecated.')
+    elif unit_type not in CANONICAL_UNIT_TYPES:
+        issues.append(f'unit_type "{unit_type}" is not canonical.')
+
+    if unit_type in STRUCTURAL_UNIT_TYPES:
+        if not unit.unit_title or not unit.unit_title.strip():
+            issues.append(f'{unit_type} units should have unit_title.')
+        if library_unit_has_body_text(unit):
+            issues.append(f'{unit_type} units should not contain body text.')
+
+    if unit_type == LibraryItemUnitsUnitType.CHAPTER.value and parent is not None:
+        issues.append("chapter units should be top-level units.")
+
+    if unit_type == LibraryItemUnitsUnitType.SECTION.value:
+        if parent_type != LibraryItemUnitsUnitType.CHAPTER.value:
+            issues.append("section units should be children of chapter units.")
+
+    if unit_type == LibraryItemUnitsUnitType.PARAGRAPH.value:
+        if not library_unit_has_body_text(unit):
+            issues.append("paragraph units should contain body text.")
+        if parent_type not in {
+            LibraryItemUnitsUnitType.CHAPTER.value,
+            LibraryItemUnitsUnitType.SECTION.value,
+        }:
+            issues.append("paragraph units should be children of chapter or section units.")
+
+    return issues
 
 
 def _storage_root() -> str:

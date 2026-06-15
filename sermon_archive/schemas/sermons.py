@@ -6,26 +6,6 @@ from pydantic import Field
 
 from sermon_archive.schemas.attachments import Attachment
 from sermon_archive.schemas.base import APIModel
-from sermon_archive.schemas.verses import BibleVerse
-
-
-class SermonPassage(APIModel):
-    sermon_passage_id: int | None = None
-    sermon_id: int | None = None
-    start_verse: BibleVerse | None = None
-    end_verse: BibleVerse | None = None
-    start_verse_id: int | None = None
-    end_verse_id: int | None = None
-    reference_text: str | None = None
-    context_note: str | None = None
-    display_order: int | None = None
-
-
-class PartialSermonPassage(APIModel):
-    start_verse_id: int | None = None
-    end_verse_id: int | None = None
-    reference_text: str | None = None
-    context_note: str | None = None
 
 
 class Sermon(APIModel):
@@ -38,7 +18,6 @@ class Sermon(APIModel):
     notes_markdown: str | None = None
     created_at: dt.datetime | None = None
     updated_at: dt.datetime | None = None
-    passages: list[SermonPassage] = Field(default_factory=list)
     attachments: list[Attachment] = Field(default_factory=list)
 
 
