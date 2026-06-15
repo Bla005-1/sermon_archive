@@ -25,6 +25,13 @@ from sermon_archive.schemas.sermons import (
     SermonPassage,
     SermonSuggestionsResponse,
 )
+from sermon_archive.schemas.scripture import (
+    ScriptureExtractionRequest,
+    ScriptureExtractionResponse,
+    ScriptureReference,
+    ScriptureReferenceSourceType,
+    UnresolvedScriptureReference,
+)
 from sermon_archive.schemas.verses import (
     BibleBook,
     BibleVerse,
@@ -81,11 +88,16 @@ __all__ = [
     "Sermon",
     "SermonPassage",
     "SermonSuggestionsResponse",
+    "ScriptureExtractionRequest",
+    "ScriptureExtractionResponse",
+    "ScriptureReference",
+    "ScriptureReferenceSourceType",
     "TestamentEnum",
     "TokenLoginRequest",
     "TokenResponse",
     "TokenRevokeResponse",
     "UserResponse",
+    "UnresolvedScriptureReference",
     "VerseCommentaryResponse",
     "VerseCrossReferencesResponse",
     "VerseNavigationTarget",

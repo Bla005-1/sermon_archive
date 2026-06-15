@@ -8,6 +8,7 @@ from app.db.models import (
     LibraryItemFiles,
     LibraryItemUnits,
     LibraryItems,
+    ScriptureReferences,
     SermonAttachments,
     SermonPassages,
     Sermons,
@@ -26,6 +27,8 @@ from sermon_archive.schemas import (
     LibraryUnitTypeEnum,
     Sermon,
     SermonPassage,
+    ScriptureReference,
+    ScriptureReferenceSourceType,
     TestamentEnum,
     VerseNote,
 )
@@ -142,6 +145,25 @@ def sermon_passage_schema(passage: SermonPassages) -> SermonPassage:
         reference_text=passage.reference_text,
         context_note=passage.context_note,
         display_order=passage.display_order,
+    )
+
+
+def scripture_reference_schema(row: ScriptureReferences) -> ScriptureReference:
+    """Convert a ScriptureReferences ORM row into a ScriptureReference schema object."""
+    return ScriptureReference(
+        scripture_reference_id=row.scripture_reference_id,
+        source_type=ScriptureReferenceSourceType(row.source_type.value),
+        source_id=row.source_id,
+        start_verse=bible_verse_schema(row.start_verse),
+        end_verse=bible_verse_schema(row.end_verse) if row.end_verse else None,
+        start_verse_id=row.start_verse_id,
+        end_verse_id=row.end_verse_id,
+        reference_text=row.reference_text,
+        matched_text=row.matched_text,
+        context_text=row.context_text,
+        start_offset=row.start_offset,
+        end_offset=row.end_offset,
+        display_order=row.display_order,
     )
 
 

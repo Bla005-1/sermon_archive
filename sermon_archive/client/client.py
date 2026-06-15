@@ -17,6 +17,9 @@ from sermon_archive.schemas import (
     Sermon,
     SermonPassage,
     SermonSuggestionsResponse,
+    ScriptureExtractionRequest,
+    ScriptureExtractionResponse,
+    ScriptureReference,
     TokenLoginRequest,
     TokenResponse,
     TokenRevokeResponse,
@@ -257,6 +260,31 @@ class SermonArchiveClient:
             params=params,
         )
 
+    def list_library_item_unit_scripture_references(
+        self, library_item_id: int, library_item_unit_id: int
+    ) -> list[ScriptureReference]:
+        return self._request_model_list(
+            "GET",
+            (
+                f"/api/library/items/{library_item_id}/units/"
+                f"{library_item_unit_id}/scripture-references"
+            ),
+            ScriptureReference,
+        )
+
+    def extract_library_item_unit_scripture_references(
+        self, library_item_id: int, library_item_unit_id: int
+    ) -> ScriptureExtractionResponse:
+        return self._request_model(
+            "POST",
+            (
+                f"/api/library/items/{library_item_id}/units/"
+                f"{library_item_unit_id}/scripture-references/extract"
+            ),
+            ScriptureExtractionResponse,
+            include_csrf=True,
+        )
+
     def list_sermon_passages(self, sermon_id: int) -> list[SermonPassage]:
         return self._request_model_list(
             "GET",
@@ -271,6 +299,37 @@ class SermonArchiveClient:
             "GET",
             f"/api/sermons/{sermon_id}/passages/{sermon_passage_id}",
             SermonPassage,
+        )
+
+    def list_sermon_scripture_references(
+        self, sermon_id: int
+    ) -> list[ScriptureReference]:
+        return self._request_model_list(
+            "GET",
+            f"/api/sermons/{sermon_id}/scripture-references",
+            ScriptureReference,
+        )
+
+    def extract_sermon_scripture_references(
+        self, sermon_id: int
+    ) -> ScriptureExtractionResponse:
+        return self._request_model(
+            "POST",
+            f"/api/sermons/{sermon_id}/scripture-references/extract",
+            ScriptureExtractionResponse,
+            include_csrf=True,
+        )
+
+    def extract_scripture_references(
+        self, text: str, context_text: str | None = None
+    ) -> ScriptureExtractionResponse:
+        payload = ScriptureExtractionRequest(text=text, context_text=context_text)
+        return self._request_model(
+            "POST",
+            "/api/scripture/extract",
+            ScriptureExtractionResponse,
+            json=payload.model_dump(mode="json"),
+            include_csrf=True,
         )
 
     def list_verse_notes(self, verse_id: int | None = None) -> list[VerseNote]:

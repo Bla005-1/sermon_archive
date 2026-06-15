@@ -18,6 +18,7 @@ FastAPI backend for sermon records, library item content, Bible reference lookup
 - Sermons CRUD with nested passages and attachments
 - Library item lookup, hierarchical content units, file uploads/downloads, and inline PDF/DOC/DOCX previews
 - Bible reference parsing + verse text lookup
+- Scripture reference extraction for arbitrary text, library item units, and sermons
 - Free-text verse search with paging/filters
 - Commentary and cross-reference lookup for references
 - Verse notes CRUD
@@ -165,6 +166,8 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `PUT /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
 - `PATCH /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
 - `DELETE /api/sermons/{sermon_id}/passages/{sermon_passage_id}`
+- `GET /api/sermons/{sermon_id}/scripture-references`
+- `POST /api/sermons/{sermon_id}/scripture-references/extract`
 
 `GET /api/sermons/suggestions` returns collection-level autocomplete values derived from existing sermons:
 
@@ -188,8 +191,16 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `GET /api/library/items/{library_item_id}/files/{library_item_file_id}/download` (file download)
 - `GET /api/library/items/{library_item_id}/files/{library_item_file_id}/preview` (inline PDF/DOC/DOCX preview response)
 - `GET /api/library/items/{library_item_id}/units`
+- `GET /api/library/items/{library_item_id}/units/{library_item_unit_id}/scripture-references`
+- `POST /api/library/items/{library_item_id}/units/{library_item_unit_id}/scripture-references/extract`
 
 `GET /api/library/items/{library_item_id}/units` returns units nested under `children`. Pass `root_unit_type` with one of `page`, `paragraph`, `section`, `chapter`, `summary`, or `unknown` to choose the returned root level while preserving descendant hierarchy.
+
+Scripture extraction for library units is structure-aware. Heading-only units such as chapters, sections, and pages provide context for descendant text-bearing units, while references are persisted on the smallest unit that actually holds text.
+
+### Scripture (protected)
+
+- `POST /api/scripture/extract`
 
 ### Verses
 

@@ -10,8 +10,10 @@ from sermon_archive.schemas import (
     Sermon,
     SermonPassage,
     SermonSuggestionsResponse,
+    ScriptureExtractionResponse,
+    ScriptureReference,
 )
-from app.services import attachment_service, sermons_service
+from app.services import attachment_service, scripture_extraction_service, sermons_service
 
 router = APIRouter(tags=["sermons"], dependencies=[Depends(require_auth)])
 
@@ -137,6 +139,36 @@ def sermons_attachments_download(
         path=abs_path,
         media_type=mime_type,
         filename=filename,
+    )
+
+
+@router.get(
+    "/{sermon_id}/scripture-references",
+    response_model=list[ScriptureReference],
+    operation_id="sermons_scripture_references_list",
+)
+def sermons_scripture_references_list(
+    sermon_id: int = Path(...),
+    db: Session = Depends(get_db),
+) -> list[ScriptureReference]:
+    return scripture_extraction_service.list_sermon_references(
+        db=db,
+        sermon_id=sermon_id,
+    )
+
+
+@router.post(
+    "/{sermon_id}/scripture-references/extract",
+    response_model=ScriptureExtractionResponse,
+    operation_id="sermons_scripture_references_extract",
+)
+def sermons_scripture_references_extract(
+    sermon_id: int = Path(...),
+    db: Session = Depends(get_db),
+) -> ScriptureExtractionResponse:
+    return scripture_extraction_service.extract_sermon_references(
+        db=db,
+        sermon_id=sermon_id,
     )
 
 

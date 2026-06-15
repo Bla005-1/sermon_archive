@@ -34,6 +34,11 @@ class LibraryItemsContentType(str, enum.Enum):
     OTHER = 'other'
 
 
+class ScriptureReferencesSourceType(str, enum.Enum):
+    LIBRARY_ITEM_UNIT = 'library_item_unit'
+    SERMON = 'sermon'
+
+
 class ApiUsers(Base):
     __tablename__ = 'api_users'
     __table_args__ = (
@@ -199,6 +204,8 @@ class BibleVerses(Base):
     widget_passages_start_verse: Mapped[list['WidgetPassages']] = relationship('WidgetPassages', foreign_keys='[WidgetPassages.start_verse_id]', back_populates='start_verse')
     footnote_cross_references_target_end_verse: Mapped[list['FootnoteCrossReferences']] = relationship('FootnoteCrossReferences', foreign_keys='[FootnoteCrossReferences.target_end_verse_id]', back_populates='target_end_verse')
     footnote_cross_references_target_start_verse: Mapped[list['FootnoteCrossReferences']] = relationship('FootnoteCrossReferences', foreign_keys='[FootnoteCrossReferences.target_start_verse_id]', back_populates='target_start_verse')
+    scripture_references_end_verse: Mapped[list['ScriptureReferences']] = relationship('ScriptureReferences', foreign_keys='[ScriptureReferences.end_verse_id]', back_populates='end_verse')
+    scripture_references_start_verse: Mapped[list['ScriptureReferences']] = relationship('ScriptureReferences', foreign_keys='[ScriptureReferences.start_verse_id]', back_populates='start_verse')
 
 
 class LibraryItemFiles(Base):
@@ -341,6 +348,32 @@ class SermonPassages(Base):
     end_verse: Mapped[Optional['BibleVerses']] = relationship('BibleVerses', foreign_keys=[end_verse_id], back_populates='sermon_passages_end_verse')
     sermon: Mapped['Sermons'] = relationship('Sermons', back_populates='sermon_passages')
     start_verse: Mapped['BibleVerses'] = relationship('BibleVerses', foreign_keys=[start_verse_id], back_populates='sermon_passages_start_verse')
+
+
+class ScriptureReferences(Base):
+    __tablename__ = 'scripture_references'
+    __table_args__ = (
+        ForeignKeyConstraint(['end_verse_id'], ['bible_verses.verse_id'], ondelete='RESTRICT', onupdate='CASCADE', name='fk_scripture_references_end_verse'),
+        ForeignKeyConstraint(['start_verse_id'], ['bible_verses.verse_id'], ondelete='RESTRICT', onupdate='CASCADE', name='fk_scripture_references_start_verse'),
+        Index('idx_scripture_references_end_verse', 'end_verse_id'),
+        Index('idx_scripture_references_source', 'source_type', 'source_id', 'display_order'),
+        Index('idx_scripture_references_start_verse', 'start_verse_id')
+    )
+
+    scripture_reference_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
+    source_type: Mapped[ScriptureReferencesSourceType] = mapped_column(Enum(ScriptureReferencesSourceType, values_callable=lambda cls: [member.value for member in cls]), nullable=False)
+    source_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    start_verse_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    end_verse_id: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True))
+    reference_text: Mapped[str] = mapped_column(String(64), nullable=False)
+    matched_text: Mapped[str] = mapped_column(String(128), nullable=False)
+    context_text: Mapped[Optional[str]] = mapped_column(String(512))
+    start_offset: Mapped[Optional[int]] = mapped_column(Integer)
+    end_offset: Mapped[Optional[int]] = mapped_column(Integer)
+    display_order: Mapped[int] = mapped_column(SMALLINT(unsigned=True), nullable=False, server_default=text("'1'"))
+
+    end_verse: Mapped[Optional['BibleVerses']] = relationship('BibleVerses', foreign_keys=[end_verse_id], back_populates='scripture_references_end_verse')
+    start_verse: Mapped['BibleVerses'] = relationship('BibleVerses', foreign_keys=[start_verse_id], back_populates='scripture_references_start_verse')
 
 
 class VerseFootnotes(Base):

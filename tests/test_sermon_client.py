@@ -15,6 +15,8 @@ from sermon_archive.schemas import (
     Sermon,
     SermonPassage,
     SermonSuggestionsResponse,
+    ScriptureExtractionResponse,
+    ScriptureReference,
     TokenResponse,
     UserResponse,
     VerseNote,
@@ -56,6 +58,15 @@ VERSE_QUERY = {
     "scope": "verse",
     "verses": [],
 }
+SCRIPTURE_REFERENCE = {
+    "scripture_reference_id": 80,
+    "source_type": "sermon",
+    "source_id": 10,
+    "start_verse_id": 1,
+    "reference_text": "Genesis 1:1",
+    "matched_text": "Gen 1:1",
+}
+SCRIPTURE_EXTRACTION = {"references": [SCRIPTURE_REFERENCE], "unresolved": []}
 USER = {
     "id": 1,
     "username": "reader",
@@ -99,6 +110,12 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
         ],
         ("GET", "/api/sermons/10/passages", ""): [SERMON_PASSAGE],
         ("GET", "/api/sermons/10/passages/20", ""): SERMON_PASSAGE,
+        ("GET", "/api/sermons/10/scripture-references", ""): [SCRIPTURE_REFERENCE],
+        (
+            "GET",
+            "/api/library/items/100/units/120/scripture-references",
+            "",
+        ): [SCRIPTURE_REFERENCE | {"source_type": "library_item_unit", "source_id": 120}],
         ("GET", "/api/verses/notes", "verse_id=1"): [VERSE_NOTE],
         ("GET", "/api/verses/notes/70", ""): VERSE_NOTE,
         ("GET", "/api/widget", ""): [WIDGET],
@@ -131,6 +148,11 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
     )
     assert isinstance(client.list_sermon_passages(10)[0], SermonPassage)
     assert isinstance(client.get_sermon_passage(10, 20), SermonPassage)
+    assert isinstance(client.list_sermon_scripture_references(10)[0], ScriptureReference)
+    assert isinstance(
+        client.list_library_item_unit_scripture_references(100, 120)[0],
+        ScriptureReference,
+    )
     assert isinstance(client.list_verse_notes(verse_id=1)[0], VerseNote)
     assert isinstance(client.get_verse_note(70), VerseNote)
     assert isinstance(client.list_widgets()[0], BibleWidget)
@@ -173,6 +195,33 @@ def test_library_file_helpers_upload_download_and_preview():
     assert downloaded == b"download bytes"
     assert previewed == b"preview bytes"
     assert requests[0].headers["Authorization"] == "Bearer token-123"
+
+
+def test_scripture_extraction_client_helpers():
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return _json_response(SCRIPTURE_EXTRACTION)
+
+    client = SermonArchiveClient(
+        "http://testserver",
+        bearer_token="token-123",
+        transport=httpx.MockTransport(handler),
+    )
+
+    preview = client.extract_scripture_references("See Gen 1:1")
+    library = client.extract_library_item_unit_scripture_references(100, 120)
+    sermon = client.extract_sermon_scripture_references(10)
+
+    assert isinstance(preview, ScriptureExtractionResponse)
+    assert isinstance(library, ScriptureExtractionResponse)
+    assert isinstance(sermon, ScriptureExtractionResponse)
+    assert [request.url.path for request in requests] == [
+        "/api/scripture/extract",
+        "/api/library/items/100/units/120/scripture-references/extract",
+        "/api/sermons/10/scripture-references/extract",
+    ]
 
 
 def test_bearer_auth_header_is_sent_and_can_be_updated():

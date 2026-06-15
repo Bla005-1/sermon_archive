@@ -115,6 +115,70 @@ def seed_bible(db: Session) -> dict[str, BibleVerses]:
     return verses
 
 
+def seed_scripture_extraction_bible(db: Session) -> dict[str, BibleVerses]:
+    books = [
+        (1, "Genesis", BibleBooksTestament.OT),
+        (2, "Exodus", BibleBooksTestament.OT),
+        (19, "Psalms", BibleBooksTestament.OT),
+        (23, "Isaiah", BibleBooksTestament.OT),
+        (24, "Jeremiah", BibleBooksTestament.OT),
+        (35, "Habakkuk", BibleBooksTestament.OT),
+        (40, "Matthew", BibleBooksTestament.NT),
+        (43, "John", BibleBooksTestament.NT),
+        (45, "Romans", BibleBooksTestament.NT),
+        (46, "1 Corinthians", BibleBooksTestament.NT),
+        (47, "2 Corinthians", BibleBooksTestament.NT),
+        (50, "Philippians", BibleBooksTestament.NT),
+        (53, "2 Thessalonians", BibleBooksTestament.NT),
+        (58, "Hebrews", BibleBooksTestament.NT),
+        (62, "1 John", BibleBooksTestament.NT),
+    ]
+    db.add_all(
+        [
+            BibleBooks(
+                book_id=book_id,
+                book_name=name,
+                book_order=book_id,
+                testament=testament,
+            )
+            for book_id, name, testament in books
+        ]
+    )
+    db.flush()
+
+    locations = [
+        (1, 1, 1), (1, 1, 2), (1, 1, 5),
+        (2, 20, 2), (2, 20, 3), (2, 20, 4), (2, 20, 5),
+        (19, 119, 1), (19, 119, 2), (19, 119, 5), (19, 119, 12),
+        (19, 119, 18), (19, 119, 97), (19, 119, 103), (19, 119, 125),
+        (23, 44, 9), (23, 44, 20), (23, 46, 6), (23, 46, 7),
+        (24, 9, 23), (24, 9, 24),
+        (35, 3, 17), (35, 3, 19),
+        (40, 16, 16), (40, 22, 37), (40, 22, 38),
+        (43, 14, 6), (43, 14, 9), (43, 17, 3),
+        (45, 8, 31), (45, 8, 39),
+        (46, 8, 1), (46, 8, 2), (46, 10, 13), (46, 15, 47), (46, 15, 54),
+        (47, 5, 21), (47, 12, 9),
+        (50, 3, 7), (50, 3, 10),
+        (53, 2, 10),
+        (58, 1, 3), (58, 8, 1), (58, 13, 8),
+        (62, 2, 4), (62, 2, 9), (62, 2, 11), (62, 3, 6), (62, 3, 11),
+        (62, 4, 20),
+    ]
+    verses = {
+        f"{book_id}_{chapter}_{verse}": BibleVerses(
+            verse_id=book_id * 100000 + chapter * 1000 + verse,
+            book_id=book_id,
+            chapter_number=chapter,
+            verse_number=verse,
+        )
+        for book_id, chapter, verse in locations
+    }
+    db.add_all(verses.values())
+    db.commit()
+    return verses
+
+
 def seed_sermons(db: Session) -> tuple[Sermons, Sermons]:
     first = Sermons(
         sermon_id=10,

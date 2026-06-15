@@ -3,19 +3,14 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import BibleBooks, BibleVerses
+from app.services.scripture_books import canonical_book_name
 
 DASHES = r"[\-\u2012\u2013\u2014]"
-BOOK_ALIASES = {
-    "revelations": "Revelation",
-    "revelation of john": "Revelation",
-    "psalm": "Psalms",
-}
 
 _REF_RE = re.compile(
     rf"""
@@ -23,7 +18,7 @@ _REF_RE = re.compile(
     (?P<book>.+?)
     \s+
     (?P<ch>\d+)\s*:\s*(?P<v1>\d+)
-    (?:\s*(?:{DASHES})\s*(?P<v2>\d+))?
+    (?:\s*(?:{DASHES})\s*(?:(?P<ch2>\d+)\s*:\s*)?(?P<v2>\d+))?
     \s*$
     """,
     re.IGNORECASE | re.VERBOSE,
@@ -43,15 +38,13 @@ _CHAPTER_ONLY_RE = re.compile(
 
 def normalize_book(raw: str) -> str:
     """Normalize free-form Bible book text to a canonical lookup string."""
-    name = re.sub(r"\s+", " ", raw).strip().lower()
-    name = BOOK_ALIASES.get(name, name.title())
-    name = re.sub(r"(^| )I{1}(?= [A-Z])", r" 1", name)
-    name = re.sub(r"(^| )I{2}(?= [A-Z])", r" 2", name)
-    name = re.sub(r"(^| )I{3}(?= [A-Z])", r" 3", name)
-    return re.sub(r"^\s+", "", name)
+    canonical = canonical_book_name(raw)
+    if canonical is not None:
+        return canonical
+    return re.sub(r"\s+", " ", raw).strip().title()
 
 
-def _find_book_tolerant(db: Session, name_normalized: str) -> Optional[BibleBooks]:
+def _find_book_tolerant(db: Session, name_normalized: str) -> BibleBooks | None:
     """Find a Bible book with exact, prefix, word-boundary, and contains fallback matching."""
     exact = db.scalar(
         select(BibleBooks).where(
@@ -68,6 +61,14 @@ def _find_book_tolerant(db: Session, name_normalized: str) -> Optional[BibleBook
     ).all()
     if len(prefix) == 1:
         return prefix[0]
+
+    word_prefix = db.scalars(
+        select(BibleBooks)
+        .where(BibleBooks.book_name.ilike(f"{name_normalized} %"))
+        .order_by(func.length(BibleBooks.book_name), BibleBooks.book_name)
+    ).all()
+    if len(word_prefix) == 1:
+        return word_prefix[0]
 
     contains = db.scalars(
         select(BibleBooks)
@@ -124,22 +125,21 @@ def parse_reference(
     else:
         assert match is not None
         v1 = int(match.group("v1"))
+        ch2 = int(match.group("ch2")) if match.group("ch2") else chapter
         v2 = int(match.group("v2")) if match.group("v2") else v1
-        low = min(v1, v2)
-        high = max(v1, v2)
 
         start_v = db.scalar(
             select(BibleVerses).where(
                 BibleVerses.book_id == book.book_id,
                 BibleVerses.chapter_number == chapter,
-                BibleVerses.verse_number == low,
+                BibleVerses.verse_number == v1,
             )
         )
         end_v = db.scalar(
             select(BibleVerses).where(
                 BibleVerses.book_id == book.book_id,
-                BibleVerses.chapter_number == chapter,
-                BibleVerses.verse_number == high,
+                BibleVerses.chapter_number == ch2,
+                BibleVerses.verse_number == v2,
             )
         )
         if start_v is None or end_v is None:

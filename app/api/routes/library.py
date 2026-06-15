@@ -3,12 +3,14 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
-from app.services import library_service
+from app.services import library_service, scripture_extraction_service
 from sermon_archive.schemas import (
     LibraryItem,
     LibraryItemFile,
     LibraryItemUnit,
     LibraryUnitTypeEnum,
+    ScriptureExtractionResponse,
+    ScriptureReference,
 )
 
 router = APIRouter(tags=["library"], dependencies=[Depends(require_auth)])
@@ -122,4 +124,38 @@ def library_item_units_list(
         db=db,
         library_item_id=library_item_id,
         root_unit_type=root_unit_type.value if root_unit_type else None,
+    )
+
+
+@router.get(
+    "/items/{library_item_id}/units/{library_item_unit_id}/scripture-references",
+    response_model=list[ScriptureReference],
+    operation_id="library_item_unit_scripture_references_list",
+)
+def library_item_unit_scripture_references_list(
+    library_item_id: int = Path(...),
+    library_item_unit_id: int = Path(...),
+    db: Session = Depends(get_db),
+) -> list[ScriptureReference]:
+    return scripture_extraction_service.list_library_unit_references(
+        db=db,
+        library_item_id=library_item_id,
+        library_item_unit_id=library_item_unit_id,
+    )
+
+
+@router.post(
+    "/items/{library_item_id}/units/{library_item_unit_id}/scripture-references/extract",
+    response_model=ScriptureExtractionResponse,
+    operation_id="library_item_unit_scripture_references_extract",
+)
+def library_item_unit_scripture_references_extract(
+    library_item_id: int = Path(...),
+    library_item_unit_id: int = Path(...),
+    db: Session = Depends(get_db),
+) -> ScriptureExtractionResponse:
+    return scripture_extraction_service.extract_library_unit_references(
+        db=db,
+        library_item_id=library_item_id,
+        library_item_unit_id=library_item_unit_id,
     )
