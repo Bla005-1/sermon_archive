@@ -17,9 +17,13 @@ from sermon_archive.schemas import (
     Sermon,
     SermonPassage,
     SermonSuggestionsResponse,
+    PartialScriptureReference,
     ScriptureExtractionRequest,
     ScriptureExtractionResponse,
     ScriptureReference,
+    ScriptureReferenceCreate,
+    ScriptureReferenceSourceType,
+    ScriptureReferenceUpdate,
     TokenLoginRequest,
     TokenResponse,
     TokenRevokeResponse,
@@ -329,6 +333,76 @@ class SermonArchiveClient:
             "/api/scripture/extract",
             ScriptureExtractionResponse,
             json=payload.model_dump(mode="json"),
+            include_csrf=True,
+        )
+
+    def list_scripture_references(
+        self,
+        source_type: ScriptureReferenceSourceType | str,
+        source_id: int,
+    ) -> list[ScriptureReference]:
+        value = (
+            source_type.value
+            if isinstance(source_type, ScriptureReferenceSourceType)
+            else source_type
+        )
+        return self._request_model_list(
+            "GET",
+            "/api/scripture/references",
+            ScriptureReference,
+            params={"source_type": value, "source_id": source_id},
+        )
+
+    def create_scripture_reference(
+        self, payload: ScriptureReferenceCreate
+    ) -> ScriptureReference:
+        return self._request_model(
+            "POST",
+            "/api/scripture/references",
+            ScriptureReference,
+            json=payload.model_dump(mode="json"),
+            include_csrf=True,
+        )
+
+    def get_scripture_reference(
+        self, scripture_reference_id: int
+    ) -> ScriptureReference:
+        return self._request_model(
+            "GET",
+            f"/api/scripture/references/{scripture_reference_id}",
+            ScriptureReference,
+        )
+
+    def update_scripture_reference(
+        self,
+        scripture_reference_id: int,
+        payload: ScriptureReferenceUpdate,
+    ) -> ScriptureReference:
+        return self._request_model(
+            "PUT",
+            f"/api/scripture/references/{scripture_reference_id}",
+            ScriptureReference,
+            json=payload.model_dump(mode="json"),
+            include_csrf=True,
+        )
+
+    def patch_scripture_reference(
+        self,
+        scripture_reference_id: int,
+        payload: PartialScriptureReference,
+    ) -> ScriptureReference:
+        return self._request_model(
+            "PATCH",
+            f"/api/scripture/references/{scripture_reference_id}",
+            ScriptureReference,
+            json=payload.model_dump(mode="json", exclude_unset=True),
+            include_csrf=True,
+        )
+
+    def delete_scripture_reference(self, scripture_reference_id: int) -> None:
+        self._request(
+            "DELETE",
+            f"/api/scripture/references/{scripture_reference_id}",
             include_csrf=True,
         )
 

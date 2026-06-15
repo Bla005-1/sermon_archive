@@ -23,8 +23,11 @@ from app.services.scripture_books import all_book_aliases, canonical_book_name
 from sermon_archive.schemas import (
     ScriptureExtractionRequest,
     ScriptureExtractionResponse,
+    ScriptureReferenceCreate,
     ScriptureReference,
     ScriptureReferenceSourceType,
+    ScriptureReferenceUpdate,
+    PartialScriptureReference,
     UnresolvedScriptureReference,
 )
 
@@ -424,6 +427,108 @@ def _source_enum(
     return ScriptureReferencesSourceType.LIBRARY_ITEM_UNIT
 
 
+def _schema_source_type(
+    source_type: ScriptureReferencesSourceType,
+) -> ScriptureReferenceSourceType:
+    if source_type == ScriptureReferencesSourceType.SERMON:
+        return ScriptureReferenceSourceType.sermon
+    return ScriptureReferenceSourceType.library_item_unit
+
+
+def _validate_source(
+    db: Session, source_type: ScriptureReferenceSourceType, source_id: int
+) -> None:
+    if source_type == ScriptureReferenceSourceType.sermon:
+        _get_sermon_or_404(db, source_id)
+        return
+
+    unit = db.scalar(
+        select(LibraryItemUnits).where(
+            LibraryItemUnits.library_item_unit_id == source_id
+        )
+    )
+    if unit is None:
+        raise HTTPException(status_code=404, detail="Library item unit not found.")
+
+
+def _get_verse_or_400(db: Session, verse_id: int, field_name: str) -> BibleVerses:
+    verse = db.scalar(
+        select(BibleVerses)
+        .where(BibleVerses.verse_id == verse_id)
+        .options(joinedload(BibleVerses.book))
+    )
+    if verse is None:
+        raise HTTPException(status_code=400, detail=f"{field_name} is invalid.")
+    return verse
+
+
+def _resolve_reference_values(
+    db: Session,
+    *,
+    reference_text: str | None,
+    start_verse_id: int | None,
+    end_verse_id: int | None,
+) -> tuple[int, int | None, str]:
+    cleaned_reference = reference_text.strip() if reference_text else None
+    if cleaned_reference:
+        try:
+            start_v, end_v = parse_reference(db, cleaned_reference)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        end_id = end_v.verse_id if end_v.verse_id != start_v.verse_id else None
+        return start_v.verse_id, end_id, format_ref(start_v, end_v)
+
+    if start_verse_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="reference_text or start_verse_id is required.",
+        )
+
+    start_v = _get_verse_or_400(db, start_verse_id, "start_verse_id")
+    end_v = None
+    if end_verse_id is not None:
+        end_v = _get_verse_or_400(db, end_verse_id, "end_verse_id")
+
+    range_end = end_v or start_v
+    if start_v.verse_id > range_end.verse_id:
+        start_v, range_end = range_end, start_v
+    normalized = format_ref(start_v, range_end)
+    end_id = range_end.verse_id if range_end.verse_id != start_v.verse_id else None
+    return start_v.verse_id, end_id, normalized
+
+
+def _next_display_order(
+    db: Session, source_type: ScriptureReferenceSourceType, source_id: int
+) -> int:
+    return (
+        db.scalar(
+            select(func.max(ScriptureReferences.display_order)).where(
+                ScriptureReferences.source_type == _source_enum(source_type),
+                ScriptureReferences.source_id == source_id,
+            )
+        )
+        or 0
+    ) + 1
+
+
+def _get_scripture_reference_row_or_404(
+    db: Session, scripture_reference_id: int
+) -> ScriptureReferences:
+    row = db.scalar(
+        select(ScriptureReferences)
+        .where(
+            ScriptureReferences.scripture_reference_id == scripture_reference_id
+        )
+        .options(
+            joinedload(ScriptureReferences.start_verse).joinedload(BibleVerses.book),
+            joinedload(ScriptureReferences.end_verse).joinedload(BibleVerses.book),
+        )
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Scripture reference not found.")
+    return row
+
+
 def _next_reference_id(db: Session) -> int:
     return (
         db.scalar(select(func.max(ScriptureReferences.scripture_reference_id))) or 0
@@ -494,6 +599,142 @@ def list_scripture_references(
         )
     ).all()
     return [scripture_reference_schema(row) for row in rows]
+
+
+def list_scripture_references_for_source(
+    db: Session,
+    source_type: ScriptureReferenceSourceType,
+    source_id: int,
+) -> list[ScriptureReference]:
+    _validate_source(db, source_type, source_id)
+    return list_scripture_references(
+        db,
+        source_type=source_type,
+        source_ids=[source_id],
+    )
+
+
+def get_scripture_reference(
+    db: Session, scripture_reference_id: int
+) -> ScriptureReference:
+    return scripture_reference_schema(
+        _get_scripture_reference_row_or_404(db, scripture_reference_id)
+    )
+
+
+def create_scripture_reference(
+    db: Session, payload: ScriptureReferenceCreate
+) -> ScriptureReference:
+    _validate_source(db, payload.source_type, payload.source_id)
+    start_id, end_id, normalized_ref = _resolve_reference_values(
+        db,
+        reference_text=payload.reference_text,
+        start_verse_id=payload.start_verse_id,
+        end_verse_id=payload.end_verse_id,
+    )
+    row = ScriptureReferences(
+        scripture_reference_id=_next_reference_id(db),
+        source_type=_source_enum(payload.source_type),
+        source_id=payload.source_id,
+        start_verse_id=start_id,
+        end_verse_id=end_id,
+        reference_text=normalized_ref,
+        matched_text=(payload.matched_text or normalized_ref)[:128],
+        context_text=payload.context_text,
+        start_offset=payload.start_offset,
+        end_offset=payload.end_offset,
+        display_order=payload.display_order
+        if payload.display_order is not None
+        else _next_display_order(db, payload.source_type, payload.source_id),
+    )
+    db.add(row)
+    db.commit()
+    return get_scripture_reference(db, row.scripture_reference_id)
+
+
+def update_scripture_reference(
+    db: Session,
+    scripture_reference_id: int,
+    payload: ScriptureReferenceUpdate,
+) -> ScriptureReference:
+    row = _get_scripture_reference_row_or_404(db, scripture_reference_id)
+    _validate_source(db, payload.source_type, payload.source_id)
+    start_id, end_id, normalized_ref = _resolve_reference_values(
+        db,
+        reference_text=payload.reference_text,
+        start_verse_id=payload.start_verse_id,
+        end_verse_id=payload.end_verse_id,
+    )
+
+    row.source_type = _source_enum(payload.source_type)
+    row.source_id = payload.source_id
+    row.start_verse_id = start_id
+    row.end_verse_id = end_id
+    row.reference_text = normalized_ref
+    row.matched_text = (payload.matched_text or normalized_ref)[:128]
+    row.context_text = payload.context_text
+    row.start_offset = payload.start_offset
+    row.end_offset = payload.end_offset
+    row.display_order = (
+        payload.display_order if payload.display_order is not None else row.display_order
+    )
+    db.commit()
+    return get_scripture_reference(db, scripture_reference_id)
+
+
+def patch_scripture_reference(
+    db: Session,
+    scripture_reference_id: int,
+    payload: PartialScriptureReference,
+) -> ScriptureReference:
+    row = _get_scripture_reference_row_or_404(db, scripture_reference_id)
+    values = payload.model_dump(exclude_unset=True)
+
+    source_type = values.get("source_type")
+    if source_type is None:
+        source_type = _schema_source_type(row.source_type)
+    source_id = values.get("source_id", row.source_id)
+    if "source_type" in values or "source_id" in values:
+        _validate_source(db, source_type, source_id)
+        row.source_type = _source_enum(source_type)
+        row.source_id = source_id
+
+    reference_keys = {"reference_text", "start_verse_id", "end_verse_id"}
+    if any(key in values for key in reference_keys):
+        start_id, end_id, normalized_ref = _resolve_reference_values(
+            db,
+            reference_text=values.get("reference_text"),
+            start_verse_id=values.get("start_verse_id", row.start_verse_id),
+            end_verse_id=values.get("end_verse_id", row.end_verse_id),
+        )
+        row.start_verse_id = start_id
+        row.end_verse_id = end_id
+        row.reference_text = normalized_ref
+        if "matched_text" not in values:
+            row.matched_text = normalized_ref[:128]
+
+    if "matched_text" in values:
+        matched = values["matched_text"]
+        row.matched_text = (matched or row.reference_text)[:128]
+    if "context_text" in values:
+        row.context_text = values["context_text"]
+    if "start_offset" in values:
+        row.start_offset = values["start_offset"]
+    if "end_offset" in values:
+        row.end_offset = values["end_offset"]
+    if "display_order" in values:
+        display_order = values["display_order"]
+        if display_order is not None:
+            row.display_order = display_order
+
+    db.commit()
+    return get_scripture_reference(db, scripture_reference_id)
+
+
+def delete_scripture_reference(db: Session, scripture_reference_id: int) -> None:
+    row = _get_scripture_reference_row_or_404(db, scripture_reference_id)
+    db.delete(row)
+    db.commit()
 
 
 def _unit_text(unit: LibraryItemUnits) -> str:

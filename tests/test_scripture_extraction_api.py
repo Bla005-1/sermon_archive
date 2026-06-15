@@ -145,3 +145,175 @@ def test_sermon_extraction_persists_without_changing_sermon_passages(client, db_
     listed = client.get("/api/sermons/300/scripture-references")
     assert listed.status_code == 200
     assert [item["reference_text"] for item in listed.json()] == refs
+
+
+def test_scripture_reference_crud_supports_manual_control(client, db_session):
+    verses = seed_scripture_extraction_bible(db_session)
+    sermon = Sermons(
+        sermon_id=301,
+        preached_on=dt.date(2024, 1, 2),
+        title="Manual References",
+        notes_markdown="Manual references",
+    )
+    db_session.add(sermon)
+    db_session.commit()
+
+    created = client.post(
+        "/api/scripture/references",
+        json={
+            "source_type": "sermon",
+            "source_id": 301,
+            "reference_text": "Jn 17:3",
+            "context_text": "manual add",
+        },
+    )
+    assert created.status_code == 201
+    created_body = created.json()
+    reference_id = created_body["scripture_reference_id"]
+    assert created_body["reference_text"] == "John 17:3"
+    assert created_body["matched_text"] == "John 17:3"
+    assert created_body["display_order"] == 1
+
+    created_by_ids = client.post(
+        "/api/scripture/references",
+        json={
+            "source_type": "sermon",
+            "source_id": 301,
+            "start_verse_id": verses["46_8_1"].verse_id,
+            "end_verse_id": verses["46_8_2"].verse_id,
+            "matched_text": "manual ids",
+        },
+    )
+    assert created_by_ids.status_code == 201
+    assert created_by_ids.json()["reference_text"] == "1 Corinthians 8:1-2"
+    assert created_by_ids.json()["matched_text"] == "manual ids"
+    assert created_by_ids.json()["display_order"] == 2
+
+    listed = client.get(
+        "/api/scripture/references",
+        params={"source_type": "sermon", "source_id": 301},
+    )
+    assert listed.status_code == 200
+    assert [item["reference_text"] for item in listed.json()] == [
+        "John 17:3",
+        "1 Corinthians 8:1-2",
+    ]
+
+    retrieved = client.get(f"/api/scripture/references/{reference_id}")
+    assert retrieved.status_code == 200
+    assert retrieved.json()["reference_text"] == "John 17:3"
+
+    updated = client.put(
+        f"/api/scripture/references/{reference_id}",
+        json={
+            "source_type": "sermon",
+            "source_id": 301,
+            "reference_text": "Hab 3:17-19",
+            "matched_text": "Hab 3:17-19",
+            "display_order": 7,
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["reference_text"] == "Habakkuk 3:17-19"
+    assert updated.json()["display_order"] == 7
+
+    patched = client.patch(
+        f"/api/scripture/references/{reference_id}",
+        json={
+            "reference_text": "Mt 22:37-38",
+            "context_text": "patched",
+            "display_order": 3,
+        },
+    )
+    assert patched.status_code == 200
+    assert patched.json()["reference_text"] == "Matthew 22:37-38"
+    assert patched.json()["matched_text"] == "Matthew 22:37-38"
+    assert patched.json()["context_text"] == "patched"
+    assert patched.json()["display_order"] == 3
+
+    deleted = client.delete(f"/api/scripture/references/{reference_id}")
+    assert deleted.status_code == 204
+    missing = client.get(f"/api/scripture/references/{reference_id}")
+    assert missing.status_code == 404
+
+
+def test_scripture_reference_crud_validates_source_and_reference(client, db_session):
+    seed_scripture_extraction_bible(db_session)
+
+    invalid_source = client.post(
+        "/api/scripture/references",
+        json={
+            "source_type": "sermon",
+            "source_id": 999,
+            "reference_text": "Jn 17:3",
+        },
+    )
+    assert invalid_source.status_code == 404
+    assert invalid_source.json()["detail"] == "Sermon not found."
+
+    sermon = Sermons(
+        sermon_id=302,
+        preached_on=dt.date(2024, 1, 3),
+        title="Bad Reference",
+    )
+    db_session.add(sermon)
+    db_session.commit()
+
+    invalid_reference = client.post(
+        "/api/scripture/references",
+        json={
+            "source_type": "sermon",
+            "source_id": 302,
+            "reference_text": "Jn 99:99",
+        },
+    )
+    assert invalid_reference.status_code == 400
+    assert invalid_reference.json()["detail"] == "We could not locate that verse in the archive."
+
+    missing_reference = client.post(
+        "/api/scripture/references",
+        json={"source_type": "sermon", "source_id": 302},
+    )
+    assert missing_reference.status_code == 400
+    assert (
+        missing_reference.json()["detail"]
+        == "reference_text or start_verse_id is required."
+    )
+
+
+def test_extraction_refresh_replaces_existing_manual_rows(client, db_session):
+    seed_scripture_extraction_bible(db_session)
+    sermon = Sermons(
+        sermon_id=303,
+        preached_on=dt.date(2024, 1, 4),
+        title="Refresh References",
+        notes_markdown="Extract this one (Jn 17:3).",
+    )
+    db_session.add(sermon)
+    db_session.commit()
+
+    manual = client.post(
+        "/api/scripture/references",
+        json={
+            "source_type": "sermon",
+            "source_id": 303,
+            "reference_text": "Hab 3:17-19",
+        },
+    )
+    assert manual.status_code == 201
+
+    extracted = client.post("/api/sermons/303/scripture-references/extract")
+    assert extracted.status_code == 200
+    assert [item["reference_text"] for item in extracted.json()["references"]] == [
+        "John 17:3"
+    ]
+
+    generic_list = client.get(
+        "/api/scripture/references",
+        params={"source_type": "sermon", "source_id": 303},
+    )
+    source_list = client.get("/api/sermons/303/scripture-references")
+    assert generic_list.status_code == 200
+    assert source_list.status_code == 200
+    assert generic_list.json() == source_list.json()
+    assert [item["reference_text"] for item in generic_list.json()] == ["John 17:3"]

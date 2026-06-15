@@ -27,6 +27,45 @@ class ScriptureReference(APIModel):
     display_order: int | None = None
 
 
+class ScriptureReferenceCreate(APIModel):
+    source_type: ScriptureReferenceSourceType
+    source_id: int
+    start_verse_id: int | None = None
+    end_verse_id: int | None = None
+    reference_text: str | None = None
+    matched_text: str | None = None
+    context_text: str | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
+    display_order: int | None = None
+
+
+class ScriptureReferenceUpdate(APIModel):
+    source_type: ScriptureReferenceSourceType
+    source_id: int
+    start_verse_id: int | None = None
+    end_verse_id: int | None = None
+    reference_text: str | None = None
+    matched_text: str | None = None
+    context_text: str | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
+    display_order: int | None = None
+
+
+class PartialScriptureReference(APIModel):
+    source_type: ScriptureReferenceSourceType | None = None
+    source_id: int | None = None
+    start_verse_id: int | None = None
+    end_verse_id: int | None = None
+    reference_text: str | None = None
+    matched_text: str | None = None
+    context_text: str | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
+    display_order: int | None = None
+
+
 class UnresolvedScriptureReference(APIModel):
     matched_text: str
     reason: str

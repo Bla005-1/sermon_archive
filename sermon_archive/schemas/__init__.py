@@ -26,10 +26,13 @@ from sermon_archive.schemas.sermons import (
     SermonSuggestionsResponse,
 )
 from sermon_archive.schemas.scripture import (
+    PartialScriptureReference,
     ScriptureExtractionRequest,
     ScriptureExtractionResponse,
     ScriptureReference,
+    ScriptureReferenceCreate,
     ScriptureReferenceSourceType,
+    ScriptureReferenceUpdate,
     UnresolvedScriptureReference,
 )
 from sermon_archive.schemas.verses import (
@@ -82,6 +85,7 @@ __all__ = [
     "PartialAttachment",
     "PartialBibleWidget",
     "PartialSermonPassage",
+    "PartialScriptureReference",
     "PartialVerseNote",
     "PatchedSermon",
     "SearchIntentEnum",
@@ -91,7 +95,9 @@ __all__ = [
     "ScriptureExtractionRequest",
     "ScriptureExtractionResponse",
     "ScriptureReference",
+    "ScriptureReferenceCreate",
     "ScriptureReferenceSourceType",
+    "ScriptureReferenceUpdate",
     "TestamentEnum",
     "TokenLoginRequest",
     "TokenResponse",

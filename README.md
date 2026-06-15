@@ -201,6 +201,14 @@ Scripture extraction for library units is structure-aware. Heading-only units su
 ### Scripture (protected)
 
 - `POST /api/scripture/extract`
+- `GET /api/scripture/references`
+- `POST /api/scripture/references`
+- `GET /api/scripture/references/{scripture_reference_id}`
+- `PUT /api/scripture/references/{scripture_reference_id}`
+- `PATCH /api/scripture/references/{scripture_reference_id}`
+- `DELETE /api/scripture/references/{scripture_reference_id}`
+
+Manual scripture reference CRUD lives under `/api/scripture/references` to keep domain routes from duplicating the same controls under sermons and library units. Bulk extraction refreshes all references for the target source; run extraction first, then manually curate references as needed.
 
 ### Verses
 

@@ -12,11 +12,14 @@ from sermon_archive.schemas import (
     LibraryItemFile,
     LibraryItemUnit,
     LibraryUnitTypeEnum,
+    PartialScriptureReference,
     Sermon,
     SermonPassage,
     SermonSuggestionsResponse,
     ScriptureExtractionResponse,
     ScriptureReference,
+    ScriptureReferenceCreate,
+    ScriptureReferenceUpdate,
     TokenResponse,
     UserResponse,
     VerseNote,
@@ -111,6 +114,10 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
         ("GET", "/api/sermons/10/passages", ""): [SERMON_PASSAGE],
         ("GET", "/api/sermons/10/passages/20", ""): SERMON_PASSAGE,
         ("GET", "/api/sermons/10/scripture-references", ""): [SCRIPTURE_REFERENCE],
+        ("GET", "/api/scripture/references", "source_type=sermon&source_id=10"): [
+            SCRIPTURE_REFERENCE
+        ],
+        ("GET", "/api/scripture/references/80", ""): SCRIPTURE_REFERENCE,
         (
             "GET",
             "/api/library/items/100/units/120/scripture-references",
@@ -149,6 +156,11 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
     assert isinstance(client.list_sermon_passages(10)[0], SermonPassage)
     assert isinstance(client.get_sermon_passage(10, 20), SermonPassage)
     assert isinstance(client.list_sermon_scripture_references(10)[0], ScriptureReference)
+    assert isinstance(
+        client.list_scripture_references("sermon", 10)[0],
+        ScriptureReference,
+    )
+    assert isinstance(client.get_scripture_reference(80), ScriptureReference)
     assert isinstance(
         client.list_library_item_unit_scripture_references(100, 120)[0],
         ScriptureReference,
@@ -221,6 +233,54 @@ def test_scripture_extraction_client_helpers():
         "/api/scripture/extract",
         "/api/library/items/100/units/120/scripture-references/extract",
         "/api/sermons/10/scripture-references/extract",
+    ]
+
+
+def test_scripture_reference_crud_client_helpers():
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "DELETE":
+            return httpx.Response(204)
+        return _json_response(SCRIPTURE_REFERENCE)
+
+    client = SermonArchiveClient(
+        "http://testserver",
+        bearer_token="token-123",
+        transport=httpx.MockTransport(handler),
+    )
+
+    created = client.create_scripture_reference(
+        ScriptureReferenceCreate(
+            source_type="sermon",
+            source_id=10,
+            reference_text="Gen 1:1",
+        )
+    )
+    updated = client.update_scripture_reference(
+        80,
+        ScriptureReferenceUpdate(
+            source_type="sermon",
+            source_id=10,
+            reference_text="Gen 1:1",
+        ),
+    )
+    patched = client.patch_scripture_reference(
+        80,
+        PartialScriptureReference(context_text="patched"),
+    )
+    deleted = client.delete_scripture_reference(80)
+
+    assert isinstance(created, ScriptureReference)
+    assert isinstance(updated, ScriptureReference)
+    assert isinstance(patched, ScriptureReference)
+    assert deleted is None
+    assert [(request.method, request.url.path) for request in requests] == [
+        ("POST", "/api/scripture/references"),
+        ("PUT", "/api/scripture/references/80"),
+        ("PATCH", "/api/scripture/references/80"),
+        ("DELETE", "/api/scripture/references/80"),
     ]
 
 
