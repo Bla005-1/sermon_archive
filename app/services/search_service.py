@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, unquote
 
 import httpx
 from fastapi import HTTPException
@@ -105,7 +105,7 @@ def _proxy_unified_search(
         query=str(payload.get("query") or query),
         total=int(payload.get("total") or 0),
         results=[
-            SearchHit.model_validate(result)
+            _with_frontend_href(SearchHit.model_validate(result))
             for result in payload.get("results") or []
         ],
     )
@@ -152,7 +152,7 @@ def _fallback_sermons(db: Session, terms: list[str]) -> list[SearchHit]:
             title=row.title,
             subtitle=row.speaker_name,
             preview_text=_preview(row.notes_markdown or row.title),
-            href=f"/sermons/{row.sermon_id}",
+            href=_sermon_href(row.sermon_id),
             score=float(len(terms)),
         )
         for row in rows
@@ -177,7 +177,7 @@ def _fallback_library_items(db: Session, terms: list[str]) -> list[SearchHit]:
             title=row.title,
             subtitle=row.author_name,
             preview_text=_preview(row.description_text or row.title),
-            href=f"/library/items/{row.library_item_id}",
+            href=_library_item_href(row.library_item_id),
             score=float(len(terms)),
         )
         for row in rows
@@ -218,7 +218,7 @@ def _fallback_library_units(db: Session, terms: list[str]) -> list[SearchHit]:
                 title=title,
                 subtitle=row.library_item.title,
                 preview_text=_preview(preview_text),
-                href=f"/library/items/{row.library_item_id}",
+                href=_library_item_href(row.library_item_id),
                 score=float(len(terms)),
             )
         )
@@ -246,3 +246,49 @@ def _preview(value: str, max_length: int = 220) -> str:
     if len(text) <= max_length:
         return text
     return f"{text[: max_length - 1].rstrip()}..."
+
+
+def _with_frontend_href(hit: SearchHit) -> SearchHit:
+    href = _frontend_href(hit)
+    if href == hit.href:
+        return hit
+    return hit.model_copy(update={"href": href})
+
+
+def _frontend_href(hit: SearchHit) -> str:
+    result_type = hit.result_type.lower()
+    if result_type == "sermon":
+        sermon_id = _first_number(hit.resource_id) or _path_id(hit.href, "sermons")
+        if sermon_id is not None:
+            return _sermon_href(sermon_id)
+    if result_type == "library":
+        library_item_id = (
+            _first_number(hit.resource_id)
+            or _path_id(hit.href, "library/items")
+            or _path_id(hit.href, "library")
+        )
+        if library_item_id is not None:
+            return _library_item_href(library_item_id)
+    if result_type == "verse" and hit.href.startswith("/verse/"):
+        reference = unquote(hit.href.removeprefix("/verse/"))
+        if reference:
+            return f"/verse?ref={quote_plus(reference)}"
+    return hit.href
+
+
+def _first_number(value: str) -> int | None:
+    match = re.search(r"\d+", value)
+    return int(match.group(0)) if match else None
+
+
+def _path_id(href: str, prefix: str) -> int | None:
+    match = re.match(rf"^/{re.escape(prefix)}/(\d+)(?:/|$)", href)
+    return int(match.group(1)) if match else None
+
+
+def _sermon_href(sermon_id: int) -> str:
+    return f"/sermon?id={sermon_id}"
+
+
+def _library_item_href(library_item_id: int) -> str:
+    return f"/library-item?id={library_item_id}"

@@ -42,7 +42,7 @@ def test_search_proxies_unified_search_with_default_host_port(
                         "title": "Institutes",
                         "subtitle": "John Calvin",
                         "preview_text": "Creation text",
-                        "href": "/library/100",
+                        "href": "/library/items/100",
                         "score": 12.0,
                     }
                 ],
@@ -83,7 +83,7 @@ def test_search_proxies_unified_search_with_default_host_port(
                 "title": "Institutes",
                 "subtitle": "John Calvin",
                 "preview_text": "Creation text",
-                "href": "/library/100",
+                "href": "/library-item?id=100",
                 "score": 12.0,
             }
         ],
@@ -139,7 +139,61 @@ def test_search_fallback_keyword_search_on_upstream_error(
     assert body["total"] == 1
     assert body["results"][0]["result_type"] == "sermon"
     assert body["results"][0]["resource_id"] == "11"
-    assert body["results"][0]["href"] == "/sermons/11"
+    assert body["results"][0]["href"] == "/sermon?id=11"
+
+
+def test_search_normalizes_upstream_frontend_links(client, db_session, monkeypatch):
+    seed_bible(db_session)
+
+    def fake_get(url, *, params, timeout):
+        return httpx.Response(
+            200,
+            json={
+                "intent": "unified_search",
+                "query": "john",
+                "total": 3,
+                "results": [
+                    {
+                        "result_type": "sermon",
+                        "resource_id": "10",
+                        "title": "Sermon",
+                        "subtitle": None,
+                        "preview_text": "Sermon text",
+                        "href": "/sermons/10",
+                        "score": 1.0,
+                    },
+                    {
+                        "result_type": "library",
+                        "resource_id": "library:100:unit:122",
+                        "title": "Library",
+                        "subtitle": None,
+                        "preview_text": "Library text",
+                        "href": "/library/100",
+                        "score": 1.0,
+                    },
+                    {
+                        "result_type": "verse",
+                        "resource_id": "John 3:16",
+                        "title": "John 3:16",
+                        "subtitle": None,
+                        "preview_text": "Verse text",
+                        "href": "/verse/John%203%3A16",
+                        "score": 1.0,
+                    },
+                ],
+            },
+        )
+
+    monkeypatch.setattr("app.services.search_service.httpx.get", fake_get)
+
+    response = client.get("/api/search", params={"q": "john"})
+
+    assert response.status_code == 200
+    assert [result["href"] for result in response.json()["results"]] == [
+        "/sermon?id=10",
+        "/library-item?id=100",
+        "/verse?ref=John+3%3A16",
+    ]
 
 
 def test_search_rejects_blank_query(client):

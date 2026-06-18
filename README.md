@@ -1,6 +1,6 @@
 # Sermon Archive API
 
-FastAPI backend for sermon records, library item content, Bible reference lookup/search, commentary and cross-reference retrieval, verse notes, and widget passage management.
+FastAPI backend for sermon records, library item content, unified archive search, Bible reference lookup, commentary and cross-reference retrieval, verse notes, and widget passage management.
 
 ## Stack
 
@@ -17,9 +17,9 @@ FastAPI backend for sermon records, library item content, Bible reference lookup
   - Bearer token (`/api/auth/token`, `/api/auth/token/revoke`)
 - Sermons CRUD with attachments
 - Library item lookup, hierarchical content units, file uploads/downloads, and inline PDF/DOC/DOCX previews
+- Unified public search endpoint with backend-owned Bible reference intent resolution
 - Bible reference parsing + verse text lookup
 - Scripture reference extraction for arbitrary text, library item units, and sermons
-- Free-text verse search with paging/filters
 - Commentary and cross-reference lookup for references
 - Verse notes CRUD
 - Widget verse entries CRUD
@@ -104,6 +104,9 @@ Base values live in `.env.template`. Most important settings:
 - `ALLOWED_HOSTS`: comma-separated trusted hosts
 - `COOKIE_SECURE`, `COOKIE_SAMESITE`: cookie behavior
 - `SESSION_COOKIE_NAME`, `CSRF_COOKIE_NAME`: cookie names
+- `SERMON_SEARCH_HOST`: host for the external unified search service, default `localhost`
+- `SERMON_SEARCH_PORT`: port for the external unified search service, default `8051`
+- `SERMON_SEARCH_TIMEOUT_SECONDS`: upstream search timeout, default `3.0`
 
 For a browser client on a different domain, set:
 - `COOKIE_SAMESITE=none`
@@ -208,12 +211,59 @@ Scripture extraction for library units is structure-aware. Heading-only chapter 
 
 Manual scripture reference CRUD lives under `/api/scripture/references` to keep domain routes from duplicating the same controls under sermons and library units. Bulk extraction refreshes all references for the target source; run extraction first, then manually curate references as needed.
 
+### Search
+
+Public:
+- `GET /api/search`
+
+`GET /api/search?q=<input>` is the frontend-facing search box endpoint. The backend owns intent resolution:
+
+- Bible reference input returns `intent: "reference"` with a canonical reference and URL for the next step.
+- All other input is proxied to the external sermon-search service as unified search.
+- If sermon-search is unavailable, the backend falls back to a simple keyword search over sermons and library content.
+
+Supported query parameters:
+
+- `q`: search text or Bible reference
+- `limit`: result limit, default `10`, max `50`
+- `offset`: result offset, default `0`
+- `domains`: optional repeated filter such as `domains=sermon&domains=library`
+
+Reference intent response:
+
+```json
+{
+  "intent": "reference",
+  "reference": "John 3:16",
+  "canonical_url": "/verse?ref=John+3%3A16"
+}
+```
+
+Unified search response:
+
+```json
+{
+  "intent": "search",
+  "query": "love one another",
+  "total": 1,
+  "results": [
+    {
+      "result_type": "sermon",
+      "resource_id": "10",
+      "title": "Love One Another",
+      "subtitle": "Ada",
+      "preview_text": "Matched excerpt...",
+      "href": "/sermon?id=10",
+      "score": 12.0
+    }
+  ]
+}
+```
+
 ### Verses
 
 Public:
-- `GET /api/verses`
 - `GET /api/verses/reference`
-- `GET /api/verses/search`
 - `GET /api/verses/translations`
 
 Protected:
@@ -227,7 +277,9 @@ Protected:
 - `DELETE /api/verses/notes/{note_id}`
 - `GET /api/verses/sermons`
 
-`GET /api/verses/translations` returns the distinct translation codes available for verse lookup and text search filters.
+`GET /api/verses/reference?ref=<reference>` retrieves verse text for an exact Bible reference. This is the next step after `/api/search` returns `intent: "reference"`.
+
+`GET /api/verses/translations` returns the distinct translation codes available for verse lookup.
 
 ### Widget
 
