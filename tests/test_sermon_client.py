@@ -21,6 +21,7 @@ from sermon_archive.schemas import (
     ScriptureReferenceUpdate,
     TokenResponse,
     UserResponse,
+    VerseCommentaryResponse,
     VerseLibraryItemReferenceResponse,
     VerseNote,
     VerseQueryResponse,
@@ -74,6 +75,38 @@ VERSE_SERMONS = {
             "context_note": "Opening text",
             "start_verse_id": 1,
             "end_verse_id": 1,
+        }
+    ],
+}
+VERSE_COMMENTARIES = {
+    "reference": "Genesis 1:1",
+    "count": 1,
+    "items": [
+        {
+            "commentary_id": 90,
+            "father_id": 20,
+            "father_name": "Augustine",
+            "display_name": "Augustine of Hippo",
+            "append_to_author_name": "",
+            "commentary_text": "In the beginning, God made all things.",
+            "book_id": 1,
+            "start_verse_id": 1,
+            "end_verse_id": 1,
+            "reference": "Genesis 1:1",
+            "source_url": "https://example.test/commentary",
+            "source_title": "On Genesis",
+            "default_year": 400,
+            "wiki_url": "https://example.test/augustine",
+            "start": {
+                "book": "Genesis",
+                "chapter_number": 1,
+                "verse_number": 1,
+            },
+            "end": {
+                "book": "Genesis",
+                "chapter_number": 1,
+                "verse_number": 1,
+            },
         }
     ],
 }
@@ -161,6 +194,11 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
         ("GET", "/api/verses/sermons", "ref=Genesis+1%3A1"): VERSE_SERMONS,
         (
             "GET",
+            "/api/verses/commentaries",
+            "ref=Genesis+1%3A1",
+        ): VERSE_COMMENTARIES,
+        (
+            "GET",
             "/api/verses/library-items",
             "ref=Genesis+1%3A1",
         ): VERSE_LIBRARY_ITEMS,
@@ -207,6 +245,10 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
     assert isinstance(
         client.get_sermons_for_reference("Genesis 1:1"),
         VerseSermonResponse,
+    )
+    assert isinstance(
+        client.get_commentaries_for_reference("Genesis 1:1"),
+        VerseCommentaryResponse,
     )
     assert isinstance(
         client.get_library_items_for_reference("Genesis 1:1"),

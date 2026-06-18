@@ -1,6 +1,6 @@
 [project]
 name = "sermon-archive"
-version = "0.1.1"
+version = "0.1.2"
 description = "Sermon Archive API Client and server dependencies"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["sermon_archive"]
+include = ["sermon_archive*"]
 
 [dependency-groups]
 backend = [

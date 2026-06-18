@@ -27,6 +27,7 @@ from sermon_archive.schemas import (
     TokenResponse,
     TokenRevokeResponse,
     UserResponse,
+    VerseCommentaryResponse,
     VerseLibraryItemReferenceResponse,
     VerseNote,
     VerseQueryResponse,
@@ -421,6 +422,16 @@ class SermonArchiveClient:
             "GET",
             "/api/verses/sermons",
             VerseSermonResponse,
+            params={"ref": reference},
+        )
+
+    def get_commentaries_for_reference(
+        self, reference: str
+    ) -> VerseCommentaryResponse:
+        return self._request_model(
+            "GET",
+            "/api/verses/commentaries",
+            VerseCommentaryResponse,
             params={"ref": reference},
         )
 
