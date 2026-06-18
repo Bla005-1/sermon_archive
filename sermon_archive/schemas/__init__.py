@@ -33,6 +33,12 @@ from sermon_archive.schemas.scripture import (
     ScriptureReferenceUpdate,
     UnresolvedScriptureReference,
 )
+from sermon_archive.schemas.search import (
+    SearchHit,
+    SearchReferenceResponse,
+    SearchResponse,
+    SearchResultsResponse,
+)
 from sermon_archive.schemas.verses import (
     BibleBook,
     BibleVerse,
@@ -44,7 +50,6 @@ from sermon_archive.schemas.verses import (
     FootnoteCrossReferenceItem,
     FootnoteCrossReferenceVerse,
     PartialVerseNote,
-    SearchIntentEnum,
     TestamentEnum,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
@@ -52,11 +57,10 @@ from sermon_archive.schemas.verses import (
     VerseLibraryItemReferenceResponse,
     VerseNavigationTarget,
     VerseNote,
-    VerseQueryResponse,
-    VerseSearchResult,
+    VerseReferenceResponse,
+    VerseReferenceText,
     VerseSermonItem,
     VerseSermonResponse,
-    VerseTextSearchResponse,
     VerseTranslationsResponse,
 )
 from sermon_archive.schemas.widget import BibleWidget, PartialBibleWidget
@@ -87,7 +91,6 @@ __all__ = [
     "PartialScriptureReference",
     "PartialVerseNote",
     "PatchedSermon",
-    "SearchIntentEnum",
     "Sermon",
     "SermonSuggestionsResponse",
     "ScriptureExtractionRequest",
@@ -96,6 +99,10 @@ __all__ = [
     "ScriptureReferenceCreate",
     "ScriptureReferenceSourceType",
     "ScriptureReferenceUpdate",
+    "SearchHit",
+    "SearchReferenceResponse",
+    "SearchResponse",
+    "SearchResultsResponse",
     "TestamentEnum",
     "TokenLoginRequest",
     "TokenResponse",
@@ -108,10 +115,9 @@ __all__ = [
     "VerseLibraryItemReferenceResponse",
     "VerseNavigationTarget",
     "VerseNote",
-    "VerseQueryResponse",
-    "VerseSearchResult",
+    "VerseReferenceResponse",
+    "VerseReferenceText",
     "VerseSermonItem",
     "VerseSermonResponse",
-    "VerseTextSearchResponse",
     "VerseTranslationsResponse",
 ]

@@ -8,9 +8,8 @@ from sermon_archive.schemas import (
     VerseCrossReferencesResponse,
     VerseLibraryItemReferenceResponse,
     VerseNote,
-    VerseQueryResponse,
+    VerseReferenceResponse,
     VerseSermonResponse,
-    VerseTextSearchResponse,
     VerseTranslationsResponse,
 )
 from app.services import verses_service
@@ -18,58 +17,19 @@ from app.services import verses_service
 router = APIRouter(tags=["verses"])
 
 
-@router.get("", response_model=VerseQueryResponse, operation_id="verses_lookup")
-def verses_lookup(
-    q: str = Query(
-        ...,
-        description=("Search by reference"),
-    ),
-    translation: str | None = Query(default=None),
-    db: Session = Depends(get_db),
-) -> VerseQueryResponse:
-    return verses_service.resolve_query_intent(db=db, q=q, translation=translation)
-
-
 @router.get(
     "/reference",
-    response_model=VerseQueryResponse,
+    response_model=VerseReferenceResponse,
     operation_id="verses_reference_retrieve",
 )
 def verses_reference_retrieve(
     ref: str = Query(..., description="Bible reference to retrieve directly."),
     translation: str | None = Query(default=None),
     db: Session = Depends(get_db),
-) -> VerseQueryResponse:
+) -> VerseReferenceResponse:
     return verses_service.get_verse_by_reference(
         db=db,
         ref=ref,
-        translation=translation,
-    )
-
-
-@router.get(
-    "/search",
-    response_model=VerseTextSearchResponse,
-    operation_id="verses_search_retrieve",
-)
-def verses_search_retrieve(
-    q: str = Query(..., description="Free-text query to search within verse text."),
-    book: str | None = Query(default=None),
-    chapter: int | None = Query(default=None),
-    exact: bool = Query(default=False),
-    page: int = Query(default=1),
-    testament: str | None = Query(default=None),
-    translation: str | None = Query(default=None),
-    db: Session = Depends(get_db),
-) -> VerseTextSearchResponse:
-    return verses_service.search_verse_text(
-        db=db,
-        q=q,
-        page=page,
-        book=book,
-        chapter=chapter,
-        testament=testament,
-        exact=exact,
         translation=translation,
     )
 

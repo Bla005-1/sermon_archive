@@ -24,7 +24,7 @@ from sermon_archive.schemas import (
     VerseCommentaryResponse,
     VerseLibraryItemReferenceResponse,
     VerseNote,
-    VerseQueryResponse,
+    VerseReferenceResponse,
     VerseSermonResponse,
 )
 from sermon_archive.client import SermonArchiveClient, SermonArchiveClientError
@@ -56,8 +56,6 @@ WIDGET = {
     "display_text": "In the beginning",
 }
 VERSE_QUERY = {
-    "intent": "reference",
-    "query": "Genesis 1:1",
     "reference": "Genesis 1:1",
     "scope": "verse",
     "verses": [],
@@ -414,7 +412,7 @@ def test_get_verse_uses_direct_reference_endpoint_and_parses_response():
 
     response = client.get_verse("Genesis 1:1", translation="KJV")
 
-    assert isinstance(response, VerseQueryResponse)
+    assert isinstance(response, VerseReferenceResponse)
     assert response.reference == "Genesis 1:1"
     assert seen_request is not None
     assert seen_request.method == "GET"

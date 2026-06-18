@@ -17,17 +17,16 @@ from tests.factories import (
 )
 
 
-def test_verses_lookup_reference_prefers_requested_translation(client, db_session):
+def test_verses_reference_prefers_requested_translation(client, db_session):
     seed_bible(db_session)
 
     response = client.get(
-        "/api/verses",
-        params={"q": "Genesis 1:1", "translation": "kjv"},
+        "/api/verses/reference",
+        params={"ref": "Genesis 1:1", "translation": "kjv"},
     )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["intent"] == "reference"
     assert body["reference"] == "Genesis 1:1"
     assert body["scope"] == "verse"
     assert body["verses"][0]["translation"] == "KJV"
@@ -39,14 +38,13 @@ def test_verses_lookup_reference_prefers_requested_translation(client, db_sessio
     }
 
 
-def test_verses_lookup_chapter_reference(client, db_session):
+def test_verses_reference_gets_chapter_reference(client, db_session):
     seed_bible(db_session)
 
-    response = client.get("/api/verses", params={"q": "Genesis 1"})
+    response = client.get("/api/verses/reference", params={"ref": "Genesis 1"})
 
     assert response.status_code == 200
     body = response.json()
-    assert body["intent"] == "reference"
     assert body["reference"] == "Genesis 1:1-4"
     assert body["scope"] == "chapter"
     assert [verse["reference"] for verse in body["verses"]] == [
@@ -55,33 +53,6 @@ def test_verses_lookup_chapter_reference(client, db_session):
         "Genesis 1:3",
         "Genesis 1:4",
     ]
-
-
-def test_verses_lookup_text_intent_for_non_reference(client, db_session):
-    seed_bible(db_session)
-
-    response = client.get("/api/verses", params={"q": "created heaven"})
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "intent": "text",
-        "query": "created heaven",
-        "reference": None,
-        "scope": None,
-        "previous_target": None,
-        "expand_target": None,
-        "next_target": None,
-        "verses": [],
-    }
-
-
-def test_verses_lookup_rejects_blank_query(client, db_session):
-    seed_bible(db_session)
-
-    response = client.get("/api/verses", params={"q": "   "})
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Provide a query in the 'q' query param."
 
 
 def test_verses_reference_gets_reference_without_text_intent(client, db_session):
@@ -94,7 +65,6 @@ def test_verses_reference_gets_reference_without_text_intent(client, db_session)
 
     assert response.status_code == 200
     body = response.json()
-    assert body["intent"] == "reference"
     assert body["reference"] == "Genesis 1:1"
     assert body["scope"] == "verse"
     assert body["verses"][0]["translation"] == "KJV"
@@ -105,39 +75,6 @@ def test_verses_reference_gets_reference_without_text_intent(client, db_session)
     )
     assert non_reference.status_code == 400
     assert "References should be formatted" in non_reference.json()["detail"]
-
-
-def test_verse_search_filters_and_clamps_page(client, db_session):
-    seed_bible(db_session)
-
-    response = client.get(
-        "/api/verses/search",
-        params={
-            "q": "God world",
-            "book": "John",
-            "testament": "nt",
-            "page": -5,
-            "translation": "esv",
-        },
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["page"] == 1
-    assert body["total"] == 2
-    assert [result["reference"] for result in body["results"]] == [
-        "John 3:16",
-        "John 3:17",
-    ]
-
-
-def test_verse_search_rejects_punctuation_only_non_exact_query(client, db_session):
-    seed_bible(db_session)
-
-    response = client.get("/api/verses/search", params={"q": "!!!"})
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Provide a non-empty search query."
 
 
 def test_verse_translations_are_distinct_and_sorted(client, db_session):

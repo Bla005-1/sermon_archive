@@ -30,7 +30,7 @@ from sermon_archive.schemas import (
     VerseCommentaryResponse,
     VerseLibraryItemReferenceResponse,
     VerseNote,
-    VerseQueryResponse,
+    VerseReferenceResponse,
     VerseSermonResponse,
 )
 
@@ -406,14 +406,14 @@ class SermonArchiveClient:
 
     def get_verse(
         self, reference: str, translation: str | None = None
-    ) -> VerseQueryResponse:
+    ) -> VerseReferenceResponse:
         params = {"ref": reference}
         if translation is not None:
             params["translation"] = translation
         return self._request_model(
             "GET",
             "/api/verses/reference",
-            VerseQueryResponse,
+            VerseReferenceResponse,
             params=params,
         )
 

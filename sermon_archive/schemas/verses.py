@@ -1,6 +1,5 @@
 import datetime as dt
 from enum import Enum
-
 from pydantic import Field
 
 from sermon_archive.schemas.base import APIModel
@@ -109,12 +108,7 @@ class VerseCrossReferencesResponse(APIModel):
     footnote_verses: list[FootnoteCrossReferenceVerse]
 
 
-class SearchIntentEnum(str, Enum):
-    REFERENCE = "reference"
-    TEXT = "text"
-
-
-class VerseSearchResult(APIModel):
+class VerseReferenceText(APIModel):
     result_order: int
     verse_id: int
     reference: str
@@ -134,22 +128,13 @@ class VerseNavigationTarget(APIModel):
     label: str
 
 
-class VerseQueryResponse(APIModel):
-    intent: SearchIntentEnum
-    query: str
-    reference: str | None = None
+class VerseReferenceResponse(APIModel):
+    reference: str
     scope: str | None = None
     previous_target: VerseNavigationTarget | None = None
     expand_target: VerseNavigationTarget | None = None
     next_target: VerseNavigationTarget | None = None
-    verses: list[VerseSearchResult] = Field(default_factory=list)
-
-
-class VerseTextSearchResponse(APIModel):
-    query: str
-    page: int
-    total: int
-    results: list[VerseSearchResult]
+    verses: list[VerseReferenceText] = Field(default_factory=list)
 
 
 class VerseTranslationsResponse(APIModel):

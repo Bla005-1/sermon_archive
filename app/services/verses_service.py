@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from bisect import bisect_right
 from functools import lru_cache
 from typing import Any
@@ -10,7 +9,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 
 from fastapi import HTTPException
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import (
@@ -38,18 +37,16 @@ from sermon_archive.schemas import (
     FootnoteCrossReferenceItem,
     FootnoteCrossReferenceVerse,
     PartialVerseNote,
-    SearchIntentEnum,
     VerseCommentaryResponse,
     VerseCrossReferencesResponse,
     VerseLibraryItemReferenceItem,
     VerseLibraryItemReferenceResponse,
     VerseNavigationTarget,
     VerseNote,
-    VerseQueryResponse,
-    VerseSearchResult,
+    VerseReferenceResponse,
+    VerseReferenceText,
     VerseSermonItem,
     VerseSermonResponse,
-    VerseTextSearchResponse,
     VerseTranslationsResponse,
 )
 from app.services._mappers import verse_note_schema
@@ -97,18 +94,13 @@ def _preview_text_for_range(db: Session, start_id: int, end_id: int) -> str:
     ).strip()
 
 
-def _tokenize_search_terms(query: str) -> list[str]:
-    """Split a free-text query into lower-cased word tokens."""
-    return re.findall(r"[\w']+", query.lower())
-
-
 def _verse_result_from_text_row(
     row: VerseTexts,
     result_order: int,
     available_translations: Sequence[str] | None = None,
-) -> VerseSearchResult:
+) -> VerseReferenceText:
     verse = row.verse
-    return VerseSearchResult(
+    return VerseReferenceText(
         result_order=result_order,
         verse_id=verse.verse_id,
         reference=format_ref(verse, verse),
@@ -456,7 +448,7 @@ def get_verse_by_reference(
     db: Session,
     ref: str,
     translation: str | None = None,
-) -> VerseQueryResponse:
+) -> VerseReferenceResponse:
     """Resolve input strictly as a Bible reference and return matching verse text."""
     reference = (ref or "").strip()
     if not reference:
@@ -477,44 +469,17 @@ def get_verse_by_reference(
     )
 
 
-def resolve_query_intent(
-    db: Session,
-    q: str,
-    translation: str | None = None,
-) -> VerseQueryResponse:
-    """Resolve input as reference or text intent and return a single envelope."""
-    query = (q or "").strip()
-    if not query:
-        raise HTTPException(
-            status_code=400, detail="Provide a query in the 'q' query param."
-        )
-
-    try:
-        start, end = parse_reference(db, query)
-    except ValueError:
-        return VerseQueryResponse(intent=SearchIntentEnum.TEXT, query=query)
-
-    return _reference_query_response(
-        db=db,
-        start=start,
-        end=end,
-        translation=translation,
-    )
-
-
 def _reference_query_response(
     db: Session,
     start: BibleVerses,
     end: BibleVerses,
     translation: str | None = None,
-) -> VerseQueryResponse:
+) -> VerseReferenceResponse:
     reference = format_ref(start, end)
     verses = _load_verse_range(db, start, end)
     verse_ids = [verse.verse_id for verse in verses]
     if not verse_ids:
-        return VerseQueryResponse(
-            intent=SearchIntentEnum.REFERENCE,
-            query=reference,
+        return VerseReferenceResponse(
             reference=reference,
             verses=[],
         )
@@ -547,9 +512,7 @@ def _reference_query_response(
 
     expand_target = _compute_expand_target(db, start, end)
     scope = _scope_for_range(db, start, end, expand_target)
-    return VerseQueryResponse(
-        intent=SearchIntentEnum.REFERENCE,
-        query=reference,
+    return VerseReferenceResponse(
         reference=reference,
         scope=scope,
         previous_target=_previous_target(db, scope, start, end),
@@ -564,106 +527,6 @@ def _reference_query_response(
                 ),
             )
             for idx, row in enumerate(selected, start=1)
-        ],
-    )
-
-
-def search_verse_text(
-    db: Session,
-    q: str,
-    page: int = 1,
-    book: str | None = None,
-    chapter: int | None = None,
-    testament: str | None = None,
-    exact: bool = False,
-    translation: str | None = None,
-) -> VerseTextSearchResponse:
-    """Search verse text rows with optional filters and paginated results."""
-    query = (q or "").strip()
-    if not query:
-        raise HTTPException(
-            status_code=400, detail="Provide a search query in the 'q' query param."
-        )
-
-    page = max(page, 1)
-    page_size = 20
-
-    stmt = (
-        select(VerseTexts)
-        .join(BibleVerses, VerseTexts.verse_id == BibleVerses.verse_id)
-        .join(BibleBooks, BibleBooks.book_id == BibleVerses.book_id)
-        .options(joinedload(VerseTexts.verse).joinedload(BibleVerses.book))
-    )
-
-    filters = []
-    if translation:
-        filters.append(
-            func.upper(VerseTexts.translation) == translation.strip().upper()
-        )
-    if book:
-        filters.append(func.lower(BibleBooks.book_name) == book.strip().lower())
-    if chapter is not None:
-        filters.append(BibleVerses.chapter_number == chapter)
-    if testament and testament.strip().upper() in {"OT", "NT"}:
-        filters.append(BibleBooks.testament == testament.strip().upper())
-
-    if exact:
-        filters.append(VerseTexts.plain_text.ilike(f"%{query}%"))
-    else:
-        terms = _tokenize_search_terms(query)
-        if not terms:
-            raise HTTPException(
-                status_code=400, detail="Provide a non-empty search query."
-            )
-        filters.append(
-            and_(*[VerseTexts.plain_text.ilike(f"%{term}%") for term in terms])
-        )
-
-    if filters:
-        stmt = stmt.where(and_(*filters))
-
-    stmt = stmt.order_by(
-        BibleBooks.book_order,
-        BibleVerses.chapter_number,
-        BibleVerses.verse_number,
-        func.lower(VerseTexts.translation),
-    )
-
-    rows = db.scalars(stmt).all()
-    selected_rows: Sequence[VerseTexts]
-    if translation:
-        selected_rows = rows
-    else:
-        selected_rows = _select_preferred_rows(rows)
-
-    total = len(selected_rows)
-    offset = (page - 1) * page_size
-    paged = selected_rows[offset : offset + page_size]
-    paged_verse_ids = [row.verse_id for row in paged]
-    available_translations_by_verse: dict[int, list[str]] = {}
-    if paged_verse_ids:
-        translation_rows = db.scalars(
-            select(VerseTexts)
-            .where(VerseTexts.verse_id.in_(paged_verse_ids))
-            .order_by(VerseTexts.verse_id, func.lower(VerseTexts.translation))
-        ).all()
-        available_translations_by_verse = _available_translations_by_verse(
-            translation_rows
-        )
-
-    return VerseTextSearchResponse(
-        query=query,
-        page=page,
-        total=total,
-        results=[
-            _verse_result_from_text_row(
-                row=row,
-                result_order=offset + idx,
-                available_translations=available_translations_by_verse.get(
-                    row.verse_id, [row.translation]
-                ),
-            )
-            for idx, row in enumerate(paged, start=1)
         ],
     )
 

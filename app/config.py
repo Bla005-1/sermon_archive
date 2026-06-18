@@ -17,6 +17,9 @@ class Settings(BaseSettings):
 
     database_url: str = ''
     sermon_storage_root: str = "."
+    sermon_search_host: str = "localhost"
+    sermon_search_port: int = 8051
+    sermon_search_timeout_seconds: float = 3.0
 
     cors_allowed_origins: list[str] | str = ["http://localhost:3000"]
     cors_allow_credentials: bool = True

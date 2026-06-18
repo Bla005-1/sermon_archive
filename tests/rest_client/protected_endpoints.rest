@@ -13,9 +13,8 @@ Content-Type: application/json
   "token_name": "vscode-rest-client-protected"
 }
 
-### Search verses (protected endpoint)
-GET {{baseUrl}}/api/search/?q=love&page=1
-Authorization: Bearer {{tokenLogin.response.body.$.access_token}}
+### Search archive
+GET {{baseUrl}}/api/search?q=love&limit=10&offset=0
 
 ### List sermons (protected endpoint)
 GET {{baseUrl}}/api/sermons/
