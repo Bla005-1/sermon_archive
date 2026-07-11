@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Generator
 import pytest
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.dialects.mysql import BIGINT, INTEGER, LONGTEXT, SMALLINT, TINYINT
@@ -31,7 +31,7 @@ def _compile_mysql_longtext_for_sqlite(_type, _compiler, **_kw) -> str:
 
 
 from app.config import settings  # noqa: E402
-from app.db.models import Base  # noqa: E402
+from app.db.models import ApiUsers, Base  # noqa: E402
 from app.dependencies import get_db, require_auth  # noqa: E402
 from main import create_app  # noqa: E402
 
@@ -88,8 +88,27 @@ def client(db_session: Session, tmp_path, monkeypatch: pytest.MonkeyPatch) -> Ge
     def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
-    def override_require_auth(request: Request) -> None:
-        request.state.current_user = None
+    def override_require_auth(
+        request: Request, db: Session = Depends(get_db)
+    ) -> None:
+        user_id = int(request.headers.get("X-Test-User-Id", "1"))
+        staff_header = request.headers.get("X-Test-Is-Staff")
+        user = db.get(ApiUsers, user_id)
+        if user is None:
+            user = ApiUsers(
+                user_id=user_id,
+                username=f"test-user-{user_id}",
+                email=f"test-user-{user_id}@example.test",
+                password_hash="test-hash",
+                is_active=1,
+                is_staff=1 if staff_header == "true" else 0,
+            )
+            db.add(user)
+            db.commit()
+        elif staff_header is not None:
+            user.is_staff = 1 if staff_header == "true" else 0
+            db.commit()
+        request.state.current_user = user
         request.state.auth_method = "test"
 
     app.dependency_overrides[get_db] = override_get_db

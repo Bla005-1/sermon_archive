@@ -54,6 +54,7 @@ def test_sermons_browse_by_scripture_orders_canonically(client, db_session):
     db_session.add(
         Sermons(
             sermon_id=12,
+            user_id=1,
             preached_on=date(2024, 4, 1),
             title="Earlier Text Later Date",
             speaker_name="Ada",
@@ -152,6 +153,7 @@ def test_sermons_create_defaults_preached_on_and_returns_nested_lists(client, db
     assert body["title"] == "A New Sermon"
     assert body["preached_on"] is not None
     assert body["attachments"] == []
+    assert body["owner"]["id"] == 1
 
 
 def test_sermons_retrieve_404(client, db_session):
@@ -189,6 +191,27 @@ def test_sermons_update_and_patch_validate_title(client, db_session):
     assert body["speaker_name"] == "Cara"
 
 
+def test_sermon_write_requires_owner_or_staff(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+
+    forbidden = client.patch(
+        "/api/sermons/10",
+        headers={"X-Test-User-Id": "2"},
+        json={"title": "Blocked"},
+    )
+    assert forbidden.status_code == 403
+    assert forbidden.json()["detail"] == "You cannot edit this sermon."
+
+    staff = client.patch(
+        "/api/sermons/10",
+        headers={"X-Test-User-Id": "2", "X-Test-Is-Staff": "true"},
+        json={"title": "Staff Edit"},
+    )
+    assert staff.status_code == 200
+    assert staff.json()["title"] == "Staff Edit"
+
+
 def test_sermons_delete_removes_row(client, db_session):
     seed_bible(db_session)
     seed_sermons(db_session)
@@ -205,6 +228,7 @@ def test_sermon_suggestions_exclude_blank_values_and_order_by_recent(client, db_
     db_session.add(
         Sermons(
             sermon_id=12,
+            user_id=1,
             preached_on=date(2024, 4, 1),
             title="Silent Metadata",
             speaker_name="",

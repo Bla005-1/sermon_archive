@@ -58,6 +58,7 @@ class ApiUsers(Base):
 
     api_access_tokens: Mapped[list['ApiAccessTokens']] = relationship('ApiAccessTokens', back_populates='user')
     api_sessions: Mapped[list['ApiSessions']] = relationship('ApiSessions', back_populates='user')
+    sermons: Mapped[list['Sermons']] = relationship('Sermons', back_populates='user')
 
 
 class BibleBooks(Base):
@@ -113,11 +114,14 @@ class LibraryItems(Base):
 class Sermons(Base):
     __tablename__ = 'sermons'
     __table_args__ = (
+        ForeignKeyConstraint(['user_id'], ['api_users.user_id'], ondelete='RESTRICT', onupdate='CASCADE', name='fk_sermons_user'),
         Index('idx_sermons_preached_on', 'preached_on'),
-        Index('idx_sermons_speaker_preached_on', 'speaker_name', 'preached_on')
+        Index('idx_sermons_speaker_preached_on', 'speaker_name', 'preached_on'),
+        Index('idx_sermons_user_id', 'user_id')
     )
 
     sermon_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
+    user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
     preached_on: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     speaker_name: Mapped[Optional[str]] = mapped_column(String(128))
@@ -127,6 +131,7 @@ class Sermons(Base):
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP, server_default=text('CURRENT_TIMESTAMP'))
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP, server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
 
+    user: Mapped['ApiUsers'] = relationship('ApiUsers', back_populates='sermons')
     sermon_attachments: Mapped[list['SermonAttachments']] = relationship('SermonAttachments', back_populates='sermon', cascade='all, delete-orphan')
 
 

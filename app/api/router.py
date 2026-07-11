@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from .routes import attachments, auth, library, scripture, search, sermons, verses, widget
+from .routes import attachments, auth, library, scripture, search, sermons, users, verses, widget
 
 api_router = APIRouter()
 
@@ -10,5 +10,6 @@ api_router.include_router(library.router, prefix="/api/library")
 api_router.include_router(search.router, prefix="/api/search")
 api_router.include_router(sermons.router, prefix="/api/sermons")
 api_router.include_router(scripture.router, prefix="/api/scripture")
+api_router.include_router(users.router, prefix="/api/users")
 api_router.include_router(verses.router, prefix="/api/verses")
 api_router.include_router(widget.router, prefix="/api/widget")

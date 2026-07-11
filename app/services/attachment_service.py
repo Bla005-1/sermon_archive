@@ -13,7 +13,7 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import SermonAttachments, Sermons
+from app.db.models import ApiUsers, SermonAttachments, Sermons
 from sermon_archive.schemas import Attachment, PartialAttachment
 from app.services._mappers import attachment_schema
 
@@ -56,6 +56,12 @@ def _get_sermon_or_404(db: Session, sermon_id: int) -> Sermons:
     return sermon
 
 
+def _assert_can_write_sermon(current_user: ApiUsers, sermon: Sermons) -> None:
+    if bool(current_user.is_staff) or sermon.user_id == current_user.user_id:
+        return
+    raise HTTPException(status_code=403, detail="You cannot edit this sermon.")
+
+
 def _get_sermon_attachment_or_404(
     db: Session, sermon_id: int, attachment_id: int
 ) -> SermonAttachments:
@@ -78,10 +84,14 @@ def get_attachment(db: Session, attachment_id: int) -> Attachment:
 
 
 def update_attachment(
-    db: Session, attachment_id: int, payload: Attachment
+    db: Session,
+    attachment_id: int,
+    payload: Attachment,
+    current_user: ApiUsers,
 ) -> Attachment:
     """Fully update writable attachment metadata fields."""
     attachment = _get_attachment_or_404(db, attachment_id)
+    _assert_can_write_sermon(current_user, attachment.sermon)
     attachment.original_filename = payload.original_filename
     attachment.mime_type = payload.mime_type
     attachment.byte_size = payload.byte_size
@@ -91,10 +101,14 @@ def update_attachment(
 
 
 def patch_attachment(
-    db: Session, attachment_id: int, payload: PartialAttachment
+    db: Session,
+    attachment_id: int,
+    payload: PartialAttachment,
+    current_user: ApiUsers,
 ) -> Attachment:
     """Partially update writable attachment metadata fields."""
     attachment = _get_attachment_or_404(db, attachment_id)
+    _assert_can_write_sermon(current_user, attachment.sermon)
     values = payload.model_dump(exclude_unset=True)
     for key, value in values.items():
         setattr(attachment, key, value)
@@ -103,9 +117,10 @@ def patch_attachment(
     return attachment_schema(attachment)
 
 
-def delete_attachment(db: Session, attachment_id: int) -> None:
+def delete_attachment(db: Session, attachment_id: int, current_user: ApiUsers) -> None:
     """Delete an attachment row and its stored file when present."""
     attachment = _get_attachment_or_404(db, attachment_id)
+    _assert_can_write_sermon(current_user, attachment.sermon)
     if attachment.relative_path:
         abs_path = _safe_rel_to_abs(attachment.relative_path)
         if os.path.exists(abs_path):
@@ -132,10 +147,12 @@ def create_sermon_attachment(
     db: Session,
     sermon_id: int,
     file: UploadFile | None,
+    current_user: ApiUsers,
     payload: Attachment | None = None,
 ) -> Attachment:
     """Persist an uploaded file for a sermon and create its metadata row."""
     sermon = _get_sermon_or_404(db, sermon_id)
+    _assert_can_write_sermon(current_user, sermon)
     if file is None or not file.filename:
         raise HTTPException(status_code=400, detail="Please include a file upload.")
 

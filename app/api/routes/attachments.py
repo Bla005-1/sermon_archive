@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Request, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
@@ -25,6 +25,7 @@ def attachments_retrieve(
 )
 def attachments_update(
     payload: Attachment,
+    request: Request,
     attachment_id: int = Path(
         ..., description="A unique integer value identifying this attachment."
     ),
@@ -34,6 +35,7 @@ def attachments_update(
         db=db,
         attachment_id=attachment_id,
         payload=payload,
+        current_user=request.state.current_user,
     )
 
 
@@ -44,6 +46,7 @@ def attachments_update(
 )
 def attachments_partial_update(
     payload: PartialAttachment,
+    request: Request,
     attachment_id: int = Path(
         ..., description="A unique integer value identifying this attachment."
     ),
@@ -53,6 +56,7 @@ def attachments_partial_update(
         db=db,
         attachment_id=attachment_id,
         payload=payload,
+        current_user=request.state.current_user,
     )
 
 
@@ -62,9 +66,14 @@ def attachments_partial_update(
     operation_id="attachments_destroy",
 )
 def attachments_destroy(
+    request: Request,
     attachment_id: int = Path(
         ..., description="A unique integer value identifying this attachment."
     ),
     db: Session = Depends(get_db),
 ) -> None:
-    attachment_service.delete_attachment(db=db, attachment_id=attachment_id)
+    attachment_service.delete_attachment(
+        db=db,
+        attachment_id=attachment_id,
+        current_user=request.state.current_user,
+    )

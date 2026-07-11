@@ -5,6 +5,7 @@ from enum import Enum
 
 from pydantic import Field
 
+from sermon_archive.schemas.auth import UserSummary
 from sermon_archive.schemas.attachments import Attachment
 from sermon_archive.schemas.base import APIModel
 
@@ -19,6 +20,7 @@ class Sermon(APIModel):
     notes_markdown: str | None = None
     created_at: dt.datetime | None = None
     updated_at: dt.datetime | None = None
+    owner: UserSummary | None = None
     attachments: list[Attachment] = Field(default_factory=list)
 
 

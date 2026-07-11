@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Path, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Path, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -67,8 +67,14 @@ def sermons_browse_list(
     status_code=status.HTTP_201_CREATED,
     operation_id="sermons_create",
 )
-def sermons_create(payload: Sermon, db: Session = Depends(get_db)) -> Sermon:
-    return sermons_service.create_sermon(db=db, payload=payload)
+def sermons_create(
+    payload: Sermon,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Sermon:
+    return sermons_service.create_sermon(
+        db=db, payload=payload, current_user=request.state.current_user
+    )
 
 
 @router.get("/{sermon_id}", response_model=Sermon, operation_id="sermons_retrieve")
@@ -84,12 +90,18 @@ def sermons_retrieve(
 @router.put("/{sermon_id}", response_model=Sermon, operation_id="sermons_update")
 def sermons_update(
     payload: Sermon,
+    request: Request,
     sermon_id: int = Path(
         ..., description="A unique integer value identifying this sermon."
     ),
     db: Session = Depends(get_db),
 ) -> Sermon:
-    return sermons_service.update_sermon(db=db, sermon_id=sermon_id, payload=payload)
+    return sermons_service.update_sermon(
+        db=db,
+        sermon_id=sermon_id,
+        payload=payload,
+        current_user=request.state.current_user,
+    )
 
 
 @router.patch(
@@ -97,12 +109,18 @@ def sermons_update(
 )
 def sermons_partial_update(
     payload: PatchedSermon,
+    request: Request,
     sermon_id: int = Path(
         ..., description="A unique integer value identifying this sermon."
     ),
     db: Session = Depends(get_db),
 ) -> Sermon:
-    return sermons_service.patch_sermon(db=db, sermon_id=sermon_id, payload=payload)
+    return sermons_service.patch_sermon(
+        db=db,
+        sermon_id=sermon_id,
+        payload=payload,
+        current_user=request.state.current_user,
+    )
 
 
 @router.delete(
@@ -111,12 +129,15 @@ def sermons_partial_update(
     operation_id="sermons_destroy",
 )
 def sermons_destroy(
+    request: Request,
     sermon_id: int = Path(
         ..., description="A unique integer value identifying this sermon."
     ),
     db: Session = Depends(get_db),
 ) -> None:
-    sermons_service.delete_sermon(db=db, sermon_id=sermon_id)
+    sermons_service.delete_sermon(
+        db=db, sermon_id=sermon_id, current_user=request.state.current_user
+    )
 
 
 @router.get(
@@ -138,12 +159,16 @@ def sermons_attachments_list(
     operation_id="sermons_attachments_create",
 )
 def sermons_attachments_create(
+    request: Request,
     sermon_id: int = Path(...),
     file: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
 ) -> Attachment:
     return attachment_service.create_sermon_attachment(
-        db=db, sermon_id=sermon_id, file=file
+        db=db,
+        sermon_id=sermon_id,
+        file=file,
+        current_user=request.state.current_user,
     )
 
 
@@ -187,10 +212,12 @@ def sermons_scripture_references_list(
     operation_id="sermons_scripture_references_extract",
 )
 def sermons_scripture_references_extract(
+    request: Request,
     sermon_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> ScriptureExtractionResponse:
     return scripture_extraction_service.extract_sermon_references(
         db=db,
         sermon_id=sermon_id,
+        current_user=request.state.current_user,
     )

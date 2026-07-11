@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.db.models import (
+    ApiUsers,
     BibleBooks,
     BibleVerses,
     LibraryItemFiles,
@@ -28,6 +29,7 @@ from sermon_archive.schemas import (
     ScriptureReference,
     ScriptureReferenceSourceType,
     TestamentEnum,
+    UserSummary,
     VerseNote,
 )
 
@@ -62,6 +64,17 @@ def attachment_schema(attachment: SermonAttachments) -> Attachment:
         mime_type=attachment.mime_type,
         byte_size=attachment.byte_size,
         created_at=attachment.created_at,
+    )
+
+
+def user_summary_schema(user: ApiUsers) -> UserSummary:
+    """Convert an API user row into a compact public user schema."""
+    return UserSummary(
+        id=user.user_id,
+        username=user.username,
+        email=user.email or "",
+        is_active=bool(user.is_active),
+        is_staff=bool(user.is_staff),
     )
 
 
@@ -169,6 +182,7 @@ def sermon_schema(sermon: Sermons, *, include_nested: bool = True) -> Sermon:
         notes_markdown=sermon.notes_markdown,
         created_at=sermon.created_at,
         updated_at=sermon.updated_at,
+        owner=user_summary_schema(sermon.user) if sermon.user else None,
         attachments=attachments,
     )
 

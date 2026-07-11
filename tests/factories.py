@@ -180,9 +180,22 @@ def seed_scripture_extraction_bible(db: Session) -> dict[str, BibleVerses]:
     return verses
 
 
-def seed_sermons(db: Session) -> tuple[Sermons, Sermons]:
+def seed_sermons(db: Session, *, user_id: int = 1) -> tuple[Sermons, Sermons]:
+    if db.get(ApiUsers, user_id) is None:
+        db.add(
+            ApiUsers(
+                user_id=user_id,
+                username=f"user-{user_id}",
+                email=f"user-{user_id}@example.test",
+                password_hash="test-hash",
+                is_active=1,
+                is_staff=0,
+            )
+        )
+        db.flush()
     first = Sermons(
         sermon_id=10,
+        user_id=user_id,
         preached_on=dt.date(2024, 2, 4),
         title="Creation and Light",
         speaker_name="Ada",
@@ -192,6 +205,7 @@ def seed_sermons(db: Session) -> tuple[Sermons, Sermons]:
     )
     second = Sermons(
         sermon_id=11,
+        user_id=user_id,
         preached_on=dt.date(2024, 3, 10),
         title="Love and Judgment",
         speaker_name="Ben",
@@ -370,14 +384,22 @@ def seed_library(db: Session) -> LibraryItems:
     return item
 
 
-def seed_user(db: Session, *, active: bool = True) -> ApiUsers:
+def seed_user(
+    db: Session,
+    *,
+    user_id: int = 1,
+    username: str = "reader",
+    email: str | None = "reader@example.test",
+    active: bool = True,
+    staff: bool = False,
+) -> ApiUsers:
     user = ApiUsers(
-        user_id=1,
-        username="reader",
-        email="reader@example.test",
+        user_id=user_id,
+        username=username,
+        email=email,
         password_hash="test-hash",
         is_active=1 if active else 0,
-        is_staff=0,
+        is_staff=1 if staff else 0,
     )
     db.add(user)
     db.commit()

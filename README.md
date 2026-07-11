@@ -15,7 +15,8 @@ FastAPI backend for sermon records, library item content, unified archive search
 - Auth with either:
   - Session cookie (`/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`)
   - Bearer token (`/api/auth/token`, `/api/auth/token/revoke`)
-- Sermons CRUD with attachments
+- Sermons CRUD with attachments and user ownership
+- Staff user management for admin pages
 - Library item lookup, hierarchical content units, file uploads/downloads, and inline PDF/DOC/DOCX previews
 - Unified public search endpoint with backend-owned Bible reference intent resolution
 - Bible reference parsing + verse text lookup
@@ -41,7 +42,7 @@ FastAPI backend for sermon records, library item content, unified archive search
 
 Notes:
 - This codebase is database-first and uses existing tables from `app/db/models.py`.
-- There are no migrations in this repository.
+- Schema changes are tracked with Alembic migrations in `migrations/versions`.
 
 ## Installable Client Package
 
@@ -139,6 +140,8 @@ Password verification supports only scrypt-formatted hashes (`scrypt$<salt>$<dig
 
 For session-cookie auth, CSRF validation is required on state-changing methods (`POST`, `PUT`, `PATCH`, `DELETE`) via `X-CSRF-Token`.
 
+Authenticated users can update their own username/email with `PATCH /api/auth/me` and change their password with `POST /api/auth/me/password`. Password changes require the current password.
+
 ## API Route Summary
 
 ### Auth
@@ -149,7 +152,19 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `POST /api/auth/token/revoke`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
+- `PATCH /api/auth/me`
+- `POST /api/auth/me/password`
 - `POST /api/auth/refresh`
+
+### Users (protected, staff only)
+
+- `GET /api/users`
+- `POST /api/users`
+- `GET /api/users/{user_id}`
+- `PATCH /api/users/{user_id}`
+- `POST /api/users/{user_id}/password`
+
+Staff users can list, create, inspect, update, deactivate/reactivate, grant/revoke staff access, and reset passwords for users. There is no hard-delete user route; deactivate users instead. Staff cannot deactivate themselves or remove their own staff access.
 
 ### Sermons (protected)
 
@@ -168,6 +183,8 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `POST /api/sermons/{sermon_id}/scripture-references/extract`
 
 Sermon scripture references are stored in the unified `scripture_references` table with `source_type=sermon`.
+
+Sermons are owned by the user who created them. Sermon response bodies include `owner`; create/update payloads do not accept owner fields. Users can edit/delete only sermons they own. Staff users can edit/delete any sermon. Existing sermon read/list/browse behavior is unchanged apart from owner data on full sermon responses.
 
 `GET /api/sermons/browse` returns compact rows for frontend browse views without requiring per-sermon scripture-reference calls. Query parameters:
 

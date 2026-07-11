@@ -195,6 +195,7 @@ def test_sermon_extraction_persists_scripture_references(client, db_session):
     seed_scripture_extraction_bible(db_session)
     sermon = Sermons(
         sermon_id=300,
+        user_id=1,
         preached_on=dt.date(2024, 1, 1),
         title="Known By God",
         notes_markdown="We are known by God (Jn 17:3; 14:6). Also see Hab 3:17-19.",
@@ -218,6 +219,7 @@ def test_scripture_reference_crud_supports_manual_control(client, db_session):
     verses = seed_scripture_extraction_bible(db_session)
     sermon = Sermons(
         sermon_id=301,
+        user_id=1,
         preached_on=dt.date(2024, 1, 2),
         title="Manual References",
         notes_markdown="Manual references",
@@ -304,6 +306,42 @@ def test_scripture_reference_crud_supports_manual_control(client, db_session):
     assert missing.status_code == 404
 
 
+def test_sermon_scripture_reference_writes_require_owner_or_staff(client, db_session):
+    seed_scripture_extraction_bible(db_session)
+    sermon = Sermons(
+        sermon_id=304,
+        user_id=1,
+        preached_on=dt.date(2024, 1, 5),
+        title="Protected References",
+    )
+    db_session.add(sermon)
+    db_session.commit()
+
+    forbidden = client.post(
+        "/api/scripture/references",
+        headers={"X-Test-User-Id": "2"},
+        json={
+            "source_type": "sermon",
+            "source_id": 304,
+            "reference_text": "Jn 17:3",
+        },
+    )
+    assert forbidden.status_code == 403
+    assert forbidden.json()["detail"] == "You cannot edit this sermon."
+
+    staff = client.post(
+        "/api/scripture/references",
+        headers={"X-Test-User-Id": "2", "X-Test-Is-Staff": "true"},
+        json={
+            "source_type": "sermon",
+            "source_id": 304,
+            "reference_text": "Jn 17:3",
+        },
+    )
+    assert staff.status_code == 201
+    assert staff.json()["reference_text"] == "John 17:3"
+
+
 def test_scripture_reference_crud_validates_source_and_reference(client, db_session):
     seed_scripture_extraction_bible(db_session)
 
@@ -320,6 +358,7 @@ def test_scripture_reference_crud_validates_source_and_reference(client, db_sess
 
     sermon = Sermons(
         sermon_id=302,
+        user_id=1,
         preached_on=dt.date(2024, 1, 3),
         title="Bad Reference",
     )
@@ -352,6 +391,7 @@ def test_extraction_refresh_replaces_existing_manual_rows(client, db_session):
     seed_scripture_extraction_bible(db_session)
     sermon = Sermons(
         sermon_id=303,
+        user_id=1,
         preached_on=dt.date(2024, 1, 4),
         title="Refresh References",
         notes_markdown="Extract this one (Jn 17:3).",

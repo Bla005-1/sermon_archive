@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Path, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_auth
@@ -53,11 +53,13 @@ def scripture_references_list(
 )
 def scripture_references_create(
     payload: ScriptureReferenceCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> ScriptureReference:
     return scripture_extraction_service.create_scripture_reference(
         db=db,
         payload=payload,
+        current_user=request.state.current_user,
     )
 
 
@@ -83,6 +85,7 @@ def scripture_references_retrieve(
 )
 def scripture_references_update(
     payload: ScriptureReferenceUpdate,
+    request: Request,
     scripture_reference_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> ScriptureReference:
@@ -90,6 +93,7 @@ def scripture_references_update(
         db=db,
         scripture_reference_id=scripture_reference_id,
         payload=payload,
+        current_user=request.state.current_user,
     )
 
 
@@ -100,6 +104,7 @@ def scripture_references_update(
 )
 def scripture_references_partial_update(
     payload: PartialScriptureReference,
+    request: Request,
     scripture_reference_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> ScriptureReference:
@@ -107,6 +112,7 @@ def scripture_references_partial_update(
         db=db,
         scripture_reference_id=scripture_reference_id,
         payload=payload,
+        current_user=request.state.current_user,
     )
 
 
@@ -116,10 +122,12 @@ def scripture_references_partial_update(
     operation_id="scripture_references_destroy",
 )
 def scripture_references_destroy(
+    request: Request,
     scripture_reference_id: int = Path(...),
     db: Session = Depends(get_db),
 ) -> None:
     scripture_extraction_service.delete_scripture_reference(
         db=db,
         scripture_reference_id=scripture_reference_id,
+        current_user=request.state.current_user,
     )

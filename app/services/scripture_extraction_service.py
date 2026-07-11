@@ -11,6 +11,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import (
+    ApiUsers,
     BibleVerses,
     LibraryItemUnits,
     LibraryItemUnitsUnitType,
@@ -615,9 +616,15 @@ def get_scripture_reference(
 
 
 def create_scripture_reference(
-    db: Session, payload: ScriptureReferenceCreate
+    db: Session, payload: ScriptureReferenceCreate, current_user: ApiUsers
 ) -> ScriptureReference:
     _validate_source(db, payload.source_type, payload.source_id)
+    _assert_can_write_source(
+        db,
+        source_type=payload.source_type,
+        source_id=payload.source_id,
+        current_user=current_user,
+    )
     start_id, end_id, normalized_ref = _resolve_reference_values(
         db,
         reference_text=payload.reference_text,
@@ -648,9 +655,22 @@ def update_scripture_reference(
     db: Session,
     scripture_reference_id: int,
     payload: ScriptureReferenceUpdate,
+    current_user: ApiUsers,
 ) -> ScriptureReference:
     row = _get_scripture_reference_row_or_404(db, scripture_reference_id)
+    _assert_can_write_source(
+        db,
+        source_type=_schema_source_type(row.source_type),
+        source_id=row.source_id,
+        current_user=current_user,
+    )
     _validate_source(db, payload.source_type, payload.source_id)
+    _assert_can_write_source(
+        db,
+        source_type=payload.source_type,
+        source_id=payload.source_id,
+        current_user=current_user,
+    )
     start_id, end_id, normalized_ref = _resolve_reference_values(
         db,
         reference_text=payload.reference_text,
@@ -678,8 +698,15 @@ def patch_scripture_reference(
     db: Session,
     scripture_reference_id: int,
     payload: PartialScriptureReference,
+    current_user: ApiUsers,
 ) -> ScriptureReference:
     row = _get_scripture_reference_row_or_404(db, scripture_reference_id)
+    _assert_can_write_source(
+        db,
+        source_type=_schema_source_type(row.source_type),
+        source_id=row.source_id,
+        current_user=current_user,
+    )
     values = payload.model_dump(exclude_unset=True)
 
     source_type = values.get("source_type")
@@ -688,6 +715,12 @@ def patch_scripture_reference(
     source_id = values.get("source_id", row.source_id)
     if "source_type" in values or "source_id" in values:
         _validate_source(db, source_type, source_id)
+        _assert_can_write_source(
+            db,
+            source_type=source_type,
+            source_id=source_id,
+            current_user=current_user,
+        )
         row.source_type = _source_enum(source_type)
         row.source_id = source_id
 
@@ -723,8 +756,16 @@ def patch_scripture_reference(
     return get_scripture_reference(db, scripture_reference_id)
 
 
-def delete_scripture_reference(db: Session, scripture_reference_id: int) -> None:
+def delete_scripture_reference(
+    db: Session, scripture_reference_id: int, current_user: ApiUsers
+) -> None:
     row = _get_scripture_reference_row_or_404(db, scripture_reference_id)
+    _assert_can_write_source(
+        db,
+        source_type=_schema_source_type(row.source_type),
+        source_id=row.source_id,
+        current_user=current_user,
+    )
     db.delete(row)
     db.commit()
 
@@ -925,6 +966,23 @@ def _get_sermon_or_404(db: Session, sermon_id: int) -> Sermons:
     return sermon
 
 
+def _assert_can_write_sermon(current_user: ApiUsers, sermon: Sermons) -> None:
+    if bool(current_user.is_staff) or sermon.user_id == current_user.user_id:
+        return
+    raise HTTPException(status_code=403, detail="You cannot edit this sermon.")
+
+
+def _assert_can_write_source(
+    db: Session,
+    *,
+    source_type: ScriptureReferenceSourceType,
+    source_id: int,
+    current_user: ApiUsers,
+) -> None:
+    if source_type == ScriptureReferenceSourceType.sermon:
+        _assert_can_write_sermon(current_user, _get_sermon_or_404(db, source_id))
+
+
 def list_sermon_references(db: Session, sermon_id: int) -> list[ScriptureReference]:
     _get_sermon_or_404(db, sermon_id)
     return list_scripture_references(
@@ -935,9 +993,10 @@ def list_sermon_references(db: Session, sermon_id: int) -> list[ScriptureReferen
 
 
 def extract_sermon_references(
-    db: Session, sermon_id: int
+    db: Session, sermon_id: int, current_user: ApiUsers
 ) -> ScriptureExtractionResponse:
     sermon = _get_sermon_or_404(db, sermon_id)
+    _assert_can_write_sermon(current_user, sermon)
     text = (sermon.notes_markdown or "").strip()
     extracted = extract_references_from_text(
         db,

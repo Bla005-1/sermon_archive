@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, aliased, joinedload
 from sqlalchemy.sql import Select
 
 from app.db.models import (
+    ApiUsers,
     BibleBooks,
     BibleVerses,
     ScriptureReferences,
@@ -29,7 +30,10 @@ from sermon_archive.schemas import (
 
 def _sermon_with_relations_stmt() -> Select:
     """Build a base sermon select statement with relations eagerly loaded."""
-    return select(Sermons).options(joinedload(Sermons.sermon_attachments))
+    return select(Sermons).options(
+        joinedload(Sermons.sermon_attachments),
+        joinedload(Sermons.user),
+    )
 
 
 def _get_sermon_or_404(
@@ -49,6 +53,13 @@ def _get_sermon_or_404(
     if sermon is None:
         raise HTTPException(status_code=404, detail="Sermon not found.")
     return sermon
+
+
+def _assert_can_write_sermon(current_user: ApiUsers, sermon: Sermons) -> None:
+    """Allow sermon writes for the owner or staff users."""
+    if bool(current_user.is_staff) or sermon.user_id == current_user.user_id:
+        return
+    raise HTTPException(status_code=403, detail="You cannot edit this sermon.")
 
 
 def _coerce_sermon_fields(
@@ -209,10 +220,10 @@ def browse_sermons(
     return items
 
 
-def create_sermon(db: Session, payload: Sermon) -> Sermon:
+def create_sermon(db: Session, payload: Sermon, current_user: ApiUsers) -> Sermon:
     """Create and return a sermon record from the supplied payload."""
     values = _coerce_sermon_fields(payload)
-    sermon = Sermons(**values)
+    sermon = Sermons(**values, user_id=current_user.user_id)
     db.add(sermon)
     db.commit()
     return get_sermon(db, sermon.sermon_id)
@@ -224,9 +235,12 @@ def get_sermon(db: Session, sermon_id: int) -> Sermon:
     return sermon_schema(sermon, include_nested=True)
 
 
-def update_sermon(db: Session, sermon_id: int, payload: Sermon) -> Sermon:
+def update_sermon(
+    db: Session, sermon_id: int, payload: Sermon, current_user: ApiUsers
+) -> Sermon:
     """Fully update a sermon's writable fields and return the updated row."""
     sermon = _get_sermon_or_404(db, sermon_id)
+    _assert_can_write_sermon(current_user, sermon)
     values = _coerce_sermon_fields(payload, sermon)
     if "title" not in values:
         raise HTTPException(status_code=400, detail="title is required.")
@@ -243,9 +257,12 @@ def update_sermon(db: Session, sermon_id: int, payload: Sermon) -> Sermon:
     return get_sermon(db, sermon_id)
 
 
-def patch_sermon(db: Session, sermon_id: int, payload: PatchedSermon) -> Sermon:
+def patch_sermon(
+    db: Session, sermon_id: int, payload: PatchedSermon, current_user: ApiUsers
+) -> Sermon:
     """Partially update a sermon's writable fields and return the updated row."""
     sermon = _get_sermon_or_404(db, sermon_id)
+    _assert_can_write_sermon(current_user, sermon)
     values = _coerce_sermon_fields(payload, sermon)
     for key, value in values.items():
         setattr(sermon, key, value)
@@ -253,9 +270,10 @@ def patch_sermon(db: Session, sermon_id: int, payload: PatchedSermon) -> Sermon:
     return get_sermon(db, sermon_id)
 
 
-def delete_sermon(db: Session, sermon_id: int) -> None:
+def delete_sermon(db: Session, sermon_id: int, current_user: ApiUsers) -> None:
     """Delete a sermon by id."""
     sermon = _get_sermon_or_404(db, sermon_id)
+    _assert_can_write_sermon(current_user, sermon)
     db.delete(sermon)
     db.commit()
 

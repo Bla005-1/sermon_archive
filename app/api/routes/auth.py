@@ -4,13 +4,15 @@ from sqlalchemy.orm import Session
 from app.dependencies import get_db
 from sermon_archive.schemas import (
     CsrfResponse,
+    CurrentUserPasswordRequest,
+    CurrentUserUpdateRequest,
     LoginRequest,
     TokenLoginRequest,
     TokenResponse,
     TokenRevokeResponse,
     UserResponse,
 )
-from app.services import auth_service
+from app.services import auth_service, user_service
 
 router = APIRouter(tags=["auth"])
 
@@ -71,6 +73,34 @@ def auth_logout_create(
 @router.get("/me", response_model=UserResponse, operation_id="auth_me_retrieve")
 def auth_me_retrieve(request: Request, db: Session = Depends(get_db)) -> UserResponse:
     return auth_service.get_me(db=db, request=request)
+
+
+@router.patch("/me", response_model=UserResponse, operation_id="auth_me_partial_update")
+def auth_me_partial_update(
+    payload: CurrentUserUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> UserResponse:
+    context = auth_service.require_authenticated_context(db=db, request=request)
+    return user_service.update_current_user(
+        db=db, current_user=context.user, payload=payload
+    )
+
+
+@router.post(
+    "/me/password",
+    response_model=UserResponse,
+    operation_id="auth_me_password_create",
+)
+def auth_me_password_create(
+    payload: CurrentUserPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> UserResponse:
+    context = auth_service.require_authenticated_context(db=db, request=request)
+    return user_service.change_current_user_password(
+        db=db, current_user=context.user, payload=payload
+    )
 
 
 @router.post(

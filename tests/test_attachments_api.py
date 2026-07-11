@@ -112,6 +112,27 @@ def test_attachment_update_patch_and_delete(client, db_session, tmp_path):
     )
 
 
+def test_attachment_writes_require_sermon_owner_or_staff(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+
+    forbidden = client.patch(
+        "/api/attachments/30",
+        headers={"X-Test-User-Id": "2"},
+        json={"byte_size": 99},
+    )
+    assert forbidden.status_code == 403
+    assert forbidden.json()["detail"] == "You cannot edit this sermon."
+
+    staff = client.patch(
+        "/api/attachments/30",
+        headers={"X-Test-User-Id": "2", "X-Test-Is-Staff": "true"},
+        json={"byte_size": 99},
+    )
+    assert staff.status_code == 200
+    assert staff.json()["byte_size"] == 99
+
+
 def test_attachment_retrieve_404(client, db_session):
     seed_bible(db_session)
 
