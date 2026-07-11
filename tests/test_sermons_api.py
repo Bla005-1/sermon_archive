@@ -4,7 +4,7 @@ from datetime import date
 
 from sqlalchemy import select
 
-from app.db.models import Sermons
+from app.db.models import ScriptureReferences, ScriptureReferencesSourceType, Sermons
 from tests.factories import seed_bible, seed_sermons
 
 
@@ -19,6 +19,112 @@ def test_sermons_list_orders_newest_first_and_filters(client, db_session):
     assert [item["title"] for item in body] == ["Creation and Light"]
     assert body[0]["attachments"][0]["original_filename"] == "notes.txt"
     assert "passages" not in body[0]
+
+
+def test_sermons_browse_by_time_orders_newest_first_and_filters(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+
+    response = client.get(
+        "/api/sermons/browse",
+        params={
+            "type": "time",
+            "year": 2024,
+            "speaker": "Ada",
+            "series": "Beginnings",
+            "location": "Main Hall",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "sermon_id": 10,
+            "title": "Creation and Light",
+            "speaker_name": "Ada",
+            "preached_on": "2024-02-04",
+            "order_number": 1,
+        }
+    ]
+
+
+def test_sermons_browse_by_scripture_orders_canonically(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+    db_session.add(
+        Sermons(
+            sermon_id=12,
+            preached_on=date(2024, 4, 1),
+            title="Earlier Text Later Date",
+            speaker_name="Ada",
+            series_name="Beginnings",
+            location_name="Main Hall",
+        )
+    )
+    db_session.flush()
+    db_session.add(
+        ScriptureReferences(
+            scripture_reference_id=23,
+            source_type=ScriptureReferencesSourceType.SERMON,
+            source_id=12,
+            start_verse_id=1,
+            end_verse_id=3,
+            reference_text="Genesis 1:1-3",
+            matched_text="Genesis 1:1-3",
+            display_order=1,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/api/sermons/browse", params={"type": "scripture"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [
+        (item["sermon_id"], item["reference"], item["order_number"])
+        for item in body
+    ] == [
+        (12, "Genesis 1:1-3", 1),
+        (10, "Genesis 1:1-3", 2),
+        (10, "Genesis 1:4", 3),
+        (11, "John 3:16-17", 4),
+    ]
+
+
+def test_sermons_browse_by_scripture_applies_exact_filters(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+
+    response = client.get(
+        "/api/sermons/browse",
+        params={
+            "type": "scripture",
+            "year": 2024,
+            "speaker": "Ben",
+            "series": "John",
+            "location": "Chapel",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "sermon_id": 11,
+            "title": "Love and Judgment",
+            "speaker_name": "Ben",
+            "preached_on": "2024-03-10",
+            "order_number": 1,
+            "reference": "John 3:16-17",
+        }
+    ]
+
+
+def test_sermons_browse_rejects_invalid_type(client, db_session):
+    seed_bible(db_session)
+
+    response = client.get("/api/sermons/browse", params={"type": "author"})
+
+    assert response.status_code == 422
 
 
 def test_sermons_create_requires_non_blank_title(client):
@@ -116,4 +222,3 @@ def test_sermon_suggestions_exclude_blank_values_and_order_by_recent(client, db_
         "series": ["John", "Beginnings"],
         "locations": ["Chapel", "Main Hall"],
     }
-

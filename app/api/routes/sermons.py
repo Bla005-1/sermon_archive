@@ -7,6 +7,8 @@ from sermon_archive.schemas import (
     Attachment,
     PatchedSermon,
     Sermon,
+    SermonBrowseItem,
+    SermonBrowseType,
     SermonSuggestionsResponse,
     ScriptureExtractionResponse,
     ScriptureReference,
@@ -33,6 +35,30 @@ def sermons_suggestions_list(
     db: Session = Depends(get_db),
 ) -> SermonSuggestionsResponse:
     return sermons_service.get_suggestions(db=db)
+
+
+@router.get(
+    "/browse",
+    response_model=list[SermonBrowseItem],
+    response_model_exclude_none=True,
+    operation_id="sermons_browse_list",
+)
+def sermons_browse_list(
+    browse_type: SermonBrowseType = Query(..., alias="type"),
+    year: int | None = Query(default=None),
+    speaker: str | None = Query(default=None),
+    series: str | None = Query(default=None),
+    location: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> list[SermonBrowseItem]:
+    return sermons_service.browse_sermons(
+        db=db,
+        browse_type=browse_type,
+        year=year,
+        speaker=speaker,
+        series=series,
+        location=location,
+    )
 
 
 @router.post(
@@ -168,4 +194,3 @@ def sermons_scripture_references_extract(
         db=db,
         sermon_id=sermon_id,
     )
-

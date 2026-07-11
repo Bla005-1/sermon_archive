@@ -155,6 +155,7 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 
 - `GET /api/sermons`
 - `GET /api/sermons/suggestions`
+- `GET /api/sermons/browse`
 - `POST /api/sermons`
 - `GET /api/sermons/{sermon_id}`
 - `PUT /api/sermons/{sermon_id}`
@@ -167,6 +168,18 @@ For session-cookie auth, CSRF validation is required on state-changing methods (
 - `POST /api/sermons/{sermon_id}/scripture-references/extract`
 
 Sermon scripture references are stored in the unified `scripture_references` table with `source_type=sermon`.
+
+`GET /api/sermons/browse` returns compact rows for frontend browse views without requiring per-sermon scripture-reference calls. Query parameters:
+
+- `type`: required, either `time` or `scripture`
+- `year`: optional preached year filter
+- `speaker`: optional exact `speaker_name` filter
+- `series`: optional exact `series_name` filter
+- `location`: optional exact `location_name` filter
+
+For `type=time`, rows are ordered by newest `preached_on` first and include `sermon_id`, `title`, `speaker_name`, `preached_on`, and `order_number`.
+
+For `type=scripture`, rows are ordered by canonical scripture position, then newest `preached_on`; each row also includes `reference`. A sermon with multiple references appears once per sermon-reference pair.
 
 `GET /api/sermons/suggestions` returns collection-level autocomplete values derived from existing sermons:
 

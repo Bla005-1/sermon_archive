@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from enum import Enum
 
 from pydantic import Field
 
@@ -28,6 +29,20 @@ class PatchedSermon(APIModel):
     series_name: str | None = None
     location_name: str | None = None
     notes_markdown: str | None = None
+
+
+class SermonBrowseType(str, Enum):
+    time = "time"
+    scripture = "scripture"
+
+
+class SermonBrowseItem(APIModel):
+    sermon_id: int
+    title: str
+    speaker_name: str | None = None
+    preached_on: dt.date | None = None
+    order_number: int
+    reference: str | None = None
 
 
 class SermonSuggestionsResponse(APIModel):

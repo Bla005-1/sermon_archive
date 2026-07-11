@@ -14,6 +14,8 @@ from sermon_archive.schemas import (
     LibraryUnitTypeEnum,
     PartialScriptureReference,
     Sermon,
+    SermonBrowseItem,
+    SermonBrowseType,
     SermonSuggestionsResponse,
     ScriptureExtractionResponse,
     ScriptureReference,
@@ -31,6 +33,14 @@ from sermon_archive.client import SermonArchiveClient, SermonArchiveClientError
 
 
 SERMON = {"sermon_id": 10, "title": "Creation and Light"}
+SERMON_BROWSE = {
+    "sermon_id": 10,
+    "title": "Creation and Light",
+    "speaker_name": "Ada",
+    "preached_on": "2024-02-04",
+    "order_number": 1,
+    "reference": "Genesis 1:1-3",
+}
 ATTACHMENT = {"attachment_id": 30, "sermon_id": 10}
 LIBRARY_ITEM = {
     "library_item_id": 100,
@@ -165,6 +175,11 @@ def test_client_imports_from_public_package():
 def test_crud_get_methods_build_expected_requests_and_parse_models():
     responses = {
         ("GET", "/api/sermons", "q=creation"): [SERMON],
+        (
+            "GET",
+            "/api/sermons/browse",
+            "type=scripture&year=2024&speaker=Ada&series=Beginnings&location=Main+Hall",
+        ): [SERMON_BROWSE],
         ("GET", "/api/sermons/10", ""): SERMON,
         ("GET", "/api/sermons/suggestions", ""): {
             "speakers": ["Ada"],
@@ -219,6 +234,16 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
     )
 
     assert isinstance(client.list_sermons(q="creation")[0], Sermon)
+    assert isinstance(
+        client.browse_sermons(
+            SermonBrowseType.scripture,
+            year=2024,
+            speaker="Ada",
+            series="Beginnings",
+            location="Main Hall",
+        )[0],
+        SermonBrowseItem,
+    )
     assert isinstance(client.get_sermon(10), Sermon)
     assert isinstance(client.get_sermon_suggestions(), SermonSuggestionsResponse)
     assert isinstance(client.list_sermon_attachments(10)[0], Attachment)

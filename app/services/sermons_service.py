@@ -6,12 +6,25 @@ from datetime import date
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, aliased, joinedload
 from sqlalchemy.sql import Select
 
-from app.db.models import Sermons
+from app.db.models import (
+    BibleBooks,
+    BibleVerses,
+    ScriptureReferences,
+    ScriptureReferencesSourceType,
+    Sermons,
+)
 from app.services._mappers import sermon_schema
-from sermon_archive.schemas import PatchedSermon, Sermon, SermonSuggestionsResponse
+from app.services._reference import format_ref
+from sermon_archive.schemas import (
+    PatchedSermon,
+    Sermon,
+    SermonBrowseItem,
+    SermonBrowseType,
+    SermonSuggestionsResponse,
+)
 
 
 def _sermon_with_relations_stmt() -> Select:
@@ -74,6 +87,126 @@ def list_sermons(db: Session, q: str | None = None) -> list[Sermon]:
         stmt = stmt.where(Sermons.title.ilike(f"%{query}%"))
     sermons = db.scalars(stmt).unique().all()
     return [sermon_schema(row, include_nested=True) for row in sermons]
+
+
+def _apply_browse_filters(
+    stmt: Select,
+    *,
+    year: int | None = None,
+    speaker: str | None = None,
+    series: str | None = None,
+    location: str | None = None,
+) -> Select:
+    """Apply exact sermon browse filters to a select statement."""
+    if year is not None:
+        stmt = stmt.where(
+            Sermons.preached_on >= date(year, 1, 1),
+            Sermons.preached_on < date(year + 1, 1, 1),
+        )
+    if speaker is not None:
+        stmt = stmt.where(Sermons.speaker_name == speaker)
+    if series is not None:
+        stmt = stmt.where(Sermons.series_name == series)
+    if location is not None:
+        stmt = stmt.where(Sermons.location_name == location)
+    return stmt
+
+
+def _sermon_browse_item(
+    sermon: Sermons, *, order_number: int, reference: str | None = None
+) -> SermonBrowseItem:
+    """Build the compact sermon browse response shape."""
+    return SermonBrowseItem(
+        sermon_id=sermon.sermon_id,
+        title=sermon.title,
+        speaker_name=sermon.speaker_name,
+        preached_on=sermon.preached_on,
+        order_number=order_number,
+        reference=reference,
+    )
+
+
+def browse_sermons(
+    db: Session,
+    *,
+    browse_type: SermonBrowseType,
+    year: int | None = None,
+    speaker: str | None = None,
+    series: str | None = None,
+    location: str | None = None,
+) -> list[SermonBrowseItem]:
+    """Return compact sermon browse rows ordered by time or scripture position."""
+    if browse_type == SermonBrowseType.time:
+        stmt = _apply_browse_filters(
+            select(Sermons).order_by(
+                Sermons.preached_on.desc(),
+                Sermons.sermon_id.desc(),
+            ),
+            year=year,
+            speaker=speaker,
+            series=series,
+            location=location,
+        )
+        sermons = db.scalars(stmt).all()
+        return [
+            _sermon_browse_item(sermon, order_number=index)
+            for index, sermon in enumerate(sermons, start=1)
+        ]
+
+    start_verse = aliased(BibleVerses)
+    end_verse = aliased(BibleVerses)
+    start_book = aliased(BibleBooks)
+    end_book = aliased(BibleBooks)
+
+    stmt = (
+        select(Sermons, ScriptureReferences)
+        .join(
+            ScriptureReferences,
+            ScriptureReferences.source_id == Sermons.sermon_id,
+        )
+        .join(start_verse, ScriptureReferences.start_verse_id == start_verse.verse_id)
+        .join(start_book, start_verse.book_id == start_book.book_id)
+        .outerjoin(end_verse, ScriptureReferences.end_verse_id == end_verse.verse_id)
+        .outerjoin(end_book, end_verse.book_id == end_book.book_id)
+        .where(ScriptureReferences.source_type == ScriptureReferencesSourceType.SERMON)
+        .options(
+            joinedload(ScriptureReferences.start_verse).joinedload(BibleVerses.book),
+            joinedload(ScriptureReferences.end_verse).joinedload(BibleVerses.book),
+        )
+        .order_by(
+            start_book.book_order,
+            start_verse.chapter_number,
+            start_verse.verse_number,
+            func.coalesce(end_book.book_order, start_book.book_order),
+            func.coalesce(end_verse.chapter_number, start_verse.chapter_number),
+            func.coalesce(end_verse.verse_number, start_verse.verse_number),
+            Sermons.preached_on.desc(),
+            Sermons.sermon_id.desc(),
+            ScriptureReferences.display_order,
+            ScriptureReferences.scripture_reference_id,
+        )
+    )
+    stmt = _apply_browse_filters(
+        stmt,
+        year=year,
+        speaker=speaker,
+        series=series,
+        location=location,
+    )
+    rows = db.execute(stmt).all()
+
+    items: list[SermonBrowseItem] = []
+    for index, (sermon, scripture_ref) in enumerate(rows, start=1):
+        end = scripture_ref.end_verse or scripture_ref.start_verse
+        items.append(
+            _sermon_browse_item(
+                sermon,
+                order_number=index,
+                reference=scripture_ref.reference_text
+                or format_ref(scripture_ref.start_verse, end),
+            )
+        )
+    return items
 
 
 def create_sermon(db: Session, payload: Sermon) -> Sermon:

@@ -21,6 +21,8 @@ from sermon_archive.schemas.library import (
 from sermon_archive.schemas.sermons import (
     PatchedSermon,
     Sermon,
+    SermonBrowseItem,
+    SermonBrowseType,
     SermonSuggestionsResponse,
 )
 from sermon_archive.schemas.scripture import (
@@ -92,6 +94,8 @@ __all__ = [
     "PartialVerseNote",
     "PatchedSermon",
     "Sermon",
+    "SermonBrowseItem",
+    "SermonBrowseType",
     "SermonSuggestionsResponse",
     "ScriptureExtractionRequest",
     "ScriptureExtractionResponse",

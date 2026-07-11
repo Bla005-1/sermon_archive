@@ -15,6 +15,8 @@ from sermon_archive.schemas import (
     LibraryUnitTypeEnum,
     LoginRequest,
     Sermon,
+    SermonBrowseItem,
+    SermonBrowseType,
     SermonSuggestionsResponse,
     PartialScriptureReference,
     ScriptureExtractionRequest,
@@ -158,6 +160,32 @@ class SermonArchiveClient:
     def list_sermons(self, q: str | None = None) -> list[Sermon]:
         params = {"q": q} if q is not None else None
         return self._request_model_list("GET", "/api/sermons", Sermon, params=params)
+
+    def browse_sermons(
+        self,
+        type: SermonBrowseType | str,  # noqa: A002
+        *,
+        year: int | None = None,
+        speaker: str | None = None,
+        series: str | None = None,
+        location: str | None = None,
+    ) -> list[SermonBrowseItem]:
+        value = type.value if isinstance(type, SermonBrowseType) else type
+        params: dict[str, str | int] = {"type": value}
+        if year is not None:
+            params["year"] = year
+        if speaker is not None:
+            params["speaker"] = speaker
+        if series is not None:
+            params["series"] = series
+        if location is not None:
+            params["location"] = location
+        return self._request_model_list(
+            "GET",
+            "/api/sermons/browse",
+            SermonBrowseItem,
+            params=params,
+        )
 
     def get_sermon(self, sermon_id: int) -> Sermon:
         return self._request_model("GET", f"/api/sermons/{sermon_id}", Sermon)
