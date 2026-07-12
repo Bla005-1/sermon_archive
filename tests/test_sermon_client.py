@@ -10,12 +10,15 @@ from sermon_archive.schemas import (
     BibleWidget,
     LibraryItem,
     LibraryItemFile,
+    LibraryItemListResponse,
     LibraryItemUnit,
     LibraryUnitTypeEnum,
     PartialScriptureReference,
     Sermon,
     SermonBrowseItem,
+    SermonBrowseListResponse,
     SermonBrowseType,
+    SermonListResponse,
     SermonSuggestionsResponse,
     ScriptureExtractionResponse,
     ScriptureReference,
@@ -148,6 +151,19 @@ SCRIPTURE_REFERENCE = {
     "matched_text": "Gen 1:1",
 }
 SCRIPTURE_EXTRACTION = {"references": [SCRIPTURE_REFERENCE], "unresolved": []}
+SERMON_LIST_RESPONSE = {"total": 1, "limit": 5, "offset": 2, "items": [SERMON]}
+SERMON_BROWSE_LIST_RESPONSE = {
+    "total": 1,
+    "limit": 5,
+    "offset": 2,
+    "items": [SERMON_BROWSE],
+}
+LIBRARY_ITEM_LIST_RESPONSE = {
+    "total": 1,
+    "limit": 5,
+    "offset": 2,
+    "items": [LIBRARY_ITEM],
+}
 USER = {
     "id": 1,
     "username": "reader",
@@ -174,12 +190,12 @@ def test_client_imports_from_public_package():
 
 def test_crud_get_methods_build_expected_requests_and_parse_models():
     responses = {
-        ("GET", "/api/sermons", "q=creation"): [SERMON],
+        ("GET", "/api/sermons", "q=creation&limit=5&offset=2"): SERMON_LIST_RESPONSE,
         (
             "GET",
             "/api/sermons/browse",
-            "type=scripture&year=2024&speaker=Ada&series=Beginnings&location=Main+Hall",
-        ): [SERMON_BROWSE],
+            "type=scripture&year=2024&speaker=Ada&series=Beginnings&location=Main+Hall&limit=5&offset=2",
+        ): SERMON_BROWSE_LIST_RESPONSE,
         ("GET", "/api/sermons/10", ""): SERMON,
         ("GET", "/api/sermons/suggestions", ""): {
             "speakers": ["Ada"],
@@ -188,7 +204,11 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
         },
         ("GET", "/api/sermons/10/attachments", ""): [ATTACHMENT],
         ("GET", "/api/attachments/30", ""): ATTACHMENT,
-        ("GET", "/api/library/items", "q=institutes"): [LIBRARY_ITEM],
+        (
+            "GET",
+            "/api/library/items",
+            "q=institutes&limit=5&offset=2",
+        ): LIBRARY_ITEM_LIST_RESPONSE,
         ("GET", "/api/library/items/100", ""): LIBRARY_ITEM,
         ("GET", "/api/library/items/100/files", ""): [LIBRARY_FILE],
         ("GET", "/api/library/items/100/units", "root_unit_type=chapter"): [
@@ -233,22 +253,27 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
         transport=httpx.MockTransport(handler),
     )
 
-    assert isinstance(client.list_sermons(q="creation")[0], Sermon)
-    assert isinstance(
-        client.browse_sermons(
-            SermonBrowseType.scripture,
-            year=2024,
-            speaker="Ada",
-            series="Beginnings",
-            location="Main Hall",
-        )[0],
-        SermonBrowseItem,
+    sermon_page = client.list_sermons(q="creation", limit=5, offset=2)
+    assert isinstance(sermon_page, SermonListResponse)
+    assert isinstance(sermon_page.items[0], Sermon)
+    browse_page = client.browse_sermons(
+        SermonBrowseType.scripture,
+        year=2024,
+        speaker="Ada",
+        series="Beginnings",
+        location="Main Hall",
+        limit=5,
+        offset=2,
     )
+    assert isinstance(browse_page, SermonBrowseListResponse)
+    assert isinstance(browse_page.items[0], SermonBrowseItem)
     assert isinstance(client.get_sermon(10), Sermon)
     assert isinstance(client.get_sermon_suggestions(), SermonSuggestionsResponse)
     assert isinstance(client.list_sermon_attachments(10)[0], Attachment)
     assert isinstance(client.get_attachment(30), Attachment)
-    assert isinstance(client.list_library_items(q="institutes")[0], LibraryItem)
+    library_page = client.list_library_items(q="institutes", limit=5, offset=2)
+    assert isinstance(library_page, LibraryItemListResponse)
+    assert isinstance(library_page.items[0], LibraryItem)
     assert isinstance(client.get_library_item(100), LibraryItem)
     assert isinstance(client.list_library_item_files(100)[0], LibraryItemFile)
     assert isinstance(

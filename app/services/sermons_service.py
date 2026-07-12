@@ -23,9 +23,19 @@ from sermon_archive.schemas import (
     PatchedSermon,
     Sermon,
     SermonBrowseItem,
+    SermonBrowseListResponse,
     SermonBrowseType,
+    SermonListResponse,
     SermonSuggestionsResponse,
 )
+
+
+def _apply_pagination(stmt: Select, *, limit: int, offset: int) -> Select:
+    """Apply offset pagination; limit=0 means return all remaining rows."""
+    stmt = stmt.offset(offset)
+    if limit > 0:
+        stmt = stmt.limit(limit)
+    return stmt
 
 
 def _sermon_with_relations_stmt() -> Select:
@@ -88,16 +98,39 @@ def _coerce_sermon_fields(
     return cleaned
 
 
-def list_sermons(db: Session, q: str | None = None) -> list[Sermon]:
-    """Return sermons ordered by newest preached date, optionally filtered by title."""
-    stmt = _sermon_with_relations_stmt().order_by(
-        Sermons.preached_on.desc(), Sermons.sermon_id.desc()
-    )
+def _apply_sermon_list_filters(stmt: Select, q: str | None) -> Select:
+    """Apply list filters shared by sermon list and count queries."""
     query = (q or "").strip()
     if query:
         stmt = stmt.where(Sermons.title.ilike(f"%{query}%"))
+    return stmt
+
+
+def list_sermons(
+    db: Session, q: str | None = None, *, limit: int = 50, offset: int = 0
+) -> SermonListResponse:
+    """Return sermons ordered by newest preached date, optionally filtered by title."""
+    filtered_count = _apply_sermon_list_filters(
+        select(func.count()).select_from(Sermons),
+        q,
+    )
+    total = db.scalar(filtered_count) or 0
+
+    stmt = _apply_sermon_list_filters(
+        _sermon_with_relations_stmt(),
+        q,
+    ).order_by(
+        Sermons.preached_on.desc(),
+        Sermons.sermon_id.desc(),
+    )
+    stmt = _apply_pagination(stmt, limit=limit, offset=offset)
     sermons = db.scalars(stmt).unique().all()
-    return [sermon_schema(row, include_nested=True) for row in sermons]
+    return SermonListResponse(
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=[sermon_schema(row, include_nested=True) for row in sermons],
+    )
 
 
 def _apply_browse_filters(
@@ -145,31 +178,76 @@ def browse_sermons(
     speaker: str | None = None,
     series: str | None = None,
     location: str | None = None,
-) -> list[SermonBrowseItem]:
+    limit: int = 50,
+    offset: int = 0,
+) -> SermonBrowseListResponse:
     """Return compact sermon browse rows ordered by time or scripture position."""
     if browse_type == SermonBrowseType.time:
-        stmt = _apply_browse_filters(
-            select(Sermons).order_by(
-                Sermons.preached_on.desc(),
-                Sermons.sermon_id.desc(),
-            ),
+        count_stmt = _apply_browse_filters(
+            select(func.count()).select_from(Sermons),
             year=year,
             speaker=speaker,
             series=series,
             location=location,
         )
+        total = db.scalar(count_stmt) or 0
+
+        stmt = _apply_browse_filters(
+            select(Sermons),
+            year=year,
+            speaker=speaker,
+            series=series,
+            location=location,
+        ).order_by(
+            Sermons.preached_on.desc(),
+            Sermons.sermon_id.desc(),
+        )
+        stmt = _apply_pagination(stmt, limit=limit, offset=offset)
         sermons = db.scalars(stmt).all()
-        return [
-            _sermon_browse_item(sermon, order_number=index)
-            for index, sermon in enumerate(sermons, start=1)
-        ]
+        return SermonBrowseListResponse(
+            total=total,
+            limit=limit,
+            offset=offset,
+            items=[
+                _sermon_browse_item(sermon, order_number=index)
+                for index, sermon in enumerate(sermons, start=offset + 1)
+            ],
+        )
 
     start_verse = aliased(BibleVerses)
     end_verse = aliased(BibleVerses)
     start_book = aliased(BibleBooks)
     end_book = aliased(BibleBooks)
 
-    stmt = (
+    joined_refs = (
+        select(Sermons.sermon_id, ScriptureReferences.scripture_reference_id)
+        .join(
+            ScriptureReferences,
+            ScriptureReferences.source_id == Sermons.sermon_id,
+        )
+        .join(start_verse, ScriptureReferences.start_verse_id == start_verse.verse_id)
+        .join(start_book, start_verse.book_id == start_book.book_id)
+        .outerjoin(end_verse, ScriptureReferences.end_verse_id == end_verse.verse_id)
+        .outerjoin(end_book, end_verse.book_id == end_book.book_id)
+        .where(ScriptureReferences.source_type == ScriptureReferencesSourceType.SERMON)
+    )
+    filtered_count_stmt = _apply_browse_filters(
+        joined_refs,
+        year=year,
+        speaker=speaker,
+        series=series,
+        location=location,
+    )
+    total = (
+        db.scalar(
+            select(func.count()).select_from(
+                filtered_count_stmt.order_by(None).subquery()
+            )
+        )
+        or 0
+    )
+
+    base_stmt = (
         select(Sermons, ScriptureReferences)
         .join(
             ScriptureReferences,
@@ -197,17 +275,19 @@ def browse_sermons(
             ScriptureReferences.scripture_reference_id,
         )
     )
-    stmt = _apply_browse_filters(
-        stmt,
+    filtered_stmt = _apply_browse_filters(
+        base_stmt,
         year=year,
         speaker=speaker,
         series=series,
         location=location,
     )
+
+    stmt = _apply_pagination(filtered_stmt, limit=limit, offset=offset)
     rows = db.execute(stmt).all()
 
     items: list[SermonBrowseItem] = []
-    for index, (sermon, scripture_ref) in enumerate(rows, start=1):
+    for index, (sermon, scripture_ref) in enumerate(rows, start=offset + 1):
         end = scripture_ref.end_verse or scripture_ref.start_verse
         items.append(
             _sermon_browse_item(
@@ -217,7 +297,12 @@ def browse_sermons(
                 or format_ref(scripture_ref.start_verse, end),
             )
         )
-    return items
+    return SermonBrowseListResponse(
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=items,
+    )
 
 
 def create_sermon(db: Session, payload: Sermon, current_user: ApiUsers) -> Sermon:

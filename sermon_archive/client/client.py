@@ -11,12 +11,14 @@ from sermon_archive.schemas import (
     CsrfResponse,
     LibraryItem,
     LibraryItemFile,
+    LibraryItemListResponse,
     LibraryItemUnit,
     LibraryUnitTypeEnum,
     LoginRequest,
     Sermon,
-    SermonBrowseItem,
+    SermonBrowseListResponse,
     SermonBrowseType,
+    SermonListResponse,
     SermonSuggestionsResponse,
     PartialScriptureReference,
     ScriptureExtractionRequest,
@@ -157,9 +159,26 @@ class SermonArchiveClient:
             include_csrf=True,
         )
 
-    def list_sermons(self, q: str | None = None) -> list[Sermon]:
-        params = {"q": q} if q is not None else None
-        return self._request_model_list("GET", "/api/sermons", Sermon, params=params)
+    def list_sermons(
+        self,
+        q: str | None = None,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> SermonListResponse:
+        params: dict[str, str | int] = {}
+        if q is not None:
+            params["q"] = q
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        return self._request_model(
+            "GET",
+            "/api/sermons",
+            SermonListResponse,
+            params=params or None,
+        )
 
     def browse_sermons(
         self,
@@ -169,7 +188,9 @@ class SermonArchiveClient:
         speaker: str | None = None,
         series: str | None = None,
         location: str | None = None,
-    ) -> list[SermonBrowseItem]:
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> SermonBrowseListResponse:
         value = type.value if isinstance(type, SermonBrowseType) else type
         params: dict[str, str | int] = {"type": value}
         if year is not None:
@@ -180,10 +201,14 @@ class SermonArchiveClient:
             params["series"] = series
         if location is not None:
             params["location"] = location
-        return self._request_model_list(
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        return self._request_model(
             "GET",
             "/api/sermons/browse",
-            SermonBrowseItem,
+            SermonBrowseListResponse,
             params=params,
         )
 
@@ -211,13 +236,25 @@ class SermonArchiveClient:
             Attachment,
         )
 
-    def list_library_items(self, q: str | None = None) -> list[LibraryItem]:
-        params = {"q": q} if q is not None else None
-        return self._request_model_list(
+    def list_library_items(
+        self,
+        q: str | None = None,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> LibraryItemListResponse:
+        params: dict[str, str | int] = {}
+        if q is not None:
+            params["q"] = q
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        return self._request_model(
             "GET",
             "/api/library/items",
-            LibraryItem,
-            params=params,
+            LibraryItemListResponse,
+            params=params or None,
         )
 
     def get_library_item(self, library_item_id: int) -> LibraryItem:

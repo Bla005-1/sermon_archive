@@ -16,9 +16,58 @@ def test_sermons_list_orders_newest_first_and_filters(client, db_session):
 
     assert response.status_code == 200
     body = response.json()
-    assert [item["title"] for item in body] == ["Creation and Light"]
-    assert body[0]["attachments"][0]["original_filename"] == "notes.txt"
-    assert "passages" not in body[0]
+    assert body["total"] == 1
+    assert body["limit"] == 50
+    assert body["offset"] == 0
+    assert [item["title"] for item in body["items"]] == ["Creation and Light"]
+    assert body["items"][0]["attachments"][0]["original_filename"] == "notes.txt"
+    assert "passages" not in body["items"][0]
+
+
+def test_sermons_list_paginates_after_ordering(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+    db_session.add(
+        Sermons(
+            sermon_id=12,
+            user_id=1,
+            preached_on=date(2024, 4, 1),
+            title="Newest Sermon",
+            speaker_name="Ada",
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/api/sermons", params={"limit": 1, "offset": 1})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert body["limit"] == 1
+    assert body["offset"] == 1
+    assert [item["title"] for item in body["items"]] == ["Love and Judgment"]
+
+
+def test_sermons_list_rejects_invalid_pagination(client, db_session):
+    seed_bible(db_session)
+
+    assert client.get("/api/sermons", params={"offset": -1}).status_code == 422
+
+
+def test_sermons_list_limit_zero_fetches_all(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+
+    response = client.get("/api/sermons", params={"limit": 0})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert body["limit"] == 0
+    assert [item["title"] for item in body["items"]] == [
+        "Love and Judgment",
+        "Creation and Light",
+    ]
 
 
 def test_sermons_browse_by_time_orders_newest_first_and_filters(client, db_session):
@@ -37,15 +86,20 @@ def test_sermons_browse_by_time_orders_newest_first_and_filters(client, db_sessi
     )
 
     assert response.status_code == 200
-    assert response.json() == [
-        {
-            "sermon_id": 10,
-            "title": "Creation and Light",
-            "speaker_name": "Ada",
-            "preached_on": "2024-02-04",
-            "order_number": 1,
-        }
-    ]
+    assert response.json() == {
+        "total": 1,
+        "limit": 50,
+        "offset": 0,
+        "items": [
+            {
+                "sermon_id": 10,
+                "title": "Creation and Light",
+                "speaker_name": "Ada",
+                "preached_on": "2024-02-04",
+                "order_number": 1,
+            }
+        ],
+    }
 
 
 def test_sermons_browse_by_scripture_orders_canonically(client, db_session):
@@ -83,12 +137,36 @@ def test_sermons_browse_by_scripture_orders_canonically(client, db_session):
     body = response.json()
     assert [
         (item["sermon_id"], item["reference"], item["order_number"])
-        for item in body
+        for item in body["items"]
     ] == [
         (12, "Genesis 1:1-3", 1),
         (10, "Genesis 1:1-3", 2),
         (10, "Genesis 1:4", 3),
         (11, "John 3:16-17", 4),
+    ]
+    assert body["total"] == 4
+
+
+def test_sermons_browse_paginates_scripture_rows(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+
+    response = client.get(
+        "/api/sermons/browse",
+        params={"type": "scripture", "limit": 2, "offset": 1},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert body["limit"] == 2
+    assert body["offset"] == 1
+    assert [
+        (item["sermon_id"], item["reference"], item["order_number"])
+        for item in body["items"]
+    ] == [
+        (10, "Genesis 1:4", 2),
+        (11, "John 3:16-17", 3),
     ]
 
 
@@ -108,16 +186,21 @@ def test_sermons_browse_by_scripture_applies_exact_filters(client, db_session):
     )
 
     assert response.status_code == 200
-    assert response.json() == [
-        {
-            "sermon_id": 11,
-            "title": "Love and Judgment",
-            "speaker_name": "Ben",
-            "preached_on": "2024-03-10",
-            "order_number": 1,
-            "reference": "John 3:16-17",
-        }
-    ]
+    assert response.json() == {
+        "total": 1,
+        "limit": 50,
+        "offset": 0,
+        "items": [
+            {
+                "sermon_id": 11,
+                "title": "Love and Judgment",
+                "speaker_name": "Ben",
+                "preached_on": "2024-03-10",
+                "order_number": 1,
+                "reference": "John 3:16-17",
+            }
+        ],
+    }
 
 
 def test_sermons_browse_rejects_invalid_type(client, db_session):
@@ -126,6 +209,39 @@ def test_sermons_browse_rejects_invalid_type(client, db_session):
     response = client.get("/api/sermons/browse", params={"type": "author"})
 
     assert response.status_code == 422
+
+
+def test_sermons_browse_rejects_invalid_pagination(client, db_session):
+    seed_bible(db_session)
+
+    assert (
+        client.get(
+            "/api/sermons/browse", params={"type": "time", "offset": -1}
+        ).status_code
+        == 422
+    )
+
+
+def test_sermons_browse_limit_zero_fetches_all(client, db_session):
+    seed_bible(db_session)
+    seed_sermons(db_session)
+
+    response = client.get(
+        "/api/sermons/browse", params={"type": "scripture", "limit": 0}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert body["limit"] == 0
+    assert [
+        (item["sermon_id"], item["reference"], item["order_number"])
+        for item in body["items"]
+    ] == [
+        (10, "Genesis 1:1-3", 1),
+        (10, "Genesis 1:4", 2),
+        (11, "John 3:16-17", 3),
+    ]
 
 
 def test_sermons_create_requires_non_blank_title(client):

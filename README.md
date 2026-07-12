@@ -66,10 +66,11 @@ from sermon_archive.client import SermonArchiveClient
 with SermonArchiveClient("http://localhost:8000") as client:
     token = client.issue_token("reader", "secret")
     client.set_bearer_token(token.access_token)
-    sermons = client.list_sermons(q="creation")
-    library_items = client.list_library_items(q="institutes")
+    sermon_page = client.list_sermons(q="creation", limit=25, offset=0)
+    library_page = client.list_library_items(q="institutes", limit=25, offset=0)
+    sermons = sermon_page.items
     units = client.list_library_item_units(
-        library_items[0].library_item_id,
+        library_page.items[0].library_item_id,
         root_unit_type="chapter",
     )
     verse = client.get_verse("Genesis 1:1", translation="ESV")
@@ -184,7 +185,16 @@ Staff users can list, create, inspect, update, deactivate/reactivate, grant/revo
 
 Sermon scripture references are stored in the unified `scripture_references` table with `source_type=sermon`.
 
-Sermons are owned by the user who created them. Sermon response bodies include `owner`; create/update payloads do not accept owner fields. Users can edit/delete only sermons they own. Staff users can edit/delete any sermon. Existing sermon read/list/browse behavior is unchanged apart from owner data on full sermon responses.
+Sermons are owned by the user who created them. Sermon response bodies include `owner`; create/update payloads do not accept owner fields. Users can edit/delete only sermons they own. Staff users can edit/delete any sermon.
+
+`GET /api/sermons` returns a paginated envelope:
+
+- `items`: sermon rows
+- `total`: total matching rows before pagination
+- `limit`: applied page size, default `50`; use `0` to fetch all matching rows
+- `offset`: applied row offset, default `0`
+
+The list route accepts `q`, `limit`, and `offset`. Results are ordered by newest `preached_on`, then highest `sermon_id`.
 
 `GET /api/sermons/browse` returns compact rows for frontend browse views without requiring per-sermon scripture-reference calls. Query parameters:
 
@@ -193,6 +203,10 @@ Sermons are owned by the user who created them. Sermon response bodies include `
 - `speaker`: optional exact `speaker_name` filter
 - `series`: optional exact `series_name` filter
 - `location`: optional exact `location_name` filter
+- `limit`: page size, default `50`; use `0` to fetch all matching rows
+- `offset`: row offset, default `0`
+
+Browse responses use the same paginated envelope as sermon lists. For `type=scripture`, `total` counts sermon-reference rows rather than distinct sermons.
 
 For `type=time`, rows are ordered by newest `preached_on` first and include `sermon_id`, `title`, `speaker_name`, `preached_on`, and `order_number`.
 
@@ -222,6 +236,8 @@ For `type=scripture`, rows are ordered by canonical scripture position, then new
 - `GET /api/library/items/{library_item_id}/units`
 - `GET /api/library/items/{library_item_id}/units/{library_item_unit_id}/scripture-references`
 - `POST /api/library/items/{library_item_id}/units/{library_item_unit_id}/scripture-references/extract`
+
+`GET /api/library/items` returns the same paginated envelope shape as sermon lists, with `items`, `total`, `limit`, and `offset`. It accepts `q`, `limit`, and `offset`; use `limit=0` to fetch all matching rows. Results are ordered by title, then `library_item_id`.
 
 `GET /api/library/items/{library_item_id}/units` returns units nested under `children`. New library ingestion should use a deterministic `chapter > section > paragraph` hierarchy. Chapters and sections are heading/context units; paragraphs hold body text. Paragraphs may be direct children of chapters when a source has no section heading. Page numbers are stored as `source_start_page_number` and `source_end_page_number` metadata rather than as page units.
 

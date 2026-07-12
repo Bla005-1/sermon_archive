@@ -18,8 +18,12 @@ def test_library_items_list_and_retrieve(client, db_session):
 
     response = client.get("/api/library/items")
     assert response.status_code == 200
-    assert response.json()[0]["title"] == "Institutes"
-    assert response.json()[0]["files"][0]["original_filename"] == "institutes.pdf"
+    body = response.json()
+    assert body["total"] == 1
+    assert body["limit"] == 50
+    assert body["offset"] == 0
+    assert body["items"][0]["title"] == "Institutes"
+    assert body["items"][0]["files"][0]["original_filename"] == "institutes.pdf"
 
     retrieve = client.get("/api/library/items/100")
     assert retrieve.status_code == 200
@@ -28,6 +32,65 @@ def test_library_items_list_and_retrieve(client, db_session):
     missing = client.get("/api/library/items/999")
     assert missing.status_code == 404
     assert missing.json()["detail"] == "Library item not found."
+
+
+def test_library_items_list_paginates_after_ordering_and_filters(client, db_session):
+    seed_library(db_session)
+    db_session.add_all(
+        [
+            LibraryItems(
+                library_item_id=101,
+                title="Athanasius",
+                content_type=LibraryItemsContentType.BOOK,
+                author_name="Athanasius",
+            ),
+            LibraryItems(
+                library_item_id=102,
+                title="Zeal",
+                content_type=LibraryItemsContentType.ARTICLE,
+                author_name="John Calvin",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/library/items",
+        params={"q": "calvin", "limit": 1, "offset": 1},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert body["limit"] == 1
+    assert body["offset"] == 1
+    assert [item["title"] for item in body["items"]] == ["Zeal"]
+
+
+def test_library_items_list_rejects_invalid_pagination(client, db_session):
+    seed_library(db_session)
+
+    assert client.get("/api/library/items", params={"offset": -1}).status_code == 422
+
+
+def test_library_items_list_limit_zero_fetches_all(client, db_session):
+    seed_library(db_session)
+    db_session.add(
+        LibraryItems(
+            library_item_id=101,
+            title="Athanasius",
+            content_type=LibraryItemsContentType.BOOK,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/api/library/items", params={"limit": 0})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert body["limit"] == 0
+    assert [item["title"] for item in body["items"]] == ["Athanasius", "Institutes"]
 
 
 def test_library_item_file_upload_download_and_preview(client, db_session, tmp_path):

@@ -24,6 +24,13 @@ class Sermon(APIModel):
     attachments: list[Attachment] = Field(default_factory=list)
 
 
+class SermonListResponse(APIModel):
+    total: int = Field(ge=0)
+    limit: int = Field(ge=0)
+    offset: int = Field(ge=0)
+    items: list[Sermon] = Field(default_factory=list)
+
+
 class PatchedSermon(APIModel):
     preached_on: dt.date | None = None
     title: str | None = None
@@ -45,6 +52,13 @@ class SermonBrowseItem(APIModel):
     preached_on: dt.date | None = None
     order_number: int
     reference: str | None = None
+
+
+class SermonBrowseListResponse(APIModel):
+    total: int = Field(ge=0)
+    limit: int = Field(ge=0)
+    offset: int = Field(ge=0)
+    items: list[SermonBrowseItem] = Field(default_factory=list)
 
 
 class SermonSuggestionsResponse(APIModel):

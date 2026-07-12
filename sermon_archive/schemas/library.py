@@ -62,3 +62,9 @@ class LibraryItem(APIModel):
     updated_at: dt.datetime | None = None
     files: list[LibraryItemFile] = Field(default_factory=list)
 
+
+class LibraryItemListResponse(APIModel):
+    total: int = Field(ge=0)
+    limit: int = Field(ge=0)
+    offset: int = Field(ge=0)
+    items: list[LibraryItem] = Field(default_factory=list)

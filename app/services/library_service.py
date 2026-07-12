@@ -23,7 +23,21 @@ from app.services._mappers import (
     library_item_schema,
     library_item_unit_schema,
 )
-from sermon_archive.schemas import LibraryItem, LibraryItemFile, LibraryItemUnit
+from sermon_archive.schemas import (
+    LibraryItem,
+    LibraryItemFile,
+    LibraryItemListResponse,
+    LibraryItemUnit,
+)
+
+
+def _apply_pagination(stmt, *, limit: int, offset: int):
+    """Apply offset pagination; limit=0 means return all remaining rows."""
+    stmt = stmt.offset(offset)
+    if limit > 0:
+        stmt = stmt.limit(limit)
+    return stmt
+
 
 PREVIEW_MIME_TYPES = {
     "application/pdf",
@@ -149,21 +163,39 @@ def _get_file_or_404(
     return file
 
 
-def list_library_items(db: Session, q: str | None = None) -> list[LibraryItem]:
-    """Return all library items ordered by title, optionally filtered by text query."""
-    stmt = (
-        select(LibraryItems)
-        .options(selectinload(LibraryItems.library_item_files))
-        .order_by(LibraryItems.title, LibraryItems.library_item_id)
-    )
+def _apply_library_item_list_filters(stmt, q: str | None):
+    """Apply list filters shared by library item list and count queries."""
     query = (q or "").strip()
     if query:
         stmt = stmt.where(
             LibraryItems.title.ilike(f"%{query}%")
             | LibraryItems.author_name.ilike(f"%{query}%")
         )
+    return stmt
+
+
+def list_library_items(
+    db: Session, q: str | None = None, *, limit: int = 50, offset: int = 0
+) -> LibraryItemListResponse:
+    """Return all library items ordered by title, optionally filtered by text query."""
+    count_stmt = _apply_library_item_list_filters(
+        select(func.count()).select_from(LibraryItems),
+        q,
+    )
+    total = db.scalar(count_stmt) or 0
+
+    stmt = _apply_library_item_list_filters(
+        select(LibraryItems).options(selectinload(LibraryItems.library_item_files)),
+        q,
+    ).order_by(LibraryItems.title, LibraryItems.library_item_id)
+    stmt = _apply_pagination(stmt, limit=limit, offset=offset)
     items = db.scalars(stmt).all()
-    return [library_item_schema(item, include_files=True) for item in items]
+    return LibraryItemListResponse(
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=[library_item_schema(item, include_files=True) for item in items],
+    )
 
 
 def get_library_item(db: Session, library_item_id: int) -> LibraryItem:

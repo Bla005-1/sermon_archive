@@ -7,6 +7,7 @@ from app.services import library_service, scripture_extraction_service
 from sermon_archive.schemas import (
     LibraryItem,
     LibraryItemFile,
+    LibraryItemListResponse,
     LibraryItemUnit,
     LibraryUnitTypeEnum,
     ScriptureExtractionResponse,
@@ -18,14 +19,18 @@ router = APIRouter(tags=["library"], dependencies=[Depends(require_auth)])
 
 @router.get(
     "/items",
-    response_model=list[LibraryItem],
+    response_model=LibraryItemListResponse,
     operation_id="library_items_list",
 )
 def library_items_list(
     q: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=0),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-) -> list[LibraryItem]:
-    return library_service.list_library_items(db=db, q=q)
+) -> LibraryItemListResponse:
+    return library_service.list_library_items(
+        db=db, q=q, limit=limit, offset=offset
+    )
 
 
 @router.get(

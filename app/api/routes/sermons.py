@@ -7,8 +7,9 @@ from sermon_archive.schemas import (
     Attachment,
     PatchedSermon,
     Sermon,
-    SermonBrowseItem,
+    SermonBrowseListResponse,
     SermonBrowseType,
+    SermonListResponse,
     SermonSuggestionsResponse,
     ScriptureExtractionResponse,
     ScriptureReference,
@@ -18,12 +19,14 @@ from app.services import attachment_service, scripture_extraction_service, sermo
 router = APIRouter(tags=["sermons"], dependencies=[Depends(require_auth)])
 
 
-@router.get("", response_model=list[Sermon], operation_id="sermons_list")
+@router.get("", response_model=SermonListResponse, operation_id="sermons_list")
 def sermons_list(
     q: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=0),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-) -> list[Sermon]:
-    return sermons_service.list_sermons(db=db, q=q)
+) -> SermonListResponse:
+    return sermons_service.list_sermons(db=db, q=q, limit=limit, offset=offset)
 
 
 @router.get(
@@ -39,7 +42,7 @@ def sermons_suggestions_list(
 
 @router.get(
     "/browse",
-    response_model=list[SermonBrowseItem],
+    response_model=SermonBrowseListResponse,
     response_model_exclude_none=True,
     operation_id="sermons_browse_list",
 )
@@ -49,8 +52,10 @@ def sermons_browse_list(
     speaker: str | None = Query(default=None),
     series: str | None = Query(default=None),
     location: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=0),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-) -> list[SermonBrowseItem]:
+) -> SermonBrowseListResponse:
     return sermons_service.browse_sermons(
         db=db,
         browse_type=browse_type,
@@ -58,6 +63,8 @@ def sermons_browse_list(
         speaker=speaker,
         series=series,
         location=location,
+        limit=limit,
+        offset=offset,
     )
 
 
