@@ -200,7 +200,7 @@ def browse_sermons(
             location=location,
         ).order_by(
             Sermons.preached_on.desc(),
-            Sermons.sermon_id.desc(),
+            Sermons.sermon_id.asc(),
         )
         stmt = _apply_pagination(stmt, limit=limit, offset=offset)
         sermons = db.scalars(stmt).all()
