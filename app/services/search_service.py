@@ -84,18 +84,20 @@ def _proxy_unified_search(
     domains: list[str] | None,
 ) -> SearchResultsResponse:
     base_url = f"http://{settings.sermon_search_host}:{settings.sermon_search_port}"
-    params: list[tuple[str, str | int]] = [
-        ("q", query),
-        ("limit", limit),
-        ("offset", offset),
-    ]
-    for domain in domains or []:
-        params.append(("domains", domain))
+    timeout_seconds = max(settings.sermon_search_timeout_seconds, 7.0)
+    payload: dict[str, object] = {
+        "query": query,
+        "match_mode": "auto",
+        "limit": limit,
+        "offset": offset,
+    }
+    if domains:
+        payload["filters"] = {"domains": domains}
 
-    response = httpx.get(
-        f"{base_url}/api/search",
-        params=params,
-        timeout=settings.sermon_search_timeout_seconds,
+    response = httpx.post(
+        f"{base_url}/api/search/query",
+        json=payload,
+        timeout=timeout_seconds,
     )
     if response.status_code >= 400:
         raise ValueError("Sermon search returned an error response.")

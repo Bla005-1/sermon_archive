@@ -25,9 +25,9 @@ def test_search_proxies_unified_search_with_default_host_port(
     seed_bible(db_session)
     seen = {}
 
-    def fake_get(url, *, params, timeout):
+    def fake_post(url, *, json, timeout):
         seen["url"] = url
-        seen["params"] = params
+        seen["json"] = json
         seen["timeout"] = timeout
         return httpx.Response(
             200,
@@ -49,7 +49,7 @@ def test_search_proxies_unified_search_with_default_host_port(
             },
         )
 
-    monkeypatch.setattr("app.services.search_service.httpx.get", fake_get)
+    monkeypatch.setattr("app.services.search_service.httpx.post", fake_post)
 
     response = client.get(
         "/api/search",
@@ -63,14 +63,15 @@ def test_search_proxies_unified_search_with_default_host_port(
 
     assert response.status_code == 200
     assert seen == {
-        "url": "http://localhost:8051/api/search",
-        "params": [
-            ("q", "creation"),
-            ("limit", 5),
-            ("offset", 2),
-            ("domains", "library"),
-        ],
-        "timeout": 3.0,
+        "url": f"http://{settings.sermon_search_host}:{settings.sermon_search_port}/api/search/query",
+        "json": {
+            "query": "creation",
+            "match_mode": "auto",
+            "limit": 5,
+            "offset": 2,
+            "filters": {"domains": ["library"]},
+        },
+        "timeout": max(settings.sermon_search_timeout_seconds, 7.0),
     }
     assert response.json() == {
         "intent": "search",
@@ -98,8 +99,9 @@ def test_search_uses_configured_sermon_search_host_port(
     monkeypatch.setattr(settings, "sermon_search_port", 9001)
     seen = {}
 
-    def fake_get(url, *, params, timeout):
+    def fake_post(url, *, json, timeout):
         seen["url"] = url
+        seen["json"] = json
         return httpx.Response(
             200,
             json={
@@ -110,12 +112,18 @@ def test_search_uses_configured_sermon_search_host_port(
             },
         )
 
-    monkeypatch.setattr("app.services.search_service.httpx.get", fake_get)
+    monkeypatch.setattr("app.services.search_service.httpx.post", fake_post)
 
     response = client.get("/api/search", params={"q": "grace"})
 
     assert response.status_code == 200
-    assert seen["url"] == "http://search.internal:9001/api/search"
+    assert seen["url"] == "http://search.internal:9001/api/search/query"
+    assert seen["json"] == {
+        "query": "grace",
+        "match_mode": "auto",
+        "limit": 10,
+        "offset": 0,
+    }
 
 
 def test_search_fallback_keyword_search_on_upstream_error(
@@ -125,10 +133,10 @@ def test_search_fallback_keyword_search_on_upstream_error(
     seed_sermons(db_session)
     seed_library(db_session)
 
-    def fake_get(url, *, params, timeout):
+    def fake_post(url, *, json, timeout):
         raise httpx.ConnectError("offline")
 
-    monkeypatch.setattr("app.services.search_service.httpx.get", fake_get)
+    monkeypatch.setattr("app.services.search_service.httpx.post", fake_post)
 
     response = client.get("/api/search", params={"q": "love judgment"})
 
@@ -145,7 +153,7 @@ def test_search_fallback_keyword_search_on_upstream_error(
 def test_search_normalizes_upstream_frontend_links(client, db_session, monkeypatch):
     seed_bible(db_session)
 
-    def fake_get(url, *, params, timeout):
+    def fake_post(url, *, json, timeout):
         return httpx.Response(
             200,
             json={
@@ -184,7 +192,7 @@ def test_search_normalizes_upstream_frontend_links(client, db_session, monkeypat
             },
         )
 
-    monkeypatch.setattr("app.services.search_service.httpx.get", fake_get)
+    monkeypatch.setattr("app.services.search_service.httpx.post", fake_post)
 
     response = client.get("/api/search", params={"q": "john"})
 

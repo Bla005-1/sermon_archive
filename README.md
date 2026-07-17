@@ -108,7 +108,7 @@ Base values live in `.env.template`. Most important settings:
 - `SESSION_COOKIE_NAME`, `CSRF_COOKIE_NAME`: cookie names
 - `SERMON_SEARCH_HOST`: host for the external unified search service, default `localhost`
 - `SERMON_SEARCH_PORT`: port for the external unified search service, default `8051`
-- `SERMON_SEARCH_TIMEOUT_SECONDS`: upstream search timeout, default `3.0`
+- `SERMON_SEARCH_TIMEOUT_SECONDS`: upstream search timeout, default `7.0`
 
 For a browser client on a different domain, set:
 - `COOKIE_SAMESITE=none`
