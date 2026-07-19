@@ -16,7 +16,9 @@ from app.db.models import (
     ScriptureReferences,
     ScriptureReferencesSourceType,
     Sermons,
+    IndexSyncOperation,
 )
+from app.services import index_sync_service
 from app.services._mappers import sermon_schema
 from app.services._reference import format_ref
 from sermon_archive.schemas import (
@@ -310,6 +312,8 @@ def create_sermon(db: Session, payload: Sermon, current_user: ApiUsers) -> Sermo
     values = _coerce_sermon_fields(payload)
     sermon = Sermons(**values, user_id=current_user.user_id)
     db.add(sermon)
+    db.flush()
+    index_sync_service.enqueue(db, sermon.sermon_id, IndexSyncOperation.UPSERT)
     db.commit()
     return get_sermon(db, sermon.sermon_id)
 
@@ -338,6 +342,7 @@ def update_sermon(
         "notes_markdown",
     ):
         setattr(sermon, key, values.get(key))
+    index_sync_service.enqueue(db, sermon_id, IndexSyncOperation.UPSERT)
     db.commit()
     return get_sermon(db, sermon_id)
 
@@ -351,6 +356,7 @@ def patch_sermon(
     values = _coerce_sermon_fields(payload, sermon)
     for key, value in values.items():
         setattr(sermon, key, value)
+    index_sync_service.enqueue(db, sermon_id, IndexSyncOperation.UPSERT)
     db.commit()
     return get_sermon(db, sermon_id)
 
@@ -359,6 +365,7 @@ def delete_sermon(db: Session, sermon_id: int, current_user: ApiUsers) -> None:
     """Delete a sermon by id."""
     sermon = _get_sermon_or_404(db, sermon_id)
     _assert_can_write_sermon(current_user, sermon)
+    index_sync_service.enqueue(db, sermon_id, IndexSyncOperation.DELETE)
     db.delete(sermon)
     db.commit()
 

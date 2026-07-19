@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     sermon_search_host: str = "localhost"
     sermon_search_port: int = 8051
     sermon_search_timeout_seconds: float = 7.0
+    index_sync_poll_seconds: float = 5.0
+    index_sync_max_attempts: int = 10
+    index_sync_dispatch_enabled: bool = True
 
     cors_allowed_origins: list[str] | str = ["http://localhost:3000"]
     cors_allow_credentials: bool = True

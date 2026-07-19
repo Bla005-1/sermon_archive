@@ -11,9 +11,9 @@ from pydantic import ValidationError
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.config import settings
 from app.db.models import LibraryItems, LibraryItemUnits, Sermons
 from app.services._reference import format_ref, parse_reference
+from app.services import search_index_client
 from sermon_archive.schemas import (
     SearchHit,
     SearchReferenceResponse,
@@ -67,7 +67,7 @@ def _proxy_or_fallback(
             offset=offset,
             domains=domains,
         )
-    except (httpx.HTTPError, ValueError, ValidationError):
+    except (httpx.HTTPError, HTTPException, ValueError, ValidationError):
         return _fallback_keyword_search(
             db=db,
             query=query,
@@ -83,8 +83,6 @@ def _proxy_unified_search(
     offset: int,
     domains: list[str] | None,
 ) -> SearchResultsResponse:
-    base_url = f"http://{settings.sermon_search_host}:{settings.sermon_search_port}"
-    timeout_seconds = max(settings.sermon_search_timeout_seconds, 7.0)
     payload: dict[str, object] = {
         "query": query,
         "match_mode": "auto",
@@ -94,14 +92,9 @@ def _proxy_unified_search(
     if domains:
         payload["filters"] = {"domains": domains}
 
-    response = httpx.post(
-        f"{base_url}/api/search/query",
-        json=payload,
-        timeout=timeout_seconds,
+    payload = search_index_client.request(
+        "POST", "/api/search/query", json=payload
     )
-    if response.status_code >= 400:
-        raise ValueError("Sermon search returned an error response.")
-    payload = response.json()
 
     return SearchResultsResponse(
         query=str(payload.get("query") or query),

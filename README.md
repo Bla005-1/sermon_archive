@@ -109,6 +109,9 @@ Base values live in `.env.template`. Most important settings:
 - `SERMON_SEARCH_HOST`: host for the external unified search service, default `localhost`
 - `SERMON_SEARCH_PORT`: port for the external unified search service, default `8051`
 - `SERMON_SEARCH_TIMEOUT_SECONDS`: upstream search timeout, default `7.0`
+- `INDEX_SYNC_POLL_SECONDS`: durable sermon-index outbox poll interval, default `5.0`
+- `INDEX_SYNC_MAX_ATTEMPTS`: delivery attempts before an event is marked failed, default `10`
+- `INDEX_SYNC_DISPATCH_ENABLED`: enable the outbox dispatcher, default `true`
 
 For a browser client on a different domain, set:
 - `COOKIE_SAMESITE=none`
@@ -267,6 +270,30 @@ Public:
 - Bible reference input returns `intent: "reference"` with a canonical reference and URL for the next step.
 - All other input is proxied to the external sermon-search service as unified search.
 - If sermon-search is unavailable, the backend falls back to a simple keyword search over sermons and library content.
+
+## Index synchronization and auditing
+
+Creating, replacing, patching, or deleting a sermon records an index-sync event
+in the same database transaction. A background dispatcher delivers the latest
+state to sermon-search with forced LLM indexing and retries temporary failures.
+Sermon writes return immediately; Qwen indexing is asynchronous, and a failed
+refresh preserves the previous searchable document.
+
+The following proxy routes require a staff account:
+
+- `GET /api/index/overview`
+- `GET /api/index/documents`
+- `GET /api/index/documents/{domain}/{source_id}`
+- `GET /api/index/jobs`
+- `GET /api/index/jobs/{job_id}`
+- `POST /api/index/sermons/{sermon_id}`
+- `POST /api/index/rebuild`
+
+The overview includes pending, processing, delivered, and failed backend outbox
+counts. Document detail exposes source-derived unit text plus generated summaries
+and topics for review, but never embedding vectors. Manual sermon and rebuild
+routes always send `index_method=llm`; clients cannot select deterministic sermon
+indexing through the backend.
 
 Supported query parameters:
 

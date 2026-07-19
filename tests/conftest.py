@@ -82,6 +82,7 @@ def client(db_session: Session, tmp_path, monkeypatch: pytest.MonkeyPatch) -> Ge
     monkeypatch.setenv("SERMON_STORAGE_ROOT", str(tmp_path))
     settings.allowed_hosts = ["testserver", "localhost"]
     settings.cors_allowed_origins = ["http://testserver"]
+    settings.index_sync_dispatch_enabled = False
 
     app = create_app()
 
@@ -114,7 +115,9 @@ def client(db_session: Session, tmp_path, monkeypatch: pytest.MonkeyPatch) -> Ge
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[require_auth] = override_require_auth
 
-    with TestClient(app) as test_client:
+    test_client = TestClient(app)
+    try:
         yield test_client
-
-    app.dependency_overrides.clear()
+    finally:
+        test_client.close()
+        app.dependency_overrides.clear()

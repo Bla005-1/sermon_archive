@@ -34,6 +34,18 @@ class LibraryItemsContentType(str, enum.Enum):
     OTHER = 'other'
 
 
+class IndexSyncOperation(str, enum.Enum):
+    UPSERT = 'upsert'
+    DELETE = 'delete'
+
+
+class IndexSyncStatus(str, enum.Enum):
+    PENDING = 'pending'
+    PROCESSING = 'processing'
+    DELIVERED = 'delivered'
+    FAILED = 'failed'
+
+
 class ScriptureReferencesSourceType(str, enum.Enum):
     LIBRARY_ITEM_UNIT = 'library_item_unit'
     SERMON = 'sermon'
@@ -59,6 +71,32 @@ class ApiUsers(Base):
     api_access_tokens: Mapped[list['ApiAccessTokens']] = relationship('ApiAccessTokens', back_populates='user')
     api_sessions: Mapped[list['ApiSessions']] = relationship('ApiSessions', back_populates='user')
     sermons: Mapped[list['Sermons']] = relationship('Sermons', back_populates='user')
+
+
+class IndexSyncOutbox(Base):
+    __tablename__ = 'index_sync_outbox'
+    __table_args__ = (
+        Index('idx_index_sync_outbox_dispatch', 'status', 'next_attempt_at', 'event_id'),
+        Index('idx_index_sync_outbox_sermon', 'sermon_id', 'event_id'),
+    )
+
+    event_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True, autoincrement=True)
+    sermon_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
+    operation: Mapped[IndexSyncOperation] = mapped_column(
+        Enum(IndexSyncOperation, values_callable=lambda cls: [member.value for member in cls]),
+        nullable=False,
+    )
+    status: Mapped[IndexSyncStatus] = mapped_column(
+        Enum(IndexSyncStatus, values_callable=lambda cls: [member.value for member in cls]),
+        nullable=False,
+        server_default=text("'pending'"),
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("'0'"))
+    last_error: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    updated_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'))
+    next_attempt_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    delivered_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
 
 
 class BibleBooks(Base):

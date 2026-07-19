@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +7,18 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.api.router import api_router
 from app.config import settings
+from app.services import index_sync_service
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if settings.index_sync_dispatch_enabled:
+        index_sync_service.start_dispatcher()
+    try:
+        yield
+    finally:
+        if settings.index_sync_dispatch_enabled:
+            index_sync_service.stop_dispatcher()
 
 
 def create_app() -> FastAPI:
@@ -16,6 +29,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Sermon Archive API",
         debug=settings.debug,
+        lifespan=lifespan,
     )
 
     app.add_middleware(ProxyHeadersMiddleware)
@@ -32,6 +46,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router)
+
     return app
 
 

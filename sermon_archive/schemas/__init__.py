@@ -26,6 +26,15 @@ from sermon_archive.schemas.library import (
     LibraryItemUnit,
     LibraryUnitTypeEnum,
 )
+from sermon_archive.schemas.indexing import (
+    IndexDocumentAudit,
+    IndexDocumentList,
+    IndexJobAudit,
+    IndexJobList,
+    IndexJobSubmission,
+    IndexOverview,
+    IndexRebuildSubmission,
+)
 from sermon_archive.schemas.sermons import (
     PatchedSermon,
     Sermon,
@@ -101,6 +110,13 @@ __all__ = [
     "LibraryItemListResponse",
     "LibraryItemUnit",
     "LibraryUnitTypeEnum",
+    "IndexDocumentAudit",
+    "IndexDocumentList",
+    "IndexJobAudit",
+    "IndexJobList",
+    "IndexJobSubmission",
+    "IndexOverview",
+    "IndexRebuildSubmission",
     "PartialAttachment",
     "PartialBibleWidget",
     "PartialScriptureReference",
