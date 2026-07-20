@@ -34,6 +34,7 @@ from sermon_archive.schemas.indexing import (
     IndexJobSubmission,
     IndexOverview,
     IndexRebuildSubmission,
+    SermonCoverageItem,
 )
 from sermon_archive.schemas.sermons import (
     PatchedSermon,
@@ -117,6 +118,7 @@ __all__ = [
     "IndexJobSubmission",
     "IndexOverview",
     "IndexRebuildSubmission",
+    "SermonCoverageItem",
     "PartialAttachment",
     "PartialBibleWidget",
     "PartialScriptureReference",

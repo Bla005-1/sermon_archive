@@ -89,6 +89,15 @@ class IndexDocumentAudit(IndexDocumentSummary):
     units: list[IndexUnitAudit]
 
 
+class SermonCoverageItem(APIModel):
+    sermon_id: int
+    title: str
+    speaker_name: str | None = None
+    preached_on: dt.date | None = None
+    source_updated_at: dt.datetime | None = None
+    indexed_at: dt.datetime | None = None
+
+
 class IndexOverview(APIModel):
     active_generation: dict[str, Any] | None = None
     domains: list[dict[str, Any]] = Field(default_factory=list)
@@ -96,6 +105,8 @@ class IndexOverview(APIModel):
     indexed_sermon_count: int = 0
     missing_sermon_count: int | None = None
     stale_sermon_count: int | None = None
+    missing_sermons: list[SermonCoverageItem] = Field(default_factory=list)
+    stale_sermons: list[SermonCoverageItem] = Field(default_factory=list)
     recent_job_counts: dict[str, int] = Field(default_factory=dict)
     latest_failures: list[IndexJobAudit] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
