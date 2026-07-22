@@ -56,8 +56,9 @@ from sermon_archive.schemas.scripture import (
     UnresolvedScriptureReference,
 )
 from sermon_archive.schemas.search import (
-    SearchHit,
+    SearchMatch,
     SearchReferenceResponse,
+    SearchResultGroup,
     SearchResponse,
     SearchResultsResponse,
 )
@@ -136,8 +137,9 @@ __all__ = [
     "ScriptureReferenceCreate",
     "ScriptureReferenceSourceType",
     "ScriptureReferenceUpdate",
-    "SearchHit",
+    "SearchMatch",
     "SearchReferenceResponse",
+    "SearchResultGroup",
     "SearchResponse",
     "SearchResultsResponse",
     "TestamentEnum",

@@ -5,20 +5,21 @@ from __future__ import annotations
 import re
 from urllib.parse import quote_plus, unquote
 
-import httpx
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sqlalchemy import and_, func, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from app.db.models import LibraryItems, LibraryItemUnits, Sermons
-from app.services._reference import format_ref, parse_reference
 from app.services import search_index_client
+from app.services._reference import format_ref, parse_reference
 from sermon_archive.schemas import (
-    SearchHit,
     SearchReferenceResponse,
+    SearchResultGroup,
     SearchResultsResponse,
 )
+
+
+UNAVAILABLE_MESSAGE = "Search is temporarily unavailable. Please try again."
+INVALID_RESPONSE_MESSAGE = "Search returned an invalid response. Please try again."
 
 
 def search(
@@ -38,8 +39,7 @@ def search(
     try:
         start, end = parse_reference(db, query)
     except ValueError:
-        return _proxy_or_fallback(
-            db=db,
+        return _proxy_unified_search(
             query=query,
             limit=limit,
             offset=offset,
@@ -53,227 +53,96 @@ def search(
     )
 
 
-def _proxy_or_fallback(
-    db: Session,
-    query: str,
-    limit: int,
-    offset: int,
-    domains: list[str] | None,
-) -> SearchResultsResponse:
-    try:
-        return _proxy_unified_search(
-            query=query,
-            limit=limit,
-            offset=offset,
-            domains=domains,
-        )
-    except (httpx.HTTPError, HTTPException, ValueError, ValidationError):
-        return _fallback_keyword_search(
-            db=db,
-            query=query,
-            limit=limit,
-            offset=offset,
-            domains=domains,
-        )
-
-
 def _proxy_unified_search(
     query: str,
     limit: int,
     offset: int,
     domains: list[str] | None,
 ) -> SearchResultsResponse:
-    payload: dict[str, object] = {
+    request_payload: dict[str, object] = {
         "query": query,
         "match_mode": "auto",
         "limit": limit,
         "offset": offset,
     }
     if domains:
-        payload["filters"] = {"domains": domains}
+        request_payload["filters"] = {"domains": domains}
 
-    payload = search_index_client.request(
-        "POST", "/api/search/query", json=payload
-    )
-
-    return SearchResultsResponse(
-        query=str(payload.get("query") or query),
-        total=int(payload.get("total") or 0),
-        results=[
-            _with_frontend_href(SearchHit.model_validate(result))
-            for result in payload.get("results") or []
-        ],
-    )
-
-
-def _fallback_keyword_search(
-    db: Session,
-    query: str,
-    limit: int,
-    offset: int,
-    domains: list[str] | None,
-) -> SearchResultsResponse:
-    terms = _tokenize(query)
-    if not terms:
-        return SearchResultsResponse(query=query, total=0, results=[])
-
-    allowed_domains = {domain.lower() for domain in domains or []}
-    results: list[SearchHit] = []
-    if not allowed_domains or "sermon" in allowed_domains:
-        results.extend(_fallback_sermons(db=db, terms=terms))
-    if not allowed_domains or "library" in allowed_domains:
-        results.extend(_fallback_library_items(db=db, terms=terms))
-        results.extend(_fallback_library_units(db=db, terms=terms))
-
-    total = len(results)
-    return SearchResultsResponse(
-        query=query,
-        total=total,
-        results=results[offset : offset + limit],
-    )
-
-
-def _fallback_sermons(db: Session, terms: list[str]) -> list[SearchHit]:
-    searchable = _combined_text(Sermons.title, Sermons.notes_markdown)
-    rows = db.scalars(
-        select(Sermons)
-        .where(_all_terms_match(searchable, terms))
-        .order_by(Sermons.preached_on.desc(), Sermons.sermon_id.desc())
-    ).all()
-    return [
-        SearchHit(
-            result_type="sermon",
-            resource_id=str(row.sermon_id),
-            title=row.title,
-            subtitle=row.speaker_name,
-            preview_text=_preview(row.notes_markdown or row.title),
-            href=_sermon_href(row.sermon_id),
-            score=float(len(terms)),
+    try:
+        payload = search_index_client.request(
+            "POST", "/api/search/query", json=request_payload
         )
-        for row in rows
+    except HTTPException as exc:
+        if exc.status_code == 503:
+            raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE) from exc
+        raise HTTPException(status_code=502, detail=INVALID_RESPONSE_MESSAGE) from exc
+
+    try:
+        response = SearchResultsResponse.model_validate(
+            {
+                "query": payload.get("query") or query,
+                "total": payload.get("total", 0),
+                "results": payload.get("results", []),
+            }
+        )
+    except (AttributeError, TypeError, ValueError, ValidationError) as exc:
+        raise HTTPException(status_code=502, detail=INVALID_RESPONSE_MESSAGE) from exc
+
+    return response.model_copy(
+        update={"results": [_with_frontend_hrefs(group) for group in response.results]}
+    )
+
+
+def _with_frontend_hrefs(group: SearchResultGroup) -> SearchResultGroup:
+    matches = [
+        match.model_copy(
+            update={
+                "href": _frontend_href(
+                    group.result_type, match.resource_id, match.href
+                )
+            }
+        )
+        for match in group.matches
     ]
-
-
-def _fallback_library_items(db: Session, terms: list[str]) -> list[SearchHit]:
-    searchable = _combined_text(
-        LibraryItems.title,
-        LibraryItems.author_name,
-        LibraryItems.description_text,
+    return group.model_copy(
+        update={
+            "href": matches[0].href,
+            "matches": matches,
+        }
     )
-    rows = db.scalars(
-        select(LibraryItems)
-        .where(_all_terms_match(searchable, terms))
-        .order_by(LibraryItems.title, LibraryItems.library_item_id)
-    ).all()
-    return [
-        SearchHit(
-            result_type="library",
-            resource_id=str(row.library_item_id),
-            title=row.title,
-            subtitle=row.author_name,
-            preview_text=_preview(row.description_text or row.title),
-            href=_library_item_href(row.library_item_id),
-            score=float(len(terms)),
-        )
-        for row in rows
-    ]
 
 
-def _fallback_library_units(db: Session, terms: list[str]) -> list[SearchHit]:
-    searchable = _combined_text(
-        LibraryItems.title,
-        LibraryItems.author_name,
-        LibraryItems.description_text,
-        LibraryItemUnits.unit_title,
-        LibraryItemUnits.content_text,
-        LibraryItemUnits.content_text_markdown,
-    )
-    rows = db.scalars(
-        select(LibraryItemUnits)
-        .join(
-            LibraryItems,
-            LibraryItems.library_item_id == LibraryItemUnits.library_item_id,
-        )
-        .options(joinedload(LibraryItemUnits.library_item))
-        .where(_all_terms_match(searchable, terms))
-        .order_by(
-            LibraryItems.title,
-            LibraryItemUnits.library_item_id,
-            LibraryItemUnits.unit_order,
-        )
-    ).all()
-    results: list[SearchHit] = []
-    for row in rows:
-        title = row.unit_title or row.library_item.title
-        preview_text = row.content_text or row.content_text_markdown or title
-        results.append(
-            SearchHit(
-                result_type="library",
-                resource_id=f"{row.library_item_id}:unit:{row.library_item_unit_id}",
-                title=title,
-                subtitle=row.library_item.title,
-                preview_text=_preview(preview_text),
-                href=_library_item_href(row.library_item_id),
-                score=float(len(terms)),
-            )
-        )
-    return results
-
-
-def _tokenize(query: str) -> list[str]:
-    return re.findall(r"[\w']+", query.lower())
-
-
-def _combined_text(*columns):
-    parts = [func.coalesce(column, "") for column in columns]
-    expression = parts[0]
-    for part in parts[1:]:
-        expression = expression + " " + part
-    return func.lower(expression)
-
-
-def _all_terms_match(searchable, terms: list[str]):
-    return and_(*[searchable.ilike(f"%{term}%") for term in terms])
-
-
-def _preview(value: str, max_length: int = 220) -> str:
-    text = re.sub(r"\s+", " ", value).strip()
-    if len(text) <= max_length:
-        return text
-    return f"{text[: max_length - 1].rstrip()}..."
-
-
-def _with_frontend_href(hit: SearchHit) -> SearchHit:
-    href = _frontend_href(hit)
-    if href == hit.href:
-        return hit
-    return hit.model_copy(update={"href": href})
-
-
-def _frontend_href(hit: SearchHit) -> str:
-    result_type = hit.result_type.lower()
+def _frontend_href(result_type: str, resource_id: str, href: str) -> str:
+    result_type = result_type.lower()
     if result_type == "sermon":
-        sermon_id = _first_number(hit.resource_id) or _path_id(hit.href, "sermons")
+        sermon_id = _first_number(resource_id) or _path_id(href, "sermons")
         if sermon_id is not None:
             return _sermon_href(sermon_id)
     if result_type == "library":
         library_item_id = (
-            _first_number(hit.resource_id)
-            or _path_id(hit.href, "library/items")
-            or _path_id(hit.href, "library")
+            _first_number(resource_id)
+            or _path_id(href, "library/items")
+            or _path_id(href, "library")
         )
         if library_item_id is not None:
-            return _library_item_href(library_item_id)
-    if result_type == "verse" and hit.href.startswith("/verse/"):
-        reference = unquote(hit.href.removeprefix("/verse/"))
+            unit_id = _unit_number(resource_id)
+            fragment = f"#library-unit-{unit_id}" if unit_id is not None else ""
+            return f"{_library_item_href(library_item_id)}{fragment}"
+    if result_type == "verse" and href.startswith("/verse/"):
+        reference = unquote(href.removeprefix("/verse/"))
         if reference:
             return f"/verse?ref={quote_plus(reference)}"
-    return hit.href
+    return href
 
 
 def _first_number(value: str) -> int | None:
     match = re.search(r"\d+", value)
     return int(match.group(0)) if match else None
+
+
+def _unit_number(value: str) -> int | None:
+    match = re.search(r":unit:(\d+)(?:$|:)", value)
+    return int(match.group(1)) if match else None
 
 
 def _path_id(href: str, prefix: str) -> int | None:
