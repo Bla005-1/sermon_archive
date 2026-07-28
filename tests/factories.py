@@ -7,6 +7,7 @@ from app.db.models import (
     ApiAccessTokens,
     ApiSessions,
     ApiUsers,
+    ApiUsersAccountType,
     BibleBooks,
     BibleBooksTestament,
     BibleVerses,
@@ -406,6 +407,27 @@ def seed_user(
     return user
 
 
+def seed_service_user(
+    db: Session,
+    *,
+    user_id: int = 2,
+    username: str = "search-service",
+    active: bool = True,
+) -> ApiUsers:
+    user = ApiUsers(
+        user_id=user_id,
+        username=username,
+        email=None,
+        password_hash=None,
+        account_type=ApiUsersAccountType.SERVICE,
+        is_active=1 if active else 0,
+        is_staff=0,
+    )
+    db.add(user)
+    db.commit()
+    return user
+
+
 def seed_session(
     db: Session, *, expired: bool = False, revoked: bool = False
 ) -> ApiSessions:
@@ -426,18 +448,24 @@ def seed_session(
 
 
 def seed_token(
-    db: Session, token_hash: str, *, expired: bool = False
+    db: Session,
+    token_hash: str,
+    *,
+    user_id: int = 1,
+    expired: bool = False,
+    non_expiring: bool = False,
 ) -> ApiAccessTokens:
     now = dt.datetime.now(dt.UTC)
     token = ApiAccessTokens(
         token_id=1,
-        user_id=1,
+        user_id=user_id,
         token_hash=token_hash,
         token_name="tests",
-        expires_at=(
+        expires_at=None if non_expiring else (
             now - dt.timedelta(minutes=1) if expired else now + dt.timedelta(days=1)
         ),
         last_used_at=now,
+        scopes="archive:read",
     )
     db.add(token)
     db.commit()

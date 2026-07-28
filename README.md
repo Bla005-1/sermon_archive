@@ -14,7 +14,7 @@ FastAPI backend for sermon records, library item content, unified archive search
 
 - Auth with either:
   - Session cookie (`/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`)
-  - Bearer token (`/api/auth/token`, `/api/auth/token/revoke`)
+  - Staff-managed read-only service bearer tokens
 - Sermons CRUD with attachments and user ownership
 - Staff user management for admin pages
 - Library item lookup, hierarchical content units, file uploads/downloads, and inline PDF/DOC/DOCX previews
@@ -61,11 +61,14 @@ pip install .
 Basic usage:
 
 ```python
+import os
+
 from sermon_archive.client import SermonArchiveClient
 
-with SermonArchiveClient("http://localhost:8000") as client:
-    token = client.issue_token("reader", "secret")
-    client.set_bearer_token(token.access_token)
+with SermonArchiveClient(
+    "http://localhost:8000",
+    bearer_token=os.environ["SERMON_ARCHIVE_TOKEN"],
+) as client:
     sermon_page = client.list_sermons(q="creation", limit=25, offset=0)
     library_page = client.list_library_items(q="institutes", limit=25, offset=0)
     sermons = sermon_page.items
@@ -76,7 +79,9 @@ with SermonArchiveClient("http://localhost:8000") as client:
     verse = client.get_verse("Genesis 1:1", translation="ESV")
 ```
 
-The client reuses the shared `sermon_archive.schemas` Pydantic package for typed responses. It covers auth routes, common GET routes for CRUD-style resources, library file upload/download/preview helpers, and direct verse reference lookup.
+The machine client reuses the shared `sermon_archive.schemas` Pydantic package
+for typed, read-only API responses. It uses a staff-provisioned service token and
+does not implement browser sessions or CSRF.
 
 ## Naming Conventions
 
@@ -100,7 +105,6 @@ Base values live in `.env.template`. Most important settings:
 - `SERMON_STORAGE_ROOT`: root folder for attachment uploads
 - `DEBUG`, `LOG_LEVEL`: runtime debugging/log level
 - `SESSION_TTL_MINUTES`: session lifetime
-- `TOKEN_TTL_MINUTES`: bearer token lifetime
 - `CORS_ALLOWED_ORIGINS`: comma-separated CORS allowlist
 - `CORS_ALLOW_CREDENTIALS`: allow credentials for CORS
 - `ALLOWED_HOSTS`: comma-separated trusted hosts
@@ -131,14 +135,10 @@ Protected endpoints use:
 1. `Authorization: Bearer <token>` first
 2. Session cookie fallback (`sessionid` by default)
 
-Common auth flow:
-
-1. `POST /api/auth/token` with username/password
-2. Use returned token as bearer auth
-3. Call protected routes
-4. `POST /api/auth/token/revoke` when done
-
-Session-cookie flow is also available through `/api/auth/login`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout`.
+Human accounts use session cookies through `/api/auth/login`, `/api/auth/me`,
+`/api/auth/refresh`, and `/api/auth/logout`. Service accounts cannot log in with
+passwords. Staff create and revoke non-expiring, read-only service tokens through
+`/api/service-accounts`; token secrets are returned only at creation.
 
 Password verification supports only scrypt-formatted hashes (`scrypt$<salt>$<digest>`). Legacy plaintext fallbacks are not accepted.
 
@@ -152,8 +152,6 @@ Authenticated users can update their own username/email with `PATCH /api/auth/me
 
 - `GET /api/auth/csrf`
 - `POST /api/auth/login`
-- `POST /api/auth/token`
-- `POST /api/auth/token/revoke`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 - `PATCH /api/auth/me`

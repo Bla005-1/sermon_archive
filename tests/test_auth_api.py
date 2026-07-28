@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from app.db.models import ApiAccessTokens, ApiSessions
+from app.db.models import ApiSessions
 from app.services import auth_service
-from tests.factories import seed_token, seed_user
+from tests.factories import seed_service_user, seed_token, seed_user
 
 
 def test_csrf_sets_cookie(client):
@@ -44,40 +44,9 @@ def test_login_sets_session_and_csrf_cookies(client, db_session, monkeypatch):
     assert session.is_revoked == 0
 
 
-def test_token_issue_and_revoke(client, db_session, monkeypatch):
-    seed_user(db_session)
-    monkeypatch.setattr(auth_service, "_verify_password", lambda *_args: True)
-
-    issue_response = client.post(
-        "/api/auth/token",
-        json={"username": "reader", "password": "secret", "token_name": "ci"},
-    )
-
-    assert issue_response.status_code == 200
-    body = issue_response.json()
-    assert body["token_type"] == "bearer"
-    assert body["access_token"]
-
-    stored_token = db_session.scalar(select(ApiAccessTokens))
-    assert stored_token is not None
-    assert stored_token.token_hash == auth_service._token_hash(body["access_token"])
-
-    revoke_response = client.post(
-        "/api/auth/token/revoke",
-        headers={"Authorization": f"Bearer {body['access_token']}"},
-    )
-
-    assert revoke_response.status_code == 200
-    assert revoke_response.json() == {"detail": "Token revoked."}
-    db_session.refresh(stored_token)
-    assert stored_token.revoked_at is not None
-
-
-def test_token_revoke_requires_bearer_token(client):
-    response = client.post("/api/auth/token/revoke")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Bearer token required."
+def test_public_token_routes_are_removed(client):
+    assert client.post("/api/auth/token", json={}).status_code == 404
+    assert client.post("/api/auth/token/revoke").status_code == 404
 
 
 def test_me_requires_real_auth_context(client):
@@ -88,9 +57,14 @@ def test_me_requires_real_auth_context(client):
 
 
 def test_me_accepts_valid_bearer_token(client, db_session):
-    seed_user(db_session)
+    seed_service_user(db_session)
     raw_token = "plain-test-token"
-    seed_token(db_session, auth_service._token_hash(raw_token))
+    seed_token(
+        db_session,
+        auth_service._token_hash(raw_token),
+        user_id=2,
+        non_expiring=True,
+    )
 
     response = client.get(
         "/api/auth/me",
@@ -98,4 +72,52 @@ def test_me_accepts_valid_bearer_token(client, db_session):
     )
 
     assert response.status_code == 200
-    assert response.json()["email"] == "reader@example.test"
+    assert response.json()["username"] == "search-service"
+
+
+def test_human_bearer_token_is_rejected(client, db_session):
+    seed_user(db_session)
+    raw_token = "human-token"
+    seed_token(db_session, auth_service._token_hash(raw_token))
+
+    response = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {raw_token}"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_service_account_cannot_log_in_with_password(
+    client, db_session, monkeypatch
+):
+    seed_service_user(db_session)
+    monkeypatch.setattr(auth_service, "_verify_password", lambda *_args: True)
+
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "search-service", "password": "secret"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid credentials."
+
+
+def test_service_token_rejects_mutating_request(client, db_session):
+    seed_service_user(db_session)
+    raw_token = "service-token"
+    seed_token(
+        db_session,
+        auth_service._token_hash(raw_token),
+        user_id=2,
+        non_expiring=True,
+    )
+
+    response = client.patch(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {raw_token}"},
+        json={"username": "changed"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Service tokens are read-only."

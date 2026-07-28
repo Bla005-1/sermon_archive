@@ -7,9 +7,6 @@ from sermon_archive.schemas import (
     CurrentUserPasswordRequest,
     CurrentUserUpdateRequest,
     LoginRequest,
-    TokenLoginRequest,
-    TokenResponse,
-    TokenRevokeResponse,
     UserResponse,
 )
 from app.services import auth_service, user_service
@@ -34,26 +31,6 @@ def auth_login_create(
     return auth_service.login_user(
         db=db, request=request, response=response, credentials=payload
     )
-
-
-@router.post("/token", response_model=TokenResponse, operation_id="auth_token_create")
-def auth_token_create(
-    payload: TokenLoginRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-) -> TokenResponse:
-    return auth_service.issue_token(db=db, request=request, payload=payload)
-
-
-@router.post(
-    "/token/revoke",
-    response_model=TokenRevokeResponse,
-    operation_id="auth_token_revoke_create",
-)
-def auth_token_revoke_create(
-    request: Request, db: Session = Depends(get_db)
-) -> TokenRevokeResponse:
-    return auth_service.revoke_token(db=db, request=request)
 
 
 @router.post(

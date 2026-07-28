@@ -8,28 +8,18 @@ from pydantic import BaseModel, TypeAdapter
 from sermon_archive.schemas import (
     Attachment,
     BibleWidget,
-    CsrfResponse,
     LibraryItem,
     LibraryItemFile,
     LibraryItemListResponse,
     LibraryItemUnit,
     LibraryUnitTypeEnum,
-    LoginRequest,
     Sermon,
     SermonBrowseListResponse,
     SermonBrowseType,
     SermonListResponse,
     SermonSuggestionsResponse,
-    PartialScriptureReference,
-    ScriptureExtractionRequest,
-    ScriptureExtractionResponse,
     ScriptureReference,
-    ScriptureReferenceCreate,
     ScriptureReferenceSourceType,
-    ScriptureReferenceUpdate,
-    TokenLoginRequest,
-    TokenResponse,
-    TokenRevokeResponse,
     UserResponse,
     VerseCommentaryResponse,
     VerseLibraryItemReferenceResponse,
@@ -81,18 +71,18 @@ class SermonArchiveClient:
         self,
         base_url: str,
         *,
-        bearer_token: str | None = None,
+        bearer_token: str,
         timeout: float | httpx.Timeout = 10.0,
         transport: httpx.BaseTransport | None = None,
-        csrf_cookie_name: str = "csrftoken",
     ) -> None:
+        if not bearer_token.strip():
+            raise ValueError("bearer_token is required.")
         self._client = httpx.Client(
             base_url=base_url,
             timeout=timeout,
             transport=transport,
         )
         self._bearer_token = bearer_token
-        self._csrf_cookie_name = csrf_cookie_name
 
     def __enter__(self) -> SermonArchiveClient:
         self._client.__enter__()
@@ -104,60 +94,13 @@ class SermonArchiveClient:
     def close(self) -> None:
         self._client.close()
 
-    def set_bearer_token(self, token: str | None) -> None:
+    def set_bearer_token(self, token: str) -> None:
+        if not token.strip():
+            raise ValueError("bearer token is required.")
         self._bearer_token = token
-
-    def csrf(self) -> CsrfResponse:
-        return self._request_model("GET", "/api/auth/csrf", CsrfResponse)
-
-    def login(self, username: str, password: str) -> UserResponse:
-        payload = LoginRequest(username=username, password=password)
-        return self._request_model(
-            "POST",
-            "/api/auth/login",
-            UserResponse,
-            json=payload.model_dump(mode="json"),
-            include_csrf=True,
-        )
-
-    def issue_token(
-        self, username: str, password: str, token_name: str | None = None
-    ) -> TokenResponse:
-        payload = TokenLoginRequest(
-            username=username,
-            password=password,
-            token_name=token_name,
-        )
-        return self._request_model(
-            "POST",
-            "/api/auth/token",
-            TokenResponse,
-            json=payload.model_dump(mode="json"),
-            include_csrf=True,
-        )
-
-    def revoke_token(self, access_token: str | None = None) -> TokenRevokeResponse:
-        return self._request_model(
-            "POST",
-            "/api/auth/token/revoke",
-            TokenRevokeResponse,
-            bearer_token=access_token,
-            include_csrf=True,
-        )
-
-    def logout(self) -> None:
-        self._request("POST", "/api/auth/logout", include_csrf=True)
 
     def me(self) -> UserResponse:
         return self._request_model("GET", "/api/auth/me", UserResponse)
-
-    def refresh(self) -> UserResponse:
-        return self._request_model(
-            "POST",
-            "/api/auth/refresh",
-            UserResponse,
-            include_csrf=True,
-        )
 
     def list_sermons(
         self,
@@ -273,26 +216,6 @@ class SermonArchiveClient:
             LibraryItemFile,
         )
 
-    def upload_library_item_file(
-        self,
-        library_item_id: int,
-        filename: str,
-        content: bytes,
-        content_type: str | None = None,
-    ) -> LibraryItemFile:
-        file_tuple = (
-            (filename, content, content_type)
-            if content_type
-            else (filename, content)
-        )
-        return self._request_model(
-            "POST",
-            f"/api/library/items/{library_item_id}/files",
-            LibraryItemFile,
-            files={"file": file_tuple},
-            include_csrf=True,
-        )
-
     def download_library_item_file(
         self, library_item_id: int, library_item_file_id: int
     ) -> bytes:
@@ -343,19 +266,6 @@ class SermonArchiveClient:
             ScriptureReference,
         )
 
-    def extract_library_item_unit_scripture_references(
-        self, library_item_id: int, library_item_unit_id: int
-    ) -> ScriptureExtractionResponse:
-        return self._request_model(
-            "POST",
-            (
-                f"/api/library/items/{library_item_id}/units/"
-                f"{library_item_unit_id}/scripture-references/extract"
-            ),
-            ScriptureExtractionResponse,
-            include_csrf=True,
-        )
-
     def list_sermon_scripture_references(
         self, sermon_id: int
     ) -> list[ScriptureReference]:
@@ -363,28 +273,6 @@ class SermonArchiveClient:
             "GET",
             f"/api/sermons/{sermon_id}/scripture-references",
             ScriptureReference,
-        )
-
-    def extract_sermon_scripture_references(
-        self, sermon_id: int
-    ) -> ScriptureExtractionResponse:
-        return self._request_model(
-            "POST",
-            f"/api/sermons/{sermon_id}/scripture-references/extract",
-            ScriptureExtractionResponse,
-            include_csrf=True,
-        )
-
-    def extract_scripture_references(
-        self, text: str, context_text: str | None = None
-    ) -> ScriptureExtractionResponse:
-        payload = ScriptureExtractionRequest(text=text, context_text=context_text)
-        return self._request_model(
-            "POST",
-            "/api/scripture/extract",
-            ScriptureExtractionResponse,
-            json=payload.model_dump(mode="json"),
-            include_csrf=True,
         )
 
     def list_scripture_references(
@@ -404,17 +292,6 @@ class SermonArchiveClient:
             params={"source_type": value, "source_id": source_id},
         )
 
-    def create_scripture_reference(
-        self, payload: ScriptureReferenceCreate
-    ) -> ScriptureReference:
-        return self._request_model(
-            "POST",
-            "/api/scripture/references",
-            ScriptureReference,
-            json=payload.model_dump(mode="json"),
-            include_csrf=True,
-        )
-
     def get_scripture_reference(
         self, scripture_reference_id: int
     ) -> ScriptureReference:
@@ -422,39 +299,6 @@ class SermonArchiveClient:
             "GET",
             f"/api/scripture/references/{scripture_reference_id}",
             ScriptureReference,
-        )
-
-    def update_scripture_reference(
-        self,
-        scripture_reference_id: int,
-        payload: ScriptureReferenceUpdate,
-    ) -> ScriptureReference:
-        return self._request_model(
-            "PUT",
-            f"/api/scripture/references/{scripture_reference_id}",
-            ScriptureReference,
-            json=payload.model_dump(mode="json"),
-            include_csrf=True,
-        )
-
-    def patch_scripture_reference(
-        self,
-        scripture_reference_id: int,
-        payload: PartialScriptureReference,
-    ) -> ScriptureReference:
-        return self._request_model(
-            "PATCH",
-            f"/api/scripture/references/{scripture_reference_id}",
-            ScriptureReference,
-            json=payload.model_dump(mode="json", exclude_unset=True),
-            include_csrf=True,
-        )
-
-    def delete_scripture_reference(self, scripture_reference_id: int) -> None:
-        self._request(
-            "DELETE",
-            f"/api/scripture/references/{scripture_reference_id}",
-            include_csrf=True,
         )
 
     def list_verse_notes(self, verse_id: int | None = None) -> list[VerseNote]:
@@ -545,16 +389,10 @@ class SermonArchiveClient:
         method: str,
         path: str,
         *,
-        bearer_token: str | None = None,
-        include_csrf: bool = False,
         headers: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
-        request_headers = self._headers(
-            bearer_token=bearer_token,
-            include_csrf=include_csrf,
-            extra=headers,
-        )
+        request_headers = self._headers(extra=headers)
         response = self._client.request(
             method,
             path,
@@ -568,20 +406,8 @@ class SermonArchiveClient:
     def _headers(
         self,
         *,
-        bearer_token: str | None,
-        include_csrf: bool,
         extra: dict[str, str] | None,
     ) -> dict[str, str]:
         headers = dict(extra or {})
-        token = bearer_token if bearer_token is not None else self._bearer_token
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        if include_csrf:
-            csrf_token = self._csrf_token()
-            if csrf_token:
-                headers["X-CSRF-Token"] = csrf_token
+        headers["Authorization"] = f"Bearer {self._bearer_token}"
         return headers
-
-    def _csrf_token(self) -> str | None:
-        value = self._client.cookies.get(self._csrf_cookie_name)
-        return str(value) if value else None

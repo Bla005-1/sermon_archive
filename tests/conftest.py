@@ -110,7 +110,7 @@ def client(db_session: Session, tmp_path, monkeypatch: pytest.MonkeyPatch) -> Ge
             user.is_staff = 1 if staff_header == "true" else 0
             db.commit()
         request.state.current_user = user
-        request.state.auth_method = "test"
+        request.state.auth_method = "session"
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[require_auth] = override_require_auth

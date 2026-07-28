@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db.models import ApiUsers, Sermons
+from app.db.models import ApiUsers, ApiUsersAccountType, Sermons
 from app.services import auth_service
 from app.services._mappers import user_summary_schema
 from sermon_archive.schemas import (
@@ -54,12 +54,20 @@ def _clean_password(value: str | None) -> str:
 
 
 def _require_staff(current_user: ApiUsers) -> None:
-    if not bool(current_user.is_staff):
+    if (
+        current_user.account_type != ApiUsersAccountType.HUMAN
+        or not bool(current_user.is_staff)
+    ):
         raise HTTPException(status_code=403, detail="Staff access required.")
 
 
 def _get_user_or_404(db: Session, user_id: int) -> ApiUsers:
-    user = db.scalar(select(ApiUsers).where(ApiUsers.user_id == user_id))
+    user = db.scalar(
+        select(ApiUsers).where(
+            ApiUsers.user_id == user_id,
+            ApiUsers.account_type == ApiUsersAccountType.HUMAN,
+        )
+    )
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
     return user
@@ -103,7 +111,11 @@ def list_users(
     is_staff: bool | None = None,
 ) -> list[UserSummary]:
     _require_staff(current_user)
-    stmt = select(ApiUsers).order_by(func.lower(ApiUsers.username), ApiUsers.user_id)
+    stmt = (
+        select(ApiUsers)
+        .where(ApiUsers.account_type == ApiUsersAccountType.HUMAN)
+        .order_by(func.lower(ApiUsers.username), ApiUsers.user_id)
+    )
     query = (q or "").strip()
     if query:
         like = f"%{query.lower()}%"
@@ -126,6 +138,7 @@ def create_user(
         username=_clean_username(payload.username),
         email=_clean_email(payload.email),
         password_hash=auth_service._password_hash(_clean_password(payload.password)),
+        account_type=ApiUsersAccountType.HUMAN,
         is_active=1 if payload.is_active else 0,
         is_staff=1 if payload.is_staff else 0,
     )

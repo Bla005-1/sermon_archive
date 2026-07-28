@@ -24,22 +24,3 @@ POST {{baseUrl}}/api/auth/refresh/
 
 ### Logout and clear cookies
 POST {{baseUrl}}/api/auth/logout/
-
-### Login with token auth (bearer)
-# @name tokenLogin
-POST {{baseUrl}}/api/auth/token/
-Content-Type: application/json
-
-{
-  "username": "{{username}}",
-  "password": "{{password}}",
-  "token_name": "vscode-rest-client"
-}
-
-### Auth check using bearer token from tokenLogin response
-GET {{baseUrl}}/api/auth/me/
-Authorization: Bearer {{tokenLogin.response.body.$.access_token}}
-
-### Revoke the same bearer token
-POST {{baseUrl}}/api/auth/token/revoke/
-Authorization: Bearer {{tokenLogin.response.body.$.access_token}}

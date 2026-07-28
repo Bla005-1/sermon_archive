@@ -35,7 +35,6 @@ class Settings(BaseSettings):
     csrf_cookie_name: str = "csrftoken"
 
     session_ttl_minutes: int = 10080
-    token_ttl_minutes: int = 1440
 
     @field_validator("cors_allowed_origins", "allowed_hosts", mode="before")
     @classmethod

@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.db.models import ApiUsers
 from app.services import auth_service
-from tests.factories import seed_token, seed_user
+from tests.factories import seed_session, seed_user
 
 
 STAFF_HEADERS = {"X-Test-Is-Staff": "true"}
@@ -94,8 +94,10 @@ def test_current_user_can_update_profile_and_change_password(
     client, db_session, monkeypatch
 ):
     seed_user(db_session)
-    raw_token = "plain-test-token"
-    seed_token(db_session, auth_service._token_hash(raw_token))
+    seed_session(db_session)
+    client.cookies.set("sessionid", "session-1")
+    client.cookies.set("csrftoken", "csrf-1")
+    session_headers = {"X-CSRF-Token": "csrf-1"}
     monkeypatch.setattr(
         auth_service,
         "_verify_password",
@@ -104,7 +106,7 @@ def test_current_user_can_update_profile_and_change_password(
 
     profile = client.patch(
         "/api/auth/me",
-        headers={"Authorization": f"Bearer {raw_token}"},
+        headers=session_headers,
         json={"username": "updated-reader", "email": "updated@example.test"},
     )
     assert profile.status_code == 200
@@ -112,7 +114,7 @@ def test_current_user_can_update_profile_and_change_password(
 
     wrong = client.post(
         "/api/auth/me/password",
-        headers={"Authorization": f"Bearer {raw_token}"},
+        headers=session_headers,
         json={"current_password": "wrong", "new_password": "new"},
     )
     assert wrong.status_code == 400
@@ -120,7 +122,7 @@ def test_current_user_can_update_profile_and_change_password(
 
     changed = client.post(
         "/api/auth/me/password",
-        headers={"Authorization": f"Bearer {raw_token}"},
+        headers=session_headers,
         json={"current_password": "old", "new_password": "new"},
     )
     assert changed.status_code == 200

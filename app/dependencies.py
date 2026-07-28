@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.services import auth_service
+from app.db.models import ApiUsersAccountType
 
 
 def get_db():
@@ -26,5 +27,9 @@ def require_auth(
 
 def require_staff(request: Request, _: None = Depends(require_auth)) -> None:
     """Require an authenticated staff account."""
-    if not bool(request.state.current_user.is_staff):
+    if (
+        request.state.auth_method != "session"
+        or request.state.current_user.account_type != ApiUsersAccountType.HUMAN
+        or not bool(request.state.current_user.is_staff)
+    ):
         raise HTTPException(status_code=403, detail="Staff access is required.")

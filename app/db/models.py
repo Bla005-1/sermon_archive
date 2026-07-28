@@ -50,17 +50,31 @@ class ScriptureReferencesSourceType(str, enum.Enum):
     LIBRARY_ITEM_UNIT = 'library_item_unit'
     SERMON = 'sermon'
 
+class ApiUsersAccountType(str, enum.Enum):
+    HUMAN = 'human'
+    SERVICE = 'service'
+
 
 class ApiUsers(Base):
     __tablename__ = 'api_users'
     __table_args__ = (
+        CheckConstraint(
+            "(account_type = 'human' AND password_hash IS NOT NULL) OR "
+            "(account_type = 'service' AND password_hash IS NULL AND is_staff = 0)",
+            name='ck_api_users_account_type_auth',
+        ),
         Index('uq_api_users_email', 'email', unique=True),
         Index('uq_api_users_username', 'username', unique=True)
     )
 
     user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True)
     username: Mapped[str] = mapped_column(String(150), nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255))
+    account_type: Mapped[ApiUsersAccountType] = mapped_column(
+        Enum(ApiUsersAccountType, values_callable=lambda cls: [member.value for member in cls]),
+        nullable=False,
+        server_default=text("'human'"),
+    )
     is_active: Mapped[int] = mapped_column(TINYINT(unsigned=True), nullable=False, server_default=text("'1'"))
     is_staff: Mapped[int] = mapped_column(TINYINT(unsigned=True), nullable=False, server_default=text("'0'"))
     created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
@@ -186,7 +200,7 @@ class ApiAccessTokens(Base):
     user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False, server_default=text('CURRENT_TIMESTAMP'))
-    expires_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP, nullable=False)
+    expires_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
     token_name: Mapped[Optional[str]] = mapped_column(String(128))
     last_used_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)
     revoked_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP)

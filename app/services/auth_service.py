@@ -9,17 +9,14 @@ import secrets
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.db.models import ApiAccessTokens, ApiSessions, ApiUsers
+from app.db.models import ApiAccessTokens, ApiSessions, ApiUsers, ApiUsersAccountType
 from sermon_archive.schemas import (
     CsrfResponse,
     LoginRequest,
-    TokenLoginRequest,
-    TokenResponse,
-    TokenRevokeResponse,
     UserResponse,
 )
 
@@ -159,7 +156,9 @@ def _authenticate_session(db: Session, session_id: str) -> AuthContext | None:
 
     user = db.scalar(
         select(ApiUsers).where(
-            ApiUsers.user_id == session.user_id, ApiUsers.is_active == 1
+            ApiUsers.user_id == session.user_id,
+            ApiUsers.is_active == 1,
+            ApiUsers.account_type == ApiUsersAccountType.HUMAN,
         )
     )
     if user is None:
@@ -177,7 +176,8 @@ def _authenticate_token(db: Session, raw_token: str) -> AuthContext | None:
         select(ApiAccessTokens).where(
             ApiAccessTokens.token_hash == _token_hash(raw_token),
             ApiAccessTokens.revoked_at.is_(None),
-            ApiAccessTokens.expires_at > now,
+            or_(ApiAccessTokens.expires_at.is_(None), ApiAccessTokens.expires_at > now),
+            ApiAccessTokens.scopes == "archive:read",
         )
     )
     if token is None:
@@ -185,7 +185,9 @@ def _authenticate_token(db: Session, raw_token: str) -> AuthContext | None:
 
     user = db.scalar(
         select(ApiUsers).where(
-            ApiUsers.user_id == token.user_id, ApiUsers.is_active == 1
+            ApiUsers.user_id == token.user_id,
+            ApiUsers.is_active == 1,
+            ApiUsers.account_type == ApiUsersAccountType.SERVICE,
         )
     )
     if user is None:
@@ -219,6 +221,12 @@ def require_authenticated_context(db: Session, request: Request) -> AuthContext:
     if context is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required."
+        )
+
+    if context.method == "token" and request.method.upper() not in {"GET", "HEAD"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Service tokens are read-only.",
         )
 
     if (
@@ -261,75 +269,22 @@ def login_user(
 
     user = db.scalar(
         select(ApiUsers).where(
-            func.lower(ApiUsers.username) == username.lower(), ApiUsers.is_active == 1
+            func.lower(ApiUsers.username) == username.lower(),
+            ApiUsers.is_active == 1,
+            ApiUsers.account_type == ApiUsersAccountType.HUMAN,
         )
     )
-    if user is None or not _verify_password(password, user.password_hash):
+    if (
+        user is None
+        or not user.password_hash
+        or not _verify_password(password, user.password_hash)
+    ):
         raise HTTPException(status_code=400, detail="Invalid credentials.")
 
     session = _create_session(db, user, request)
     _set_session_cookie(response, session.session_id)
     _set_csrf_cookie(response, session.csrf_token)
     return _to_user_response(user)
-
-
-def issue_token(
-    db: Session, request: Request, payload: TokenLoginRequest
-) -> TokenResponse:
-    """Authenticate credentials and issue a new bearer token record."""
-    username = (payload.username or "").strip()
-    password = payload.password or ""
-    if not username or not password:
-        raise HTTPException(
-            status_code=400, detail="Username and password are required."
-        )
-
-    user = db.scalar(
-        select(ApiUsers).where(
-            func.lower(ApiUsers.username) == username.lower(), ApiUsers.is_active == 1
-        )
-    )
-    if user is None or not _verify_password(password, user.password_hash):
-        raise HTTPException(status_code=400, detail="Invalid credentials.")
-
-    raw_token = secrets.token_urlsafe(48)
-    now = _utcnow()
-    token = ApiAccessTokens(
-        user_id=user.user_id,
-        token_hash=_token_hash(raw_token),
-        token_name=payload.token_name,
-        expires_at=now + dt.timedelta(minutes=settings.token_ttl_minutes),
-        last_used_at=now,
-    )
-    user.last_login_at = now
-    db.add(token)
-    db.commit()
-
-    return TokenResponse(
-        access_token=raw_token,
-        token_type="bearer",
-        expires_at=token.expires_at,
-    )
-
-
-def revoke_token(db: Session, request: Request) -> TokenRevokeResponse:
-    """Revoke the currently supplied bearer token."""
-    raw_token = _extract_bearer_token(request)
-    if not raw_token:
-        raise HTTPException(status_code=400, detail="Bearer token required.")
-
-    token = db.scalar(
-        select(ApiAccessTokens).where(
-            ApiAccessTokens.token_hash == _token_hash(raw_token),
-            ApiAccessTokens.revoked_at.is_(None),
-        )
-    )
-    if token is None:
-        raise HTTPException(status_code=404, detail="Token not found.")
-
-    token.revoked_at = _utcnow()
-    db.commit()
-    return TokenRevokeResponse(detail="Token revoked.")
 
 
 def logout_user(db: Session, request: Request, response: Response) -> None:

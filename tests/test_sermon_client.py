@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 import httpx
 import pytest
 
@@ -13,18 +11,13 @@ from sermon_archive.schemas import (
     LibraryItemListResponse,
     LibraryItemUnit,
     LibraryUnitTypeEnum,
-    PartialScriptureReference,
     Sermon,
     SermonBrowseItem,
     SermonBrowseListResponse,
     SermonBrowseType,
     SermonListResponse,
     SermonSuggestionsResponse,
-    ScriptureExtractionResponse,
     ScriptureReference,
-    ScriptureReferenceCreate,
-    ScriptureReferenceUpdate,
-    TokenResponse,
     UserResponse,
     VerseCommentaryResponse,
     VerseLibraryItemReferenceResponse,
@@ -310,15 +303,11 @@ def test_crud_get_methods_build_expected_requests_and_parse_models():
     assert seen == list(responses)
 
 
-def test_library_file_helpers_upload_download_and_preview():
+def test_library_file_helpers_download_and_preview():
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        if request.url.path == "/api/library/items/100/files":
-            assert request.method == "POST"
-            assert b'name="file"; filename="outline.docx"' in request.content
-            return _json_response(LIBRARY_FILE, status_code=201)
         if request.url.path.endswith("/download"):
             return httpx.Response(200, content=b"download bytes")
         if request.url.path.endswith("/preview"):
@@ -331,94 +320,12 @@ def test_library_file_helpers_upload_download_and_preview():
         transport=httpx.MockTransport(handler),
     )
 
-    uploaded = client.upload_library_item_file(
-        100,
-        "outline.docx",
-        b"docx bytes",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
     downloaded = client.download_library_item_file(100, 110)
     previewed = client.preview_library_item_file(100, 110)
 
-    assert isinstance(uploaded, LibraryItemFile)
     assert downloaded == b"download bytes"
     assert previewed == b"preview bytes"
     assert requests[0].headers["Authorization"] == "Bearer token-123"
-
-
-def test_scripture_extraction_client_helpers():
-    requests: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return _json_response(SCRIPTURE_EXTRACTION)
-
-    client = SermonArchiveClient(
-        "http://testserver",
-        bearer_token="token-123",
-        transport=httpx.MockTransport(handler),
-    )
-
-    preview = client.extract_scripture_references("See Gen 1:1")
-    library = client.extract_library_item_unit_scripture_references(100, 120)
-    sermon = client.extract_sermon_scripture_references(10)
-
-    assert isinstance(preview, ScriptureExtractionResponse)
-    assert isinstance(library, ScriptureExtractionResponse)
-    assert isinstance(sermon, ScriptureExtractionResponse)
-    assert [request.url.path for request in requests] == [
-        "/api/scripture/extract",
-        "/api/library/items/100/units/120/scripture-references/extract",
-        "/api/sermons/10/scripture-references/extract",
-    ]
-
-
-def test_scripture_reference_crud_client_helpers():
-    requests: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        if request.method == "DELETE":
-            return httpx.Response(204)
-        return _json_response(SCRIPTURE_REFERENCE)
-
-    client = SermonArchiveClient(
-        "http://testserver",
-        bearer_token="token-123",
-        transport=httpx.MockTransport(handler),
-    )
-
-    created = client.create_scripture_reference(
-        ScriptureReferenceCreate(
-            source_type="sermon",
-            source_id=10,
-            reference_text="Gen 1:1",
-        )
-    )
-    updated = client.update_scripture_reference(
-        80,
-        ScriptureReferenceUpdate(
-            source_type="sermon",
-            source_id=10,
-            reference_text="Gen 1:1",
-        ),
-    )
-    patched = client.patch_scripture_reference(
-        80,
-        PartialScriptureReference(context_text="patched"),
-    )
-    deleted = client.delete_scripture_reference(80)
-
-    assert isinstance(created, ScriptureReference)
-    assert isinstance(updated, ScriptureReference)
-    assert isinstance(patched, ScriptureReference)
-    assert deleted is None
-    assert [(request.method, request.url.path) for request in requests] == [
-        ("POST", "/api/scripture/references"),
-        ("PUT", "/api/scripture/references/80"),
-        ("PATCH", "/api/scripture/references/80"),
-        ("DELETE", "/api/scripture/references/80"),
-    ]
 
 
 def test_bearer_auth_header_is_sent_and_can_be_updated():
@@ -437,14 +344,13 @@ def test_bearer_auth_header_is_sent_and_can_be_updated():
     assert isinstance(client.me(), UserResponse)
     client.set_bearer_token("second-token")
     client.me()
-    client.set_bearer_token(None)
-    client.me()
 
     assert authorization_headers == [
         "Bearer first-token",
         "Bearer second-token",
-        None,
     ]
+    with pytest.raises(ValueError, match="required"):
+        client.set_bearer_token("")
 
 
 def test_get_verse_uses_direct_reference_endpoint_and_parses_response():
@@ -457,6 +363,7 @@ def test_get_verse_uses_direct_reference_endpoint_and_parses_response():
 
     client = SermonArchiveClient(
         "http://testserver",
+        bearer_token="token-123",
         transport=httpx.MockTransport(handler),
     )
 
@@ -471,60 +378,9 @@ def test_get_verse_uses_direct_reference_endpoint_and_parses_response():
     assert seen_request.url.params["translation"] == "KJV"
 
 
-def test_auth_methods_send_payloads_cookies_csrf_and_parse_responses():
-    requests: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        if request.url.path == "/api/auth/csrf":
-            return httpx.Response(
-                200,
-                json={"detail": "CSRF cookie set."},
-                headers={"Set-Cookie": "csrftoken=csrf-123; Path=/"},
-            )
-        if request.url.path == "/api/auth/login":
-            assert json.loads(request.content) == {
-                "username": "reader",
-                "password": "secret",
-            }
-            return _json_response(USER)
-        if request.url.path == "/api/auth/token":
-            assert json.loads(request.content) == {
-                "username": "reader",
-                "password": "secret",
-                "token_name": "ci",
-            }
-            return _json_response(TOKEN)
-        if request.url.path == "/api/auth/token/revoke":
-            return _json_response({"detail": "Token revoked."})
-        if request.url.path == "/api/auth/refresh":
-            return _json_response(USER)
-        if request.url.path == "/api/auth/logout":
-            return httpx.Response(200)
-        raise AssertionError(f"Unexpected path {request.url.path}")
-
-    client = SermonArchiveClient(
-        "http://testserver",
-        bearer_token="stored-token",
-        transport=httpx.MockTransport(handler),
-    )
-
-    client.csrf()
-    assert isinstance(client.login("reader", "secret"), UserResponse)
-    assert isinstance(client.issue_token("reader", "secret", "ci"), TokenResponse)
-    assert client.revoke_token("override-token").detail == "Token revoked."
-    assert isinstance(client.refresh(), UserResponse)
-    client.logout()
-
-    by_path = {request.url.path: request for request in requests}
-    assert by_path["/api/auth/login"].headers["X-CSRF-Token"] == "csrf-123"
-    assert by_path["/api/auth/token"].headers["X-CSRF-Token"] == "csrf-123"
-    assert by_path["/api/auth/refresh"].headers["X-CSRF-Token"] == "csrf-123"
-    assert by_path["/api/auth/logout"].headers["X-CSRF-Token"] == "csrf-123"
-    assert (
-        by_path["/api/auth/token/revoke"].headers["Authorization"]
-        == "Bearer override-token"
-    )
+def test_client_requires_a_machine_token():
+    with pytest.raises(ValueError, match="required"):
+        SermonArchiveClient("http://testserver", bearer_token="")
 
 
 def test_error_includes_status_detail_and_body_for_json_response():
@@ -533,6 +389,7 @@ def test_error_includes_status_detail_and_body_for_json_response():
 
     client = SermonArchiveClient(
         "http://testserver",
+        bearer_token="token-123",
         transport=httpx.MockTransport(handler),
     )
 
@@ -551,6 +408,7 @@ def test_error_uses_text_body_for_non_json_response():
 
     client = SermonArchiveClient(
         "http://testserver",
+        bearer_token="token-123",
         transport=httpx.MockTransport(handler),
     )
 

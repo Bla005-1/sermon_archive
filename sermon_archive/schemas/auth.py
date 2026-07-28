@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Literal
 
 from sermon_archive.schemas.base import APIModel
 
@@ -6,12 +7,6 @@ from sermon_archive.schemas.base import APIModel
 class LoginRequest(APIModel):
     username: str
     password: str
-
-
-class TokenLoginRequest(APIModel):
-    username: str
-    password: str
-    token_name: str | None = None
 
 
 class UserResponse(APIModel):
@@ -76,11 +71,34 @@ class CsrfResponse(APIModel):
     detail: str
 
 
-class TokenResponse(APIModel):
+class ServiceAccountCreateRequest(APIModel):
+    name: str
+
+
+class ServiceAccountResponse(APIModel):
+    id: int
+    name: str
+    is_active: bool
+    created_at: dt.datetime | None = None
+    token_count: int = 0
+
+
+class ServiceAccountUpdateRequest(APIModel):
+    is_active: bool
+
+
+class ServiceTokenCreateRequest(APIModel):
+    name: str
+
+
+class ServiceTokenResponse(APIModel):
+    id: int
+    name: str
+    created_at: dt.datetime | None = None
+    last_used_at: dt.datetime | None = None
+    revoked_at: dt.datetime | None = None
+    scope: Literal["archive:read"] = "archive:read"
+
+
+class ServiceTokenCreatedResponse(ServiceTokenResponse):
     access_token: str
-    token_type: str
-    expires_at: dt.datetime
-
-
-class TokenRevokeResponse(APIModel):
-    detail: str
