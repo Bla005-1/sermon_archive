@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime as dt
+
 from app.db.models import (
     IndexSyncOperation,
     IndexSyncOutbox,
@@ -118,7 +120,7 @@ def test_dispatcher_marks_accepted_event_delivered(db_session, monkeypatch):
     assert db_session.get(IndexSyncOutbox, event.event_id).status == IndexSyncStatus.DELIVERED
 
 
-def test_dispatcher_records_terminal_delivery_failure(db_session, monkeypatch):
+def test_dispatcher_records_failed_delivery_after_fast_retries(db_session, monkeypatch):
     event = index_sync_service.enqueue(db_session, 43, IndexSyncOperation.UPSERT)
     db_session.commit()
     sessions = sessionmaker(bind=db_session.bind, expire_on_commit=False)
@@ -136,3 +138,29 @@ def test_dispatcher_records_terminal_delivery_failure(db_session, monkeypatch):
     failed = db_session.get(IndexSyncOutbox, event.event_id)
     assert failed.status == IndexSyncStatus.FAILED
     assert failed.last_error == "search offline"
+
+
+def test_dispatcher_retries_failed_delivery_after_search_recovers(
+    db_session, monkeypatch
+):
+    event = index_sync_service.enqueue(db_session, 43, IndexSyncOperation.UPSERT)
+    event.status = IndexSyncStatus.FAILED
+    event.attempt_count = 5
+    event.next_attempt_at = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(
+        seconds=1
+    )
+    db_session.commit()
+    sessions = sessionmaker(bind=db_session.bind, expire_on_commit=False)
+    monkeypatch.setattr(index_sync_service, "SessionLocal", sessions)
+    delivered: list[int] = []
+    monkeypatch.setattr(
+        index_sync_service.search_index_client,
+        "queue_sermon",
+        lambda sermon_id: delivered.append(sermon_id) or {"job_id": 1},
+    )
+
+    assert index_sync_service.dispatch_once() is True
+
+    db_session.expire_all()
+    assert delivered == [43]
+    assert db_session.get(IndexSyncOutbox, event.event_id).status == IndexSyncStatus.DELIVERED

@@ -99,14 +99,18 @@ class SermonCoverageItem(APIModel):
 
 
 class IndexOverview(APIModel):
+    search_available: bool = True
     active_generation: dict[str, Any] | None = None
     domains: list[dict[str, Any]] = Field(default_factory=list)
     source_sermon_count: int | None = None
     indexed_sermon_count: int = 0
     missing_sermon_count: int | None = None
     stale_sermon_count: int | None = None
+    non_indexable_sermon_count: int = 0
+    orphaned_sermon_count: int | None = None
     missing_sermons: list[SermonCoverageItem] = Field(default_factory=list)
     stale_sermons: list[SermonCoverageItem] = Field(default_factory=list)
+    orphaned_sermons: list[SermonCoverageItem] = Field(default_factory=list)
     recent_job_counts: dict[str, int] = Field(default_factory=dict)
     latest_failures: list[IndexJobAudit] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

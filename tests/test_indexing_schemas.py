@@ -8,6 +8,7 @@ def test_index_overview_preserves_actionable_sermon_coverage_details():
             "indexed_sermon_count": 1,
             "missing_sermon_count": 1,
             "stale_sermon_count": 1,
+            "orphaned_sermon_count": 1,
             "missing_sermons": [
                 {
                     "sermon_id": 12,
@@ -25,9 +26,17 @@ def test_index_overview_preserves_actionable_sermon_coverage_details():
                     "indexed_at": "2026-01-05T12:00:00Z",
                 }
             ],
+            "orphaned_sermons": [
+                {
+                    "sermon_id": 14,
+                    "title": "Deleted source sermon",
+                    "indexed_at": "2026-01-05T12:00:00Z",
+                }
+            ],
         }
     )
 
     assert overview.missing_sermons[0].title == "Missing sermon"
     assert overview.stale_sermons[0].sermon_id == 13
     assert overview.missing_sermon_count == len(overview.missing_sermons)
+    assert overview.orphaned_sermon_count == len(overview.orphaned_sermons)

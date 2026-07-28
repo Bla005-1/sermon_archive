@@ -59,7 +59,9 @@ def dispatch_once() -> bool:
         event = db.scalar(
             select(IndexSyncOutbox)
             .where(
-                IndexSyncOutbox.status == IndexSyncStatus.PENDING,
+                IndexSyncOutbox.status.in_(
+                    [IndexSyncStatus.PENDING, IndexSyncStatus.FAILED]
+                ),
                 IndexSyncOutbox.next_attempt_at <= now,
             )
             .order_by(IndexSyncOutbox.event_id)
@@ -88,6 +90,10 @@ def dispatch_once() -> bool:
                 failed.updated_at = dt.datetime.now(dt.UTC).replace(tzinfo=None)
                 if failed.attempt_count >= settings.index_sync_max_attempts:
                     failed.status = IndexSyncStatus.FAILED
+                    # Keep retrying at a capped interval. "Failed" remains
+                    # visible in audit counts, but a temporary search outage
+                    # does not require a new sermon edit or backend restart.
+                    failed.next_attempt_at = now + dt.timedelta(minutes=5)
                 else:
                     failed.status = IndexSyncStatus.PENDING
                     delay = min(300, 2 ** min(failed.attempt_count, 8))
